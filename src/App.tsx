@@ -22,6 +22,7 @@ import { CustomAppBuilderModal } from './components/apps/CustomAppBuilderModal';
 import { 
   AppTab, 
   ThemeMode, 
+  LanguageMode,
   ContentSource, 
   CapturedVideo, 
   ScheduledJob, 
@@ -47,8 +48,9 @@ export default function App() {
     document.title = "SignalCatcher";
   }, []);
 
-  // Theme State
+  // Theme & Language State
   const [theme, setTheme] = useState<ThemeMode>('cyberpunk');
+  const [language, setLanguage] = useState<LanguageMode>('pt');
   
   // Backend Status Simulation
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(true);
@@ -209,6 +211,8 @@ export default function App() {
       <Header
         theme={theme}
         setTheme={setTheme}
+        language={language}
+        setLanguage={setLanguage}
         isBackendConnected={isBackendConnected}
         setIsBackendConnected={setIsBackendConnected}
         latency={latency}
@@ -277,6 +281,7 @@ export default function App() {
         <main className="flex-1 overflow-y-auto relative p-2 sm:p-4 md:p-6 bg-[#09090b]">
           {activeTab.appId === 'signalcatcher' && (
             <SignalCatcherApp
+              language={language}
               sources={sources}
               setSources={setSources}
               captures={captures}
