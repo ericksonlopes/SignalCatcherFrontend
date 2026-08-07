@@ -48,7 +48,7 @@ export const D3CustomHeatmap: React.FC<D3CustomHeatmapProps> = ({ data }) => {
 
     const colorScale = d3
       .scaleSequential()
-      .interpolator(d3.interpolateCyan)
+      .interpolator(d3.interpolateRgb('#18181b', '#6366f1'))
       .domain([0, 100]);
 
     // X axis
