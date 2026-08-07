@@ -48,6 +48,42 @@ export default function App() {
     document.title = "SignalCatcher";
   }, []);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    fetch(`http://eriberry.local:5001/api/youtube/content?page=${currentPage}&limit=20`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.items) {
+          const fetchedCaptures: CapturedVideo[] = data.items.map((item: any) => ({
+            id: item.id || `vid-${Math.random()}`,
+            sourceId: 'api',
+            sourceName: item.channel_name || 'YouTube API',
+            sourceAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+            title: item.title,
+            videoUrl: item.url,
+            thumbnail: item.thumbnail || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80',
+            publishedAt: new Date().toISOString(),
+            duration: item.duration || '0:00',
+            views: 0,
+            likes: 0,
+            commentsCount: 0,
+            status: item.step || 'PENDING_DOWNLOAD',
+            postgresRecordId: item.id || '',
+            tags: item.tags || [],
+            summary: '',
+            sentimentScore: 0
+          }));
+          setCaptures(fetchedCaptures);
+          if (data.total_pages) {
+            setTotalPages(data.total_pages);
+          }
+        }
+      })
+      .catch(err => console.error("Failed to fetch API data", err));
+  }, [currentPage]);
+
   // Theme & Language State
   const [theme, setTheme] = useState<ThemeMode>('cyberpunk');
   const [language, setLanguage] = useState<LanguageMode>('pt');
@@ -290,6 +326,9 @@ export default function App() {
               setJobs={setJobs}
               onTriggerJob={handleTriggerJob}
               onAddLog={addLog}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
             />
           )}
 

@@ -1,36 +1,25 @@
-import React, { useState } from 'react';
-import { 
-  Radio, 
-  Database, 
-  Video, 
-  Clock, 
-  Play, 
-  Plus, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  AlertCircle, 
-  RefreshCw, 
-  ExternalLink, 
-  Tag, 
-  ThumbsUp, 
-  MessageSquare, 
-  Eye, 
-  Zap, 
-  Sliders, 
-  BarChart2, 
-  Terminal,
-  Calendar,
-  Sparkles,
-  PauseCircle,
-  PlayCircle,
-  X,
-  UploadCloud,
+import React, {useState} from 'react';
+import {
+  Clock,
+  Database,
+  ExternalLink,
   ListVideo,
-  PlusCircle
+  PauseCircle,
+  Play,
+  PlayCircle,
+  Plus,
+  Radio,
+  RefreshCw,
+  Search,
+  Sparkles,
+  UploadCloud,
+  Video,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-import { CapturedVideo, ContentSource, ScheduledJob, LanguageMode } from '../../types';
-import { getTranslation } from '../../locales';
+import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
+import {getTranslation} from '../../locales';
 
 interface SignalCatcherAppProps {
   language?: LanguageMode;
@@ -42,6 +31,9 @@ interface SignalCatcherAppProps {
   setJobs: React.Dispatch<React.SetStateAction<ScheduledJob[]>>;
   onTriggerJob: (jobId: string) => void;
   onAddLog: (sourceApp: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
@@ -53,12 +45,14 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   jobs,
   setJobs,
   onTriggerJob,
-  onAddLog
+  onAddLog,
+  currentPage = 1,
+  totalPages = 1,
+  onPageChange
 }) => {
   const { t } = getTranslation(language);
   const [subTab, setSubTab] = useState<'captures' | 'sources' | 'jobs' | 'stats'>('captures');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string>('all');
   const [isAddingSource, setIsAddingSource] = useState(false);
   const [isCapturingNow, setIsCapturingNow] = useState(false);
 
@@ -75,17 +69,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [newSourceName, setNewSourceName] = useState('');
   const [newSourceUrl, setNewSourceUrl] = useState('');
 
-  // Extract all unique tags
-  const allTags = Array.from(new Set(captures.flatMap((c) => c.tags)));
-
   // Filtered captures
   const filteredCaptures = captures.filter((c) => {
     const matchesQuery = 
       c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.sourceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.summary?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTag = selectedTag === 'all' || c.tags.includes(selectedTag);
-    return matchesQuery && matchesTag;
+    return matchesQuery;
   });
 
   // Handler for POST /api/youtube/sources
@@ -451,46 +441,18 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 font-mono"
               />
             </div>
-
-            {/* Tag Selector */}
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto scrollbar-none text-xs font-mono">
-              <button
-                onClick={() => setSelectedTag('all')}
-                className={`px-3 py-1.5 rounded-xl border text-[11px] transition-all ${
-                  selectedTag === 'all'
-                    ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300 font-bold'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                {t('allTags')}
-              </button>
-              {allTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => setSelectedTag(tag)}
-                  className={`px-3 py-1.5 rounded-xl border text-[11px] whitespace-nowrap transition-all ${
-                    selectedTag === tag
-                      ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300 font-bold'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Videos Bento Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
             {filteredCaptures.map((video) => (
               <div
                 key={video.id}
-                className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
+                className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
               >
                 <div>
                   {/* Card Header: Channel Info */}
                   <div className="flex items-center gap-2 mb-3">
-                    <img src={video.sourceAvatar} alt="" className="w-5 h-5 rounded-full" />
                     <span className="text-xs font-semibold text-zinc-200">{video.sourceName}</span>
                   </div>
 
@@ -507,6 +469,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-zinc-950/90 text-white font-mono text-[10px] border border-zinc-700">
                       {video.duration}
                     </span>
+
+                    {/* Step Badge */}
+                    {video.status && (
+                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 text-emerald-400 text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md">
+                        <span>{video.status.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
 
                     {/* PostgreSQL Record ID Badge */}
                     <div className="absolute top-2 right-2 flex items-center gap-1 bg-indigo-500/10 text-indigo-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-indigo-500/20 backdrop-blur-md">
@@ -527,12 +496,17 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   )}
 
                   {/* Tags */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {video.tags.map((tItem) => (
-                      <span key={tItem} className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800">
+                  <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-auto pt-2">
+                    {video.tags.slice(0, 3).map((tItem) => (
+                      <span key={tItem} className="text-[10px] shrink truncate max-w-[90px] font-mono px-2.5 py-0.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800" title={tItem}>
                         #{tItem}
                       </span>
                     ))}
+                    {video.tags.length > 3 && (
+                      <span className="text-[10px] shrink-0 font-mono px-2 py-0.5 rounded-full bg-zinc-800/50 text-zinc-400 border border-zinc-700/50" title={video.tags.slice(3).join(', ')}>
+                        +{video.tags.length - 3}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -551,6 +525,29 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               </div>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && onPageChange && (
+            <div className="flex items-center justify-center gap-4 mt-8 mb-4">
+              <button
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-sm font-mono text-zinc-300">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

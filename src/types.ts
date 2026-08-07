@@ -41,7 +41,7 @@ export interface CapturedVideo {
   views: number;
   likes: number;
   commentsCount: number;
-  status: 'ingested' | 'processing' | 'analyzed' | 'archived';
+  status: string;
   postgresRecordId: string;
   tags: string[];
   summary?: string;
