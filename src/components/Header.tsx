@@ -7,9 +7,7 @@ import {
   Bell, 
   Sun, 
   Moon, 
-  Zap,
-  Database,
-  RefreshCw
+  Zap
 } from 'lucide-react';
 import { ThemeMode } from '../types';
 
@@ -86,35 +84,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Status Metrics & Quick Action Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Backend & DB Status Pills */}
-        <div className="hidden lg:flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800 text-xs font-mono">
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${isBackendConnected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-            <span className="text-zinc-300">FastAPI</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-indigo-400">{latency}ms</span>
-          </div>
-          <span className="text-zinc-700">|</span>
-          <div className="flex items-center gap-1.5 text-zinc-400" title="PostgreSQL Database Connection">
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-[11px] text-zinc-300">PostgreSQL OK</span>
-          </div>
-        </div>
-
-        {/* Live Stream Simulation Toggle */}
-        <button
-          onClick={() => setIsSimulatingLive(!isSimulatingLive)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-            isSimulatingLive 
-              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 shadow-sm' 
-              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-          }`}
-          title="Alternar Simulação em Tempo Real (Event Stream)"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isSimulatingLive ? 'animate-spin text-indigo-400' : ''}`} />
-          <span className="hidden sm:inline">Live Stream</span>
-        </button>
-
         {/* Theme Mode Toggle */}
         <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1">
           <button

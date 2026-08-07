@@ -10,7 +10,6 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Header } from './components/Header';
-import { TabNav } from './components/TabNav';
 import { CommandPalette } from './components/CommandPalette';
 import { NotificationDrawer } from './components/NotificationDrawer';
 import { SignalCatcherApp } from './components/apps/SignalCatcherApp';
@@ -221,15 +220,6 @@ export default function App() {
         unreadCount={unreadLogsCount}
         isSimulatingLive={isSimulatingLive}
         setIsSimulatingLive={setIsSimulatingLive}
-      />
-
-      {/* Tabs Navigation Bar */}
-      <TabNav
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onSelectTab={handleSelectTab}
-        onCloseTab={handleCloseTab}
-        onTogglePin={handleTogglePin}
       />
 
       {/* Main Workspace with Side Rail + Bento Content Area */}
