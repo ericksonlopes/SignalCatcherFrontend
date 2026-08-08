@@ -16,7 +16,8 @@ import {
   Video,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Youtube
 } from 'lucide-react';
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
@@ -34,7 +35,30 @@ interface SignalCatcherAppProps {
   currentPage?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
+  onOpenNotifications?: () => void;
+  onRefresh?: () => void;
 }
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'COMPLETED': return 'text-emerald-400';
+    case 'ERROR':
+    case 'COPYRIGHT_REMOVED':
+    case 'ACCOUNT_TERMINATED':
+    case 'VIDEO_REMOVED':
+    case 'PRIVATE_VIDEO':
+    case 'AGE_RESTRICTED':
+    case 'MEMBERS_ONLY':
+      return 'text-rose-400';
+    case 'PENDING_DOWNLOAD':
+    case 'DOWNLOADING':
+    case 'PENDING_METADATA_EXTRACTION':
+    case 'EXTRACTING_METADATA':
+      return 'text-amber-400';
+    default:
+      return 'text-zinc-400';
+  }
+};
 
 export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   language = 'pt',
@@ -48,7 +72,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   onAddLog,
   currentPage = 1,
   totalPages = 1,
-  onPageChange
+  onPageChange,
+  onOpenNotifications,
+  onRefresh
 }) => {
   const { t } = getTranslation(language);
   const [subTab, setSubTab] = useState<'captures' | 'sources' | 'jobs' | 'stats'>('captures');
@@ -59,6 +85,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   // Modal State
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'content' | 'playlist' | 'sources'>('content');
+  const [selectedVideo, setSelectedVideo] = useState<CapturedVideo | null>(null);
 
   // Form State for API Routes
   const [manualUrl, setManualUrl] = useState('');
@@ -84,41 +111,32 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     if (!newSourceUrl) return;
 
     setIsProcessingManual(true);
-    onAddLog('SignalCatcher', 'info', `POST /api/youtube/sources -> Request Body: { url: "${newSourceUrl}" }`);
+    onAddLog('SignalCatcher', 'info', `${t('notifSendingSource')} ${newSourceUrl}`);
 
     try {
-      const response = await fetch('/api/youtube/sources', {
+      const response = await fetch('http://eriberry.local:5001/api/youtube/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: newSourceUrl })
+        body: JSON.stringify({ name: newSourceUrl.split('@')[1] || 'Novo Canal', url: newSourceUrl })
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const resData = await response.json();
-      const apiSource = resData.data;
+      onAddLog('SignalCatcher', 'success', `${t('notifSuccessSource')} ${resData.id || 'OK'})`);
+      
+      if (onOpenNotifications) {
+        onOpenNotifications();
+      }
 
-      const newSource: ContentSource = {
-        id: apiSource?.id || `src-${Date.now()}`,
-        name: apiSource?.name || (newSourceUrl.includes('@') ? `@${newSourceUrl.split('@')[1]}` : 'Canal YouTube'),
-        type: 'youtube',
-        url: apiSource?.url || newSourceUrl,
-        channelId: apiSource?.channelId || `UC_${Math.random().toString(36).substring(2, 9)}`,
-        avatar: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
-        subscriberCount: apiSource?.subscriberCount || 25000,
-        lastCaptured: new Date().toISOString(),
-        status: 'active',
-        intervalMinutes: 60,
-        totalCaptured: 0
-      };
-
-      setSources([newSource, ...sources]);
-      onAddLog('SignalCatcher', 'success', `POST /api/youtube/sources [201 Created]: Canal ${newSource.name} registrado!`);
-    } catch (err) {
-      onAddLog('SignalCatcher', 'warning', `Sincronizado localmente.`);
-    } finally {
-      setIsProcessingManual(false);
-      setNewSourceName('');
       setNewSourceUrl('');
       setIsIngestionModalOpen(false);
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `${t('notifErrorSource')} ${err}`);
+    } finally {
+      setIsProcessingManual(false);
     }
   };
 
@@ -128,46 +146,37 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     if (!manualUrl) return;
 
     setIsProcessingManual(true);
-    onAddLog('SignalCatcher', 'info', `POST /api/youtube/content -> Request Body: { url: "${manualUrl}" }`);
+    onAddLog('SignalCatcher', 'info', `${t('notifSendingVideo')} ${manualUrl}`);
 
     try {
-      const response = await fetch('/api/youtube/content', {
+      const response = await fetch('http://eriberry.local:5001/api/youtube/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: manualUrl })
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const resData = await response.json();
-      const apiContent = resData.data;
+      
+      onAddLog('SignalCatcher', 'success', `${t('notifSuccessVideo')} ${resData.message || 'OK'})`);
+      
+      if (onOpenNotifications) {
+        onOpenNotifications();
+      }
 
-      const mockVideo: CapturedVideo = {
-        id: apiContent?.id || `vid-${Date.now()}`,
-        sourceId: apiContent?.sourceId || sources[0]?.id || 'src-1',
-        sourceName: apiContent?.sourceName || 'YouTube Direct Ingestion',
-        sourceAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        title: apiContent?.title || 'Vídeo Ingerido: Análise do Conteúdo e Metadados YouTube',
-        videoUrl: manualUrl,
-        thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80',
-        publishedAt: new Date().toISOString(),
-        duration: '12:45',
-        views: 1850,
-        likes: 240,
-        commentsCount: 32,
-        status: 'ingested',
-        postgresRecordId: apiContent?.postgresRecordId || `pg_vid_${Math.floor(Math.random() * 8999 + 1000)}`,
-        tags: ['YouTube', 'Video', 'ContentAPI'],
-        summary: apiContent?.summary || 'Conteúdo extraído do link fornecido e processado.',
-        sentimentScore: 0.94
-      };
+      if (onRefresh) {
+        onRefresh();
+      }
 
-      setCaptures([mockVideo, ...captures]);
-      onAddLog('SignalCatcher', 'success', `POST /api/youtube/content [201 Created]: ID ${mockVideo.postgresRecordId}`);
-    } catch (err) {
-      onAddLog('SignalCatcher', 'warning', `Sincronizado localmente.`);
-    } finally {
-      setIsProcessingManual(false);
       setManualUrl('');
       setIsIngestionModalOpen(false);
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `${t('notifErrorVideo')} ${err}`);
+    } finally {
+      setIsProcessingManual(false);
     }
   };
 
@@ -177,10 +186,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     if (!manualUrl) return;
 
     setIsProcessingManual(true);
-    onAddLog('SignalCatcher', 'info', `POST /api/youtube/playlist -> Request Body: { url: "${manualUrl}", save_in_playlist_folder: ${saveInPlaylistFolder} }`);
+    onAddLog('SignalCatcher', 'info', `${t('notifSendingPlaylist')} ${manualUrl}`);
 
     try {
-      const response = await fetch('/api/youtube/playlist', {
+      const response = await fetch('http://eriberry.local:5001/api/youtube/playlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -189,37 +198,28 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         })
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const resData = await response.json();
-      const apiItems = Array.isArray(resData.data) ? resData.data : [];
+      
+      onAddLog('SignalCatcher', 'success', `${t('notifSuccessPlaylist')} (${resData.message || 'OK'})`);
+      
+      if (onOpenNotifications) {
+        onOpenNotifications();
+      }
 
-      const newVideos: CapturedVideo[] = apiItems.map((item: any) => ({
-        id: item.id || `vid-${Date.now()}-${Math.random()}`,
-        sourceId: item.sourceId || sources[0]?.id || 'src-1',
-        sourceName: item.sourceName || 'YouTube Playlist Ingestion',
-        sourceAvatar: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
-        title: item.title,
-        videoUrl: manualUrl,
-        thumbnail: item.thumbnail || 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=600&auto=format&fit=crop&q=80',
-        publishedAt: item.publishedAt || new Date().toISOString(),
-        duration: item.duration || '18:30',
-        views: item.views || 4200,
-        likes: item.likes || 510,
-        commentsCount: item.commentsCount || 42,
-        status: 'ingested',
-        postgresRecordId: item.postgresRecordId || `pg_pl_${Math.floor(Math.random() * 8999 + 1000)}`,
-        tags: item.tags || ['YouTube', 'Playlist'],
-        summary: item.summary || 'Vídeo de playlist extraída automaticamente.',
-        sentimentScore: item.sentimentScore || 0.96
-      }));
+      if (onRefresh) {
+        onRefresh();
+      }
 
-      setCaptures([...newVideos, ...captures]);
-      onAddLog('SignalCatcher', 'success', `POST /api/youtube/playlist [201 Created]: ${newVideos.length} vídeos salvos.`);
-    } catch (err) {
-      onAddLog('SignalCatcher', 'warning', `Sincronizado localmente.`);
-    } finally {
-      setIsProcessingManual(false);
       setManualUrl('');
       setIsIngestionModalOpen(false);
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `${t('notifErrorPlaylist')} ${err}`);
+    } finally {
+      setIsProcessingManual(false);
     }
   };
 
@@ -291,15 +291,27 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     setIsAddingSource(false);
   };
 
-  const handleToggleSourceStatus = (id: string) => {
-    setSources(sources.map(s => {
-      if (s.id === id) {
-        const nextStatus = s.status === 'active' ? 'paused' : 'active';
-        onAddLog('SignalCatcher', 'info', `Status da fonte ${s.name} alterado para ${nextStatus}`);
-        return { ...s, status: nextStatus };
+  const handleToggleSourceStatus = async (id: string) => {
+    try {
+      const response = await fetch(`http://eriberry.local:5001/api/youtube/channels/${id}/status`, {
+        method: 'PATCH',
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return s;
-    }));
+      const data = await response.json();
+      
+      setSources(sources.map(s => {
+        if (s.id === id) {
+          const nextStatus = data.active ? 'active' : 'paused';
+          onAddLog('SignalCatcher', 'info', `Status da fonte ${s.name} alterado para ${nextStatus}`);
+          return { ...s, status: nextStatus };
+        }
+        return s;
+      }));
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `Erro ao alternar status do canal: ${err}`);
+    }
   };
 
   const handleManualCaptureTrigger = () => {
@@ -448,9 +460,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             {filteredCaptures.map((video) => (
               <div
                 key={video.id}
-                className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
+                className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-lg cursor-pointer hover:-translate-y-1 relative"
+                onClick={() => setSelectedVideo(video)}
               >
-                <div>
+                <div className="flex flex-col flex-1">
                   {/* Card Header: Channel Info */}
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-xs font-semibold text-zinc-200">{video.sourceName}</span>
@@ -458,11 +471,17 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
                   {/* Thumbnail & Badges */}
                   <div className="relative mb-3.5 rounded-xl overflow-hidden aspect-video bg-zinc-950 border border-zinc-800">
-                    <img
-                      src={video.thumbnail}
-                      alt={video.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                    {video.thumbnail ? (
+                      <img
+                        src={video.thumbnail}
+                        alt={video.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-zinc-900 group-hover:bg-zinc-800 transition-colors duration-300">
+                        <Youtube className="w-12 h-12 text-zinc-700 opacity-50 group-hover:text-red-600 group-hover:opacity-100 transition-all duration-300" />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
                     
                     {/* Duration Badge */}
@@ -472,7 +491,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
                     {/* Step Badge */}
                     {video.status && (
-                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 text-emerald-400 text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md">
+                      <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${getStatusColor(video.status)} text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
                         <span>{video.status.replace(/_/g, ' ')}</span>
                       </div>
                     )}
@@ -484,29 +503,45 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     </div>
                   </div>
 
-                  {/* Title & Summary */}
-                  <h3 className="font-bold text-sm text-zinc-100 group-hover:text-indigo-300 transition-colors line-clamp-2 mb-2">
+                  {/* Title */}
+                  <h3 className="font-bold text-sm text-zinc-100 group-hover:text-indigo-300 transition-colors duration-300 line-clamp-2 mb-2 h-[40px]">
                     {video.title}
                   </h3>
 
-                  {video.summary && (
-                    <p className="text-xs text-zinc-400 line-clamp-2 font-sans mb-3 bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/60">
-                      {video.summary}
-                    </p>
-                  )}
+                  <div className="mt-auto pt-2 flex flex-col gap-3">
+                    {/* Description Box - Fixed height for perfect alignment */}
+                    <div className="h-[52px] w-full">
+                      {video.description ? (
+                        <p className="text-xs text-zinc-400 line-clamp-2 font-sans bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/60 h-full">
+                          {video.description}
+                        </p>
+                      ) : (
+                        <div className="h-full bg-zinc-950/30 rounded-xl border border-zinc-800/30 border-dashed flex items-center justify-center">
+                          <span className="text-[10px] text-zinc-600 font-mono">{t('noDescription')}</span>
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Tags */}
-                  <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-auto pt-2">
-                    {video.tags.slice(0, 3).map((tItem) => (
-                      <span key={tItem} className="text-[10px] shrink truncate max-w-[90px] font-mono px-2.5 py-0.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800" title={tItem}>
-                        #{tItem}
-                      </span>
-                    ))}
-                    {video.tags.length > 3 && (
-                      <span className="text-[10px] shrink-0 font-mono px-2 py-0.5 rounded-full bg-zinc-800/50 text-zinc-400 border border-zinc-700/50" title={video.tags.slice(3).join(', ')}>
-                        +{video.tags.length - 3}
-                      </span>
-                    )}
+                    {/* Tags */}
+                    <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 h-[22px]">
+                      {video.tags.slice(0, 3).map((tItem) => (
+                        <span 
+                          key={tItem} 
+                          className="text-[10px] shrink truncate max-w-[90px] font-mono px-2.5 py-0.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800"
+                          title={tItem}
+                        >
+                          #{tItem}
+                        </span>
+                      ))}
+                      {video.tags.length > 3 && (
+                        <span 
+                          className="text-[10px] shrink-0 font-mono px-2 py-0.5 rounded-full bg-zinc-800/50 text-zinc-400 border border-zinc-700/50" 
+                          title={video.tags.slice(3).join(', ')}
+                        >
+                          +{video.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -516,6 +551,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     href={video.videoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-sm hover:scale-[1.02]"
                   >
                     <span>{t('openVideo')}</span>
@@ -567,9 +603,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <thead>
                   <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-[11px] uppercase">
                     <th className="p-3">{t('tableChannelSource')}</th>
-                    <th className="p-3">{t('tableType')}</th>
-                    <th className="p-3">{t('tableSubscribers')}</th>
-                    <th className="p-3">{t('tableTotalIngested')}</th>
                     <th className="p-3">{t('tableLastCapture')}</th>
                     <th className="p-3">{t('tableStatus')}</th>
                     <th className="p-3 text-right">{t('tableAction')}</th>
@@ -586,17 +619,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                             {source.channelId}
                           </a>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <span className="uppercase text-[10px] px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800">
-                          {source.type}
-                        </span>
-                      </td>
-                      <td className="p-3 text-slate-300">
-                        {source.subscriberCount.toLocaleString()}
-                      </td>
-                      <td className="p-3 font-bold text-cyan-400">
-                        {source.totalCaptured} {t('vids')}
                       </td>
                       <td className="p-3 text-slate-400 text-[11px]">
                         {source.lastCaptured.replace('T', ' ').slice(0, 16)}
@@ -940,6 +962,105 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Details Modal */}
+      {selectedVideo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedVideo(null)}>
+          <div 
+            className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/30">
+              <div className="flex items-center gap-3">
+                <Video className="w-5 h-5 text-indigo-400" />
+                <h2 className="text-sm font-bold text-zinc-100 font-mono uppercase">{t('videoDetails')}</h2>
+              </div>
+              <button
+                onClick={() => setSelectedVideo(null)}
+                className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto scrollbar-none flex flex-col gap-6">
+              <div className="flex flex-col sm:flex-row gap-5 items-start">
+                <div className="w-full sm:w-56 shrink-0 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 relative shadow-md aspect-video">
+                  {selectedVideo.thumbnail ? (
+                    <img src={selectedVideo.thumbnail} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-zinc-900">
+                      <Youtube className="w-16 h-16 text-zinc-700 opacity-50" />
+                    </div>
+                  )}
+                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-[10px] border border-zinc-700/50">{selectedVideo.duration}</span>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-lg font-bold text-zinc-100 leading-tight">{selectedVideo.title}</h3>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-semibold text-zinc-400 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-[10px] uppercase font-bold border border-indigo-500/30">
+                        {selectedVideo.sourceName.charAt(0)}
+                      </span>
+                      {selectedVideo.sourceName}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 ${getStatusColor(selectedVideo.status)} text-[10px] uppercase font-mono font-bold tracking-wider shadow-sm`}>
+                      {selectedVideo.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-2.5">
+                <h4 className="text-[11px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+                  <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+                  {t('fullDescription')}
+                </h4>
+                <div className="text-sm text-zinc-300 bg-zinc-900/60 p-5 rounded-xl border border-zinc-800/80 whitespace-pre-wrap font-sans leading-relaxed shadow-inner">
+                  {selectedVideo.description || selectedVideo.summary || t('noDescriptionAvailable')}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                <h4 className="text-[11px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+                  <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+                  {t('tagsLabel')} ({selectedVideo.tags.length})
+                </h4>
+                <div className="flex flex-wrap gap-2 bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50">
+                  {selectedVideo.tags.length > 0 ? selectedVideo.tags.map(tItem => (
+                    <span key={tItem} className="text-xs font-mono px-3 py-1.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800 shadow-sm hover:border-indigo-500/50 hover:text-indigo-300 transition-colors cursor-default">
+                      #{tItem}
+                    </span>
+                  )) : (
+                    <span className="text-xs text-zinc-500 font-mono">{t('noTags')}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-zinc-800/80 flex items-center justify-end gap-3 bg-zinc-950">
+              <button
+                onClick={() => setSelectedVideo(null)}
+                className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs font-bold transition-all"
+              >
+                {t('closeDetails')}
+              </button>
+              <a
+                href={selectedVideo.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 hover:scale-[1.02] hover:shadow-indigo-600/40"
+              >
+                <span>{t('watchOnYouTube')}</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
             </div>
           </div>
         </div>

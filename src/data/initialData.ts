@@ -193,14 +193,7 @@ export const INITIAL_CREATORS: CreatorMetric[] = [
   }
 ];
 
-export const INITIAL_LOGS: SystemLog[] = [
-  { id: 'log-1', timestamp: '07:30:12', sourceApp: 'SignalCatcher', level: 'info', message: 'Cron Job [YouTube Daily Harvester] triggered successfully' },
-  { id: 'log-2', timestamp: '07:29:45', sourceApp: 'FastAPI Backend', level: 'success', message: 'REST API GET /api/v1/captures 200 OK (12ms)' },
-  { id: 'log-3', timestamp: '07:28:10', sourceApp: 'Smart Home', level: 'info', message: 'Server Rack Temperature sensor reading updated: 38.5°C' },
-  { id: 'log-4', timestamp: '07:25:00', sourceApp: 'SignalCatcher', level: 'success', message: 'Captured video: Python 3.14 Features in PostgreSQL ID pg_uuid_9921' },
-  { id: 'log-5', timestamp: '07:20:15', sourceApp: 'Follower Tracker', level: 'warning', message: 'Churn alert: 120 unfollows detected on X/Twitter after post #842' },
-  { id: 'log-6', timestamp: '07:15:00', sourceApp: 'PostgreSQL DB', level: 'info', message: 'pg_stat_activity: 12 active client pools connected to signalcatcher_db' }
-];
+export const INITIAL_LOGS: SystemLog[] = [];
 
 export const FASTAPI_ENDPOINTS: ApiEndpoint[] = [
   {

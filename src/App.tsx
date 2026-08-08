@@ -50,6 +50,7 @@ export default function App() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     fetch(`http://eriberry.local:5001/api/youtube/content?page=${currentPage}&limit=20`)
@@ -63,7 +64,7 @@ export default function App() {
             sourceAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
             title: item.title,
             videoUrl: item.url,
-            thumbnail: item.thumbnail || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80',
+            thumbnail: item.thumbnail || '',
             publishedAt: new Date().toISOString(),
             duration: item.duration || '0:00',
             views: 0,
@@ -73,6 +74,7 @@ export default function App() {
             postgresRecordId: item.id || '',
             tags: item.tags || [],
             summary: '',
+            description: item.description || '',
             sentimentScore: 0
           }));
           setCaptures(fetchedCaptures);
@@ -82,7 +84,30 @@ export default function App() {
         }
       })
       .catch(err => console.error("Failed to fetch API data", err));
-  }, [currentPage]);
+  }, [currentPage, refreshTrigger]);
+
+  useEffect(() => {
+    fetch(`http://eriberry.local:5001/api/youtube/channels`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data)) {
+          const fetchedSources: ContentSource[] = data.map((item: any) => ({
+            id: item.id.toString(),
+            name: item.name || 'Unknown Channel',
+            url: item.url,
+            channelId: item.url,
+            avatar: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
+            subscriberCount: 0,
+            lastCaptured: new Date().toISOString(),
+            status: item.active ? 'active' : 'inactive',
+            intervalMinutes: 60,
+            totalCaptured: 0
+          }));
+          setSources(fetchedSources);
+        }
+      })
+      .catch(err => console.error("Failed to fetch channels", err));
+  }, [refreshTrigger]);
 
   // Theme & Language State
   const [theme, setTheme] = useState<ThemeMode>('cyberpunk');
@@ -105,8 +130,8 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState<string>('tab-1');
 
   // Datasets State
-  const [sources, setSources] = useState<ContentSource[]>(INITIAL_SOURCES);
-  const [captures, setCaptures] = useState<CapturedVideo[]>(INITIAL_CAPTURES);
+  const [sources, setSources] = useState<ContentSource[]>([]);
+  const [captures, setCaptures] = useState<CapturedVideo[]>([]);
   const [jobs, setJobs] = useState<ScheduledJob[]>(INITIAL_JOBS);
   const [devices, setDevices] = useState<SmartDevice[]>(INITIAL_DEVICES);
   const [followerHistory, setFollowerHistory] = useState<FollowerStats[]>(INITIAL_FOLLOWER_HISTORY);
@@ -141,19 +166,6 @@ export default function App() {
     const interval = setInterval(() => {
       // Fluctuate latency slightly
       setLatency(Math.floor(Math.random() * 12) + 8);
-
-      // Random background events (50% chance each 10s)
-      const rand = Math.random();
-      if (rand > 0.6) {
-        const events = [
-          () => addLog('SignalCatcher', 'info', 'Verificação rápida de canais do YouTube em segundo plano concluída.'),
-          () => addLog('Smart Home', 'info', 'Telemetria do Server Rack atualizada: 38.4°C • 18W'),
-          () => addLog('FastAPI REST', 'success', 'GET /api/v1/health 200 OK (8ms)'),
-          () => addLog('Follower Tracker', 'info', '+12 novos seguidores detectados no canal do YouTube')
-        ];
-        const randomEvent = events[Math.floor(Math.random() * events.length)];
-        randomEvent();
-      }
     }, 10000);
 
     return () => clearInterval(interval);
@@ -328,7 +340,12 @@ export default function App() {
               onAddLog={addLog}
               currentPage={currentPage}
               totalPages={totalPages}
-              onPageChange={setCurrentPage}
+              onPageChange={(page) => setCurrentPage(page)}
+              onOpenNotifications={() => {
+                setIsNotificationsOpen(true);
+                setUnreadLogsCount(0);
+              }}
+              onRefresh={() => setRefreshTrigger(prev => prev + 1)}
             />
           )}
 

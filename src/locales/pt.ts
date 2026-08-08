@@ -31,7 +31,7 @@ export const pt = {
   capturing: "Capturando...",
   runCaptureNow: "Executar Captura Agora",
   openVideo: "Abrir",
-  btnNewIngestionOrSource: "+ Nova Ingestão / Fonte",
+  btnNewIngestionOrSource: "Add",
 
   // Ingestion Modal
   modalIngestionTitle: "Ingestão & Cadastro YouTube API",
@@ -90,7 +90,28 @@ export const pt = {
   totalExecutions: "Total Execuções",
   avgTime: "Tempo Médio",
   statusLabel: "Status",
-  triggerNow: "Disparar Agora"
+  triggerNow: "Disparar Agora",
+
+  // Video Details Modal
+  noDescription: "Sem descrição",
+  videoDetails: "Detalhes do Vídeo",
+  fullDescription: "Descrição Completa",
+  tagsLabel: "Tags",
+  noTags: "Nenhuma tag cadastrada.",
+  noDescriptionAvailable: "Nenhuma descrição disponível.",
+  closeDetails: "Fechar Detalhes",
+  watchOnYouTube: "Assistir no YouTube",
+
+  // Notifications
+  notifSendingVideo: "Enviando requisição POST para inserção do vídeo:",
+  notifSuccessVideo: "Vídeo enviado com sucesso para a fila de processamento! (Resposta:",
+  notifErrorVideo: "Erro ao inserir vídeo:",
+  notifSendingPlaylist: "Enviando requisição POST para playlist:",
+  notifSuccessPlaylist: "Playlist enviada com sucesso!",
+  notifErrorPlaylist: "Erro ao processar playlist:",
+  notifSendingSource: "Enviando requisição POST para registrar fonte:",
+  notifSuccessSource: "Fonte registrada com sucesso! (ID:",
+  notifErrorSource: "Erro ao registrar fonte:"
 };
 
 export type TranslationKeys = keyof typeof pt;

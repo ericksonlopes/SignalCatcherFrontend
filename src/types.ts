@@ -17,7 +17,6 @@ export type LanguageMode = 'pt' | 'en';
 export interface ContentSource {
   id: string;
   name: string;
-  type: 'youtube' | 'rss' | 'twitch' | 'podcast';
   url: string;
   channelId: string;
   avatar: string;
@@ -45,6 +44,7 @@ export interface CapturedVideo {
   postgresRecordId: string;
   tags: string[];
   summary?: string;
+  description?: string;
   sentimentScore?: number; // -1 to 1
 }
 

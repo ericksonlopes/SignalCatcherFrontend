@@ -33,7 +33,7 @@ export const en: Record<TranslationKeys, string> = {
   capturing: "Capturing...",
   runCaptureNow: "Run Capture Now",
   openVideo: "Open",
-  btnNewIngestionOrSource: "+ New Ingestion / Source",
+  btnNewIngestionOrSource: "Add",
 
   // Ingestion Modal
   modalIngestionTitle: "YouTube API Ingestion & Sources",
@@ -92,5 +92,26 @@ export const en: Record<TranslationKeys, string> = {
   totalExecutions: "Total Executions",
   avgTime: "Avg Duration",
   statusLabel: "Status",
-  triggerNow: "Trigger Now"
+  triggerNow: "Trigger Now",
+
+  // Video Details Modal
+  noDescription: "No description",
+  videoDetails: "Video Details",
+  fullDescription: "Full Description",
+  tagsLabel: "Tags",
+  noTags: "No tags registered.",
+  noDescriptionAvailable: "No description available.",
+  closeDetails: "Close Details",
+  watchOnYouTube: "Watch on YouTube",
+
+  // Notifications
+  notifSendingVideo: "Sending POST request to ingest video:",
+  notifSuccessVideo: "Video successfully added to processing queue! (Response:",
+  notifErrorVideo: "Error ingesting video:",
+  notifSendingPlaylist: "Sending POST request for playlist:",
+  notifSuccessPlaylist: "Playlist successfully submitted!",
+  notifErrorPlaylist: "Error processing playlist:",
+  notifSendingSource: "Sending POST request to register source:",
+  notifSuccessSource: "Source successfully registered! (ID:",
+  notifErrorSource: "Error registering source:"
 };
