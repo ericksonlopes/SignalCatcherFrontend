@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://eriberry.local:5001}
+    image: signal-catcher-frontend:latest
+    container_name: signal-catcher-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
