@@ -26,7 +26,7 @@ export const en: Record<TranslationKeys, string> = {
 
   // Tabs
   capturedFeeds: "Captured Ingestions",
-  sources: "Sources",
+  sources: "Channels",
   cronJobs: "Cron Jobs",
 
   // Action Buttons
@@ -61,7 +61,7 @@ export const en: Record<TranslationKeys, string> = {
   allTags: "All Tags",
 
   // Sources Manager
-  monitoredSources: "Monitored Content Sources",
+  monitoredSources: "Monitored Channels",
   addSource: "Add Source",
   registerNewSource: "Register New Source in SignalCatcher",
   channelNameLabel: "Channel / Feed Name",

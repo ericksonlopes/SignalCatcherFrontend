@@ -762,19 +762,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
               <button
                 type="button"
-                onClick={() => setModalMode('playlist')}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
-                  modalMode === 'playlist'
-                    ? 'bg-purple-500/15 border-purple-500/50 text-purple-300 font-bold shadow-sm'
-                    : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
-              >
-                <ListVideo className="w-3.5 h-3.5 mb-1 text-purple-400" />
-                <span>{t('tabPlaylistRoute')}</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setModalMode('sources')}
                 className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
                   modalMode === 'sources'
@@ -784,6 +771,19 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               >
                 <Radio className="w-3.5 h-3.5 mb-1 text-emerald-400" />
                 <span>{t('tabCanalRoute')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModalMode('playlist')}
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
+                  modalMode === 'playlist'
+                    ? 'bg-purple-500/15 border-purple-500/50 text-purple-300 font-bold shadow-sm'
+                    : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                }`}
+              >
+                <ListVideo className="w-3.5 h-3.5 mb-1 text-purple-400" />
+                <span>{t('tabPlaylistRoute')}</span>
               </button>
             </div>
 

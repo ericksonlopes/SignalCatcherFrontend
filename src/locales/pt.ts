@@ -24,7 +24,7 @@ export const pt = {
 
   // Tabs
   capturedFeeds: "Capturas Ingeridas",
-  sources: "Fontes",
+  sources: "Canais",
   cronJobs: "Cron Jobs",
 
   // Action Buttons
@@ -59,7 +59,7 @@ export const pt = {
   allTags: "Todas Tags",
 
   // Sources Manager
-  monitoredSources: "Fontes de Conteúdo Monitoradas",
+  monitoredSources: "Canais Monitorados",
   addSource: "Adicionar Fonte",
   registerNewSource: "Registrar Nova Fonte no SignalCatcher",
   channelNameLabel: "Nome do Canal / Feed",
