@@ -208,6 +208,8 @@ const getStatusColor = (status: string) => {
     case 'AGE_RESTRICTED':
     case 'MEMBERS_ONLY':
       return 'text-rose-400';
+    case 'REPROCESSING':
+      return 'text-cyan-400';
     case 'PENDING_DOWNLOAD':
     case 'DOWNLOADING':
     case 'PENDING_METADATA_EXTRACTION':
@@ -257,6 +259,69 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   // New source form state
   const [newSourceName, setNewSourceName] = useState('');
   const [newSourceUrl, setNewSourceUrl] = useState('');
+
+  // Filtered captures
+  const [isRetryingGlobal, setIsRetryingGlobal] = useState(false);
+  const [retryingVideoIds, setRetryingVideoIds] = useState<Set<string>>(new Set());
+
+  const handleGlobalRetry = async () => {
+    setIsRetryingGlobal(true);
+    onAddLog('SignalCatcher', 'info', t('notifGlobalRetryStart'));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/content/retry-errors`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      
+      onAddLog('SignalCatcher', 'success', t('notifGlobalRetrySuccess'));
+      if (onRefresh) onRefresh();
+      if (onOpenNotifications) onOpenNotifications();
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `${t('notifGlobalRetryError')} ${err}`);
+    } finally {
+      setIsRetryingGlobal(false);
+    }
+  };
+
+  const handleIndividualRetry = async (e: React.MouseEvent, video: CapturedVideo) => {
+    e.stopPropagation();
+    
+    let externalId = video.postgresRecordId || video.id;
+    if (video.videoUrl) {
+      const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
+      if (match) externalId = match[1];
+    }
+
+    setRetryingVideoIds(prev => new Set(prev).add(video.id));
+    onAddLog('SignalCatcher', 'info', `${t('notifIndivRetryStart')} ${externalId}...`);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/content/${externalId}/retry`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      
+      onAddLog('SignalCatcher', 'success', t('notifIndivRetrySuccess'));
+      
+      setCaptures(prev => prev.map(v => 
+        v.id === video.id 
+          ? { ...v, status: 'REPROCESSING' } 
+          : v
+      ));
+      
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `${t('notifIndivRetryError')} ${err}`);
+    } finally {
+      setRetryingVideoIds(prev => {
+        const next = new Set(prev);
+        next.delete(video.id);
+        return next;
+      });
+    }
+  };
 
   // Filtered captures
   const filteredCaptures = captures.filter((c) => {
@@ -568,6 +633,17 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
         {/* Action Trigger Buttons */}
         <div className="flex items-center gap-2">
+          {subTab === 'captures' && (
+            <button
+              onClick={handleGlobalRetry}
+              disabled={isRetryingGlobal}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-medium text-xs transition-all shadow-sm disabled:opacity-50"
+              title={t('titleReprocessFailures')}
+            >
+              <RefreshCw className={`w-4 h-4 ${isRetryingGlobal ? 'animate-spin text-indigo-400' : 'text-zinc-400'}`} />
+              <span className="hidden sm:inline">{t('btnReprocessFailures')}</span>
+            </button>
+          )}
           <button
             onClick={() => {
               setModalMode('content');
@@ -697,7 +773,20 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 </div>
 
                 {/* Card Footer: Abrir Button */}
-                <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-end">
+                <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-between">
+                  {video.status === 'ERROR' ? (
+                    <button
+                      onClick={(e) => handleIndividualRetry(e, video)}
+                      disabled={retryingVideoIds.has(video.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-medium text-[11px] transition-all disabled:opacity-50 shadow-sm hover:shadow-rose-500/10"
+                      title={t('titleReprocessVideo')}
+                    >
+                      <RefreshCw className={`w-3 h-3 ${retryingVideoIds.has(video.id) ? 'animate-spin' : ''}`} />
+                      <span>{t('btnReprocess')}</span>
+                    </button>
+                  ) : (
+                    <div />
+                  )}
                   <a
                     href={video.videoUrl}
                     target="_blank"

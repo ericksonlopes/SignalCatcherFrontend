@@ -113,5 +113,17 @@ export const en: Record<TranslationKeys, string> = {
   notifErrorPlaylist: "Error processing playlist:",
   notifSendingSource: "Sending POST request to register source:",
   notifSuccessSource: "Source successfully registered! (ID:",
-  notifErrorSource: "Error registering source:"
+  notifErrorSource: "Error registering source:",
+
+  // Retry Actions
+  btnReprocessFailures: "Reprocess Failures",
+  titleReprocessFailures: "Reprocess all capture failures",
+  btnReprocess: "Reprocess",
+  titleReprocessVideo: "Reprocess Video",
+  notifGlobalRetryStart: "Starting global error reprocessing...",
+  notifGlobalRetrySuccess: "Reprocessing started in the background!",
+  notifGlobalRetryError: "Failed global reprocessing:",
+  notifIndivRetryStart: "Resuming download for video",
+  notifIndivRetrySuccess: "Resuming video download in the background!",
+  notifIndivRetryError: "Error resuming download:"
 };

@@ -111,7 +111,19 @@ export const pt = {
   notifErrorPlaylist: "Erro ao processar playlist:",
   notifSendingSource: "Enviando requisição POST para registrar fonte:",
   notifSuccessSource: "Fonte registrada com sucesso! (ID:",
-  notifErrorSource: "Erro ao registrar fonte:"
+  notifErrorSource: "Erro ao registrar fonte:",
+
+  // Retry Actions
+  btnReprocessFailures: "Reprocessar Falhas",
+  titleReprocessFailures: "Reprocessar todas as falhas de captura",
+  btnReprocess: "Reprocessar",
+  titleReprocessVideo: "Reprocessar Vídeo",
+  notifGlobalRetryStart: "Iniciando reprocessamento global de erros...",
+  notifGlobalRetrySuccess: "Reprocessamento iniciado em segundo plano!",
+  notifGlobalRetryError: "Falha no reprocessamento global:",
+  notifIndivRetryStart: "Retomando download para o vídeo",
+  notifIndivRetrySuccess: "Retomando o download do vídeo em segundo plano!",
+  notifIndivRetryError: "Erro ao retomar download:"
 };
 
 export type TranslationKeys = keyof typeof pt;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Radio, 
   Home, 
@@ -56,8 +56,13 @@ export default function App() {
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
 
+  const initialVideosFetched = useRef(false);
+  const initialChannelsFetched = useRef(false);
+
   useEffect(() => {
-    setIsFetchingVideos(true);
+    if (!initialVideosFetched.current) {
+      setIsFetchingVideos(true);
+    }
     fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}`)
       .then(res => res.json())
       .then(data => {
@@ -89,11 +94,16 @@ export default function App() {
         }
       })
       .catch(err => console.error("Failed to fetch API data", err))
-      .finally(() => setIsFetchingVideos(false));
+      .finally(() => {
+        setIsFetchingVideos(false);
+        initialVideosFetched.current = true;
+      });
   }, [currentPage, refreshTrigger, limit]);
 
   useEffect(() => {
-    setIsFetchingChannels(true);
+    if (!initialChannelsFetched.current) {
+      setIsFetchingChannels(true);
+    }
     fetch(`${API_BASE_URL}/api/youtube/channels`)
       .then(res => res.json())
       .then(data => {
@@ -114,8 +124,19 @@ export default function App() {
         }
       })
       .catch(err => console.error("Failed to fetch channels", err))
-      .finally(() => setIsFetchingChannels(false));
+      .finally(() => {
+        setIsFetchingChannels(false);
+        initialChannelsFetched.current = true;
+      });
   }, [refreshTrigger]);
+
+  // Data Refresh Interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshTrigger(prev => prev + 1);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Theme & Language State
   const [theme, setTheme] = useState<ThemeMode>('cyberpunk');
