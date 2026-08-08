@@ -14,3 +14,10 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
+    networks:
+      - shared_postgres_network
+
+networks:
+  shared_postgres_network:
+    external: true
+    name: signalcatcher_network
