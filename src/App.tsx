@@ -49,13 +49,16 @@ export default function App() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isFetchingVideos, setIsFetchingVideos] = useState(false);
   const [isFetchingChannels, setIsFetchingChannels] = useState(false);
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
+
   useEffect(() => {
     setIsFetchingVideos(true);
-    fetch(`http://eriberry.local:5001/api/youtube/content?page=${currentPage}&limit=20`)
+    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.items) {
@@ -87,11 +90,11 @@ export default function App() {
       })
       .catch(err => console.error("Failed to fetch API data", err))
       .finally(() => setIsFetchingVideos(false));
-  }, [currentPage, refreshTrigger]);
+  }, [currentPage, refreshTrigger, limit]);
 
   useEffect(() => {
     setIsFetchingChannels(true);
-    fetch(`http://eriberry.local:5001/api/youtube/channels`)
+    fetch(`${API_BASE_URL}/api/youtube/channels`)
       .then(res => res.json())
       .then(data => {
         if (data && Array.isArray(data)) {
@@ -344,6 +347,8 @@ export default function App() {
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              limit={limit}
+              onLimitChange={setLimit}
               onOpenNotifications={() => {
                 setIsNotificationsOpen(true);
                 setUnreadLogsCount(0);

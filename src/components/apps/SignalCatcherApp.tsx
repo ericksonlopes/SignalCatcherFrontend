@@ -4,6 +4,7 @@ import {
   Database,
   ExternalLink,
   ListVideo,
+  Loader2,
   PauseCircle,
   Play,
   PlayCircle,
@@ -17,15 +18,43 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Youtube,
-  Loader2
+  Youtube
 } from 'lucide-react';
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
+
 const VideoTrackingViewer: React.FC<{ video: CapturedVideo }> = ({ video }) => {
   const [tracking, setTracking] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeft(scrollRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   useEffect(() => {
     let externalId = video.postgresRecordId || video.id;
@@ -37,7 +66,7 @@ const VideoTrackingViewer: React.FC<{ video: CapturedVideo }> = ({ video }) => {
     setTracking([]);
     setLoading(true);
     
-    fetch(`http://eriberry.local:5001/api/youtube/content/${externalId}/tracking`, { cache: 'no-store' })
+    fetch(`${API_BASE_URL}/api/youtube/content/${externalId}/tracking`, { cache: 'no-store' })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch tracking');
         return res.json();
@@ -80,7 +109,14 @@ const VideoTrackingViewer: React.FC<{ video: CapturedVideo }> = ({ video }) => {
         <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
         Status de Processamento
       </h4>
-      <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800/80 overflow-x-auto scrollbar-none shadow-inner">
+      <div 
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        className={`bg-zinc-900/50 p-6 rounded-xl border border-zinc-800/80 overflow-x-auto scrollbar-none shadow-inner ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+      >
         <div className="relative flex items-center justify-center w-max mx-auto pb-12 pt-2 px-4">
           
           {tracking.map((item, idx) => {
@@ -154,6 +190,8 @@ interface SignalCatcherAppProps {
   currentPage?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
+  limit?: number;
+  onLimitChange?: (limit: number) => void;
   onOpenNotifications?: () => void;
   onRefresh?: () => void;
   isLoadingData?: boolean;
@@ -193,19 +231,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   currentPage = 1,
   totalPages = 1,
   onPageChange,
+  limit,
+  onLimitChange,
   onOpenNotifications,
   onRefresh,
   isLoadingData = false
 }) => {
   const { t } = getTranslation(language);
-  const [isInitializing, setIsInitializing] = useState(true);
-  
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsInitializing(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
 
   const [subTab, setSubTab] = useState<'captures' | 'sources' | 'jobs' | 'stats'>('captures');
   const [searchQuery, setSearchQuery] = useState('');
@@ -244,7 +276,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `${t('notifSendingSource')} ${newSourceUrl}`);
 
     try {
-      const response = await fetch('http://eriberry.local:5001/api/youtube/channels', {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/channels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newSourceUrl.split('@')[1] || 'Novo Canal', url: newSourceUrl })
@@ -279,7 +311,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `${t('notifSendingVideo')} ${manualUrl}`);
 
     try {
-      const response = await fetch('http://eriberry.local:5001/api/youtube/content', {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/content`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: manualUrl })
@@ -319,7 +351,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `${t('notifSendingPlaylist')} ${manualUrl}`);
 
     try {
-      const response = await fetch('http://eriberry.local:5001/api/youtube/playlist', {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/playlist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -360,7 +392,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `Enviando POST /api/youtube/sources: { name: "${newSourceName}", url: "${newSourceUrl}" }`);
 
     try {
-      const response = await fetch('/api/youtube/sources', {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/sources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newSourceName, url: newSourceUrl })
@@ -423,7 +455,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
   const handleToggleSourceStatus = async (id: string) => {
     try {
-      const response = await fetch(`http://eriberry.local:5001/api/youtube/channels/${id}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/channels/${id}/status`, {
         method: 'PATCH',
       });
       if (!response.ok) {
@@ -475,22 +507,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }, 1200);
   };
 
-  if (isInitializing) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full bg-[#09090b] text-zinc-100 font-sans animate-in fade-in duration-500">
-        <div className="relative flex items-center justify-center mb-6">
-          <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl animate-pulse" />
-          <div className="relative bg-zinc-900 p-4 rounded-2xl border border-zinc-800 shadow-2xl">
-            <Radio className="w-12 h-12 text-indigo-500 animate-pulse" />
-          </div>
-        </div>
-        <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mb-4" />
-        <h2 className="text-xl font-bold tracking-tight text-zinc-100 font-mono">YouTube Catcher Engine</h2>
-        <p className="text-zinc-500 text-sm mt-2 animate-pulse font-mono tracking-widest uppercase">Inicializando Módulo...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full bg-[#09090b] text-zinc-100 font-sans p-2 sm:p-4 space-y-4 overflow-y-auto animate-in fade-in duration-500">
       {/* Top App Hero & Overview Bar - Bento Grid Card */}
@@ -513,18 +529,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         </div>
 
         {/* Quick Stats Bento Metrics */}
-        <div className="grid grid-cols-3 gap-3 w-full lg:w-auto font-mono text-xs">
-          <div className="p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-center">
+        <div className="grid grid-cols-1 gap-3 w-full lg:w-auto font-mono text-xs">
+          <div className="p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-center min-w-[120px]">
             <div className="text-zinc-500 text-[10px] uppercase font-semibold tracking-wider">{t('activeSources')}</div>
             <div className="text-lg font-bold text-indigo-400 mt-0.5">{sources.filter(s => s.status === 'active').length} / {sources.length}</div>
-          </div>
-          <div className="p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-center">
-            <div className="text-zinc-500 text-[10px] uppercase font-semibold tracking-wider">{t('postgresRecords')}</div>
-            <div className="text-lg font-bold text-cyan-400 mt-0.5">{captures.length}</div>
-          </div>
-          <div className="p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-center">
-            <div className="text-zinc-500 text-[10px] uppercase font-semibold tracking-wider">{t('scheduledJobs')}</div>
-            <div className="text-lg font-bold text-emerald-400 mt-0.5">{jobs.length}</div>
           </div>
         </div>
       </div>
@@ -553,7 +561,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             }`}
           >
             <Radio className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{t('sources')} ({sources.length})</span>
+            <span>{t('monitoredSources')} ({sources.length})</span>
           </button>
 
         </div>
@@ -707,7 +715,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           )}
 
           {/* Pagination Controls */}
-          {totalPages > 1 && onPageChange && (
+          {totalPages > 0 && onPageChange && (
             <div className="flex items-center justify-center gap-4 mt-8 mb-4">
               <button
                 onClick={() => onPageChange(currentPage - 1)}
@@ -726,6 +734,26 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
+
+              {/* Items per page selector */}
+              {onLimitChange && limit && (
+                <div className="ml-4 flex items-center gap-2">
+                  <label className="text-xs text-zinc-400 font-mono">Vídeos por página:</label>
+                  <select 
+                    value={limit}
+                    onChange={(e) => {
+                      onLimitChange(Number(e.target.value));
+                      onPageChange(1);
+                    }}
+                    className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs rounded-lg px-2 py-1 outline-none focus:border-indigo-500 font-mono"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </div>

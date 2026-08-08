@@ -25,7 +25,7 @@ export const en: Record<TranslationKeys, string> = {
   scheduledJobs: "Scheduled Jobs",
 
   // Tabs
-  capturedFeeds: "Captured Ingestions",
+  capturedFeeds: "Ingested Videos",
   sources: "Channels",
   cronJobs: "Cron Jobs",
 

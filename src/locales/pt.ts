@@ -23,7 +23,7 @@ export const pt = {
   scheduledJobs: "Jobs Agendados",
 
   // Tabs
-  capturedFeeds: "Capturas Ingeridas",
+  capturedFeeds: "Vídeos Ingeridos",
   sources: "Canais",
   cronJobs: "Cron Jobs",
 

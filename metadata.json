@@ -2,5 +2,5 @@
   "name": "SignalCatcher",
   "description": "Plataforma central SignalCatcher para monitoramento e captura automatizada de vídeos (YouTube Catcher), Casa Inteligente, análise de seguidores e dashboards.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }
