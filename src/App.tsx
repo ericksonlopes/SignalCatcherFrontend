@@ -16,7 +16,6 @@ import { SignalCatcherApp } from './components/apps/SignalCatcherApp';
 import { SmartHomeApp } from './components/apps/SmartHomeApp';
 import { FollowerAnalyticsApp } from './components/apps/FollowerAnalyticsApp';
 import { CreatorDashboardsApp } from './components/apps/CreatorDashboardsApp';
-import { FastApiDocsApp } from './components/apps/FastApiDocsApp';
 import { CustomAppBuilderModal } from './components/apps/CustomAppBuilderModal';
 
 import { 
@@ -51,8 +50,11 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isFetchingVideos, setIsFetchingVideos] = useState(false);
+  const [isFetchingChannels, setIsFetchingChannels] = useState(false);
 
   useEffect(() => {
+    setIsFetchingVideos(true);
     fetch(`http://eriberry.local:5001/api/youtube/content?page=${currentPage}&limit=20`)
       .then(res => res.json())
       .then(data => {
@@ -83,10 +85,12 @@ export default function App() {
           }
         }
       })
-      .catch(err => console.error("Failed to fetch API data", err));
+      .catch(err => console.error("Failed to fetch API data", err))
+      .finally(() => setIsFetchingVideos(false));
   }, [currentPage, refreshTrigger]);
 
   useEffect(() => {
+    setIsFetchingChannels(true);
     fetch(`http://eriberry.local:5001/api/youtube/channels`)
       .then(res => res.json())
       .then(data => {
@@ -106,7 +110,8 @@ export default function App() {
           setSources(fetchedSources);
         }
       })
-      .catch(err => console.error("Failed to fetch channels", err));
+      .catch(err => console.error("Failed to fetch channels", err))
+      .finally(() => setIsFetchingChannels(false));
   }, [refreshTrigger]);
 
   // Theme & Language State
@@ -120,11 +125,7 @@ export default function App() {
 
   // App Tabs State
   const [tabs, setTabs] = useState<AppTab[]>([
-    { id: 'tab-1', appId: 'signalcatcher', title: 'SignalCatcher Ingestor', icon: 'radio', isPinned: true },
-    { id: 'tab-2', appId: 'smarthome', title: 'Casa Inteligente Hub', icon: 'home' },
-    { id: 'tab-3', appId: 'followers', title: 'Perda de Seguidores', icon: 'followers' },
-    { id: 'tab-4', appId: 'creatordash', title: 'Analytics Criadores', icon: 'creatordash' },
-    { id: 'tab-5', appId: 'fastapi', title: 'FastAPI REST Sandbox', icon: 'fastapi' }
+    { id: 'tab-1', appId: 'signalcatcher', title: 'SignalCatcher Ingestor', icon: 'radio', isPinned: true }
   ]);
 
   const [activeTabId, setActiveTabId] = useState<string>('tab-1');
@@ -283,11 +284,10 @@ export default function App() {
           </div>
 
           {[
-            { id: 'signalcatcher', name: 'SignalCatcher' },
-            { id: 'smarthome', name: 'Casa Inteligente' },
-            { id: 'followers', name: 'Seguidores' },
-            { id: 'creatordash', name: 'Criadores' },
-            { id: 'fastapi', name: 'FastAPI' }
+            { id: 'signalcatcher', name: 'SignalCatcher', disabled: false },
+            { id: 'smarthome', name: 'Casa Inteligente', disabled: true },
+            { id: 'followers', name: 'Seguidores', disabled: true },
+            { id: 'creatordash', name: 'Criadores', disabled: true }
           ].map((app) => {
             const isAppActive = activeTab.appId === app.id;
             const existingTab = tabs.find((t) => t.appId === app.id);
@@ -295,6 +295,7 @@ export default function App() {
             return (
               <button
                 key={app.id}
+                disabled={app.disabled}
                 onClick={() => {
                   if (existingTab) {
                     setActiveTabId(existingTab.id);
@@ -305,9 +306,11 @@ export default function App() {
                 className={`group relative p-2.5 rounded-xl border transition-all ${
                   isAppActive
                     ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-400 shadow-md shadow-indigo-600/10'
-                    : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    : app.disabled
+                      ? 'bg-zinc-900/30 border-zinc-800/40 text-zinc-600 cursor-not-allowed'
+                      : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
                 }`}
-                title={app.name}
+                title={app.disabled ? `${app.name} (Em breve)` : app.name}
               >
                 {getAppletIcon(app.id)}
                 
@@ -340,12 +343,13 @@ export default function App() {
               onAddLog={addLog}
               currentPage={currentPage}
               totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(page)}
+              onPageChange={setCurrentPage}
               onOpenNotifications={() => {
                 setIsNotificationsOpen(true);
                 setUnreadLogsCount(0);
               }}
               onRefresh={() => setRefreshTrigger(prev => prev + 1)}
+              isLoadingData={isFetchingVideos || isFetchingChannels}
             />
           )}
 
@@ -366,13 +370,6 @@ export default function App() {
 
           {activeTab.appId === 'creatordash' && (
             <CreatorDashboardsApp creators={creators} />
-          )}
-
-          {activeTab.appId === 'fastapi' && (
-            <FastApiDocsApp
-              endpoints={FASTAPI_ENDPOINTS}
-              onAddLog={addLog}
-            />
           )}
         </main>
       </div>

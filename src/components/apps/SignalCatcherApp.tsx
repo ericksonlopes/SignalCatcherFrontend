@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   Clock,
   Database,
@@ -17,10 +17,129 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Youtube
+  Youtube,
+  Loader2
 } from 'lucide-react';
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
+
+const VideoTrackingViewer: React.FC<{ video: CapturedVideo }> = ({ video }) => {
+  const [tracking, setTracking] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let externalId = video.postgresRecordId || video.id;
+    if (video.videoUrl) {
+      const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
+      if (match) externalId = match[1];
+    }
+    
+    setTracking([]);
+    setLoading(true);
+    
+    fetch(`http://eriberry.local:5001/api/youtube/content/${externalId}/tracking`, { cache: 'no-store' })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch tracking');
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+            const unifiedSteps = [];
+            data.forEach(item => {
+                unifiedSteps.push({
+                    step: item.new_step,
+                    changed_at: item.changed_at
+                });
+            });
+            setTracking(unifiedSteps);
+        } else {
+            throw new Error('No tracking');
+        }
+      })
+      .catch(() => {
+        // Sem tracking retornado pela API, mostramos apenas o início e o status atual para não parecer duplicado
+        setTracking([
+          { step: 'START', changed_at: new Date(Date.now() - 60000).toISOString() },
+          { step: video.status || 'PENDING', changed_at: new Date().toISOString() }
+        ]);
+      })
+      .finally(() => setLoading(false));
+  }, [video]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 mt-2 mb-2">
+      <h4 className="text-[11px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+        <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+        Status de Processamento
+      </h4>
+      <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800/80 overflow-x-auto scrollbar-none shadow-inner">
+        <div className="relative flex items-center justify-center w-max mx-auto pb-12 pt-2 px-4">
+          
+          {tracking.map((item, idx) => {
+            const isLast = idx === tracking.length - 1;
+            const isSuccess = item.step === 'COMPLETED';
+            const isError = item.step === 'ERROR' || item.step?.includes('REMOVED') || item.step?.includes('RESTRICTED');
+            const isActive = isLast && !isSuccess && !isError;
+            const hasNext = idx < tracking.length - 1;
+            
+            return (
+              <div key={idx} className="flex items-center">
+                {/* Node Container */}
+                <div className="relative flex flex-col items-center z-10">
+                  {/* Node Circle */}
+                  <div className={`w-6 h-6 rounded-full border-[3px] flex items-center justify-center transition-all bg-zinc-950 ${
+                    isSuccess ? 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' :
+                    isError ? 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]' :
+                    isActive ? 'border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.5)] animate-pulse' :
+                    'border-indigo-500/40'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      isSuccess ? 'bg-emerald-400' : 
+                      isError ? 'bg-rose-400' : 
+                      isActive ? 'bg-indigo-300' : 
+                      'bg-indigo-500/50'
+                    }`}></div>
+                  </div>
+                  
+                  {/* Status text (absolute positioned to avoid breaking flex layout) */}
+                  <div className="absolute top-8 flex flex-col items-center text-center w-32">
+                    <span className={`text-[9px] font-bold uppercase font-mono tracking-wider leading-tight ${
+                      isActive ? 'text-indigo-300 drop-shadow-[0_0_8px_rgba(99,102,241,0.8)]' : 
+                      isSuccess ? 'text-emerald-400' : 
+                      isError ? 'text-rose-400' : 
+                      'text-zinc-400'
+                    }`}>
+                      {item.step ? item.step.replace(/_/g, ' ') : 'START'}
+                    </span>
+                    <span className="text-[8px] text-zinc-600 font-mono mt-1 bg-zinc-950/80 px-1.5 py-0.5 rounded border border-zinc-800/50">
+                      {new Date(item.changed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Connecting Line to next node */}
+                {hasNext && (
+                  <div className={`w-16 sm:w-24 h-[2px] -mx-1 z-0 ${
+                    isError ? 'bg-rose-900/50' : 
+                    'bg-indigo-500/70'
+                  }`}></div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface SignalCatcherAppProps {
   language?: LanguageMode;
@@ -37,6 +156,7 @@ interface SignalCatcherAppProps {
   onPageChange?: (page: number) => void;
   onOpenNotifications?: () => void;
   onRefresh?: () => void;
+  isLoadingData?: boolean;
 }
 
 const getStatusColor = (status: string) => {
@@ -74,9 +194,19 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   totalPages = 1,
   onPageChange,
   onOpenNotifications,
-  onRefresh
+  onRefresh,
+  isLoadingData = false
 }) => {
   const { t } = getTranslation(language);
+  const [isInitializing, setIsInitializing] = useState(true);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [subTab, setSubTab] = useState<'captures' | 'sources' | 'jobs' | 'stats'>('captures');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingSource, setIsAddingSource] = useState(false);
@@ -345,8 +475,24 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }, 1200);
   };
 
+  if (isInitializing) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-[#09090b] text-zinc-100 font-sans animate-in fade-in duration-500">
+        <div className="relative flex items-center justify-center mb-6">
+          <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl animate-pulse" />
+          <div className="relative bg-zinc-900 p-4 rounded-2xl border border-zinc-800 shadow-2xl">
+            <Radio className="w-12 h-12 text-indigo-500 animate-pulse" />
+          </div>
+        </div>
+        <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mb-4" />
+        <h2 className="text-xl font-bold tracking-tight text-zinc-100 font-mono">YouTube Catcher Engine</h2>
+        <p className="text-zinc-500 text-sm mt-2 animate-pulse font-mono tracking-widest uppercase">Inicializando Módulo...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full bg-[#09090b] text-zinc-100 font-sans p-2 sm:p-4 space-y-4 overflow-y-auto">
+    <div className="flex flex-col h-full bg-[#09090b] text-zinc-100 font-sans p-2 sm:p-4 space-y-4 overflow-y-auto animate-in fade-in duration-500">
       {/* Top App Hero & Overview Bar - Bento Grid Card */}
       <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 transition-all hover:border-zinc-700/80">
         <div className="flex items-center gap-3.5">
@@ -410,17 +556,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             <span>{t('sources')} ({sources.length})</span>
           </button>
 
-          <button
-            onClick={() => setSubTab('jobs')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
-              subTab === 'jobs'
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
-                : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{t('cronJobs')} ({jobs.length})</span>
-          </button>
         </div>
 
         {/* Action Trigger Buttons */}
@@ -456,8 +591,16 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           </div>
 
           {/* Videos Bento Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-            {filteredCaptures.map((video) => (
+          {isLoadingData ? (
+            <div className="flex flex-col items-center justify-center py-24 animate-in fade-in duration-300">
+              <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-4" />
+              <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest animate-pulse">
+                Carregando Dados da API...
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+              {filteredCaptures.map((video) => (
               <div
                 key={video.id}
                 className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-lg cursor-pointer hover:-translate-y-1 relative"
@@ -561,6 +704,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               </div>
             ))}
           </div>
+          )}
 
           {/* Pagination Controls */}
           {totalPages > 1 && onPageChange && (
@@ -650,71 +794,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         </div>
       )}
 
-      {/* SUB-TAB 3: SCHEDULED CRON JOBS */}
-      {subTab === 'jobs' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between font-mono">
-            <h3 className="font-bold text-sm text-slate-200">
-              {t('jobsManagerTitle')}
-            </h3>
-            <span className="text-xs text-slate-400">
-              {t('jobsManagerSubtitle')}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-emerald-500/40 transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-cyan-400 uppercase">{job.name}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-950 text-emerald-400 border border-slate-800">
-                      {job.cronExpression}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-400 mb-3">
-                    {t('target')}: <strong className="text-slate-200">{job.targetSource}</strong>
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-950 p-2.5 rounded-xl border border-slate-800/60 mb-3">
-                    <div>
-                      <span className="text-slate-500 block">{t('lastRun')}:</span>
-                      <span className="text-slate-300">{job.lastRun.replace('T', ' ').slice(11, 19)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">{t('nextRun')}:</span>
-                      <span className="text-slate-300">{job.nextRun.replace('T', ' ').slice(11, 19)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">{t('totalExecutions')}:</span>
-                      <span className="text-cyan-400 font-bold">{job.executionCount.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">{t('avgTime')}:</span>
-                      <span className="text-emerald-400">{job.avgDurationSec}s</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                  <span className="text-[10px] text-slate-500">{t('statusLabel')}: {job.status.toUpperCase()}</span>
-                  <button
-                    onClick={() => onTriggerJob(job.id)}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition-colors"
-                  >
-                    <Play className="w-3 h-3 fill-slate-950" />
-                    <span>{t('triggerNow')}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* INGESTION & SOURCE CREATION MODAL */}
       {isIngestionModalOpen && (
@@ -1016,7 +1095,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   </div>
                 </div>
               </div>
-              
+  
               <div className="flex flex-col gap-2.5">
                 <h4 className="text-[11px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
                   <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
@@ -1041,6 +1120,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     <span className="text-xs text-zinc-500 font-mono">{t('noTags')}</span>
                   )}
                 </div>
+              </div>
+
+              <div className="w-full">
+                <VideoTrackingViewer video={selectedVideo} />
               </div>
             </div>
 
