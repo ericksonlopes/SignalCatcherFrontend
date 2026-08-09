@@ -100,6 +100,8 @@ export const en: Record<TranslationKeys, string> = {
   fullDescription: "Full Description",
   tagsLabel: "Tags",
   noTags: "No tags registered.",
+  createdAt: "Created at",
+  publishedAt: "Published at",
   noDescriptionAvailable: "No description available.",
   closeDetails: "Close Details",
   watchOnYouTube: "Watch on YouTube",

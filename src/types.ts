@@ -35,6 +35,7 @@ export interface CapturedVideo {
   title: string;
   videoUrl: string;
   thumbnail: string;
+  createdAt?: string;
   publishedAt: string;
   duration: string;
   views: number;

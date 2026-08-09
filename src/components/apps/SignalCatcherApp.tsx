@@ -1331,6 +1331,28 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 </div>
               </div>
 
+              {/* Timestamps */}
+              <div className="flex flex-col sm:flex-row gap-4 bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50">
+                <div className="flex flex-col gap-1 w-full">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+                    <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+                    {t('createdAt')}
+                  </span>
+                  <span className="text-sm text-zinc-300 font-mono ml-3">
+                    {selectedVideo.createdAt ? new Date(selectedVideo.createdAt).toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US') : '-'}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 w-full">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+                    <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+                    {t('publishedAt')}
+                  </span>
+                  <span className="text-sm text-zinc-300 font-mono ml-3">
+                    {selectedVideo.publishedAt ? new Date(selectedVideo.publishedAt).toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US') : '-'}
+                  </span>
+                </div>
+              </div>
+
               <div className="w-full">
                 <VideoTrackingViewer video={selectedVideo} />
               </div>

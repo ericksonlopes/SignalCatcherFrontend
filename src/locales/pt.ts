@@ -98,6 +98,8 @@ export const pt = {
   fullDescription: "Descrição Completa",
   tagsLabel: "Tags",
   noTags: "Nenhuma tag cadastrada.",
+  createdAt: "Criado em",
+  publishedAt: "Publicado em",
   noDescriptionAvailable: "Nenhuma descrição disponível.",
   closeDetails: "Fechar Detalhes",
   watchOnYouTube: "Assistir no YouTube",
