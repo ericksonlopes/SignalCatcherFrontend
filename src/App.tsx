@@ -89,7 +89,7 @@ export default function App() {
             title: item.title,
             videoUrl: item.url,
             thumbnail: item.thumbnail || '',
-            createdAt: item.created_at,
+            createdAt: item.created_at || item.createdAt || new Date().toISOString(),
             publishedAt: item.published_at || item.publishedAt || new Date().toISOString(),
             duration: item.duration || '0:00',
             views: 0,
@@ -119,7 +119,7 @@ export default function App() {
     if (!initialChannelsFetched.current) {
       setIsFetchingChannels(true);
     }
-    fetch(`${API_BASE_URL}/api/youtube/channels`)
+    fetch(`${API_BASE_URL}/api/youtube/monitored_channels`)
       .then(res => res.json())
       .then(data => {
         if (data && Array.isArray(data)) {
@@ -138,11 +138,34 @@ export default function App() {
           setSources(fetchedSources);
         }
       })
-      .catch(err => console.error("Failed to fetch channels", err))
+      .catch(err => console.error("Failed to fetch monitored channels", err))
       .finally(() => {
         setIsFetchingChannels(false);
         initialChannelsFetched.current = true;
       });
+      
+    // Fetch Saved Channels
+    fetch(`${API_BASE_URL}/api/youtube/channels`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data)) {
+          const fetchedChannels: ContentSource[] = data.map((item: any) => ({
+            id: item.id.toString(),
+            name: item.title || item.name || 'Unknown Saved Channel',
+            url: item.custom_url || item.url || '',
+            channelId: item.external_id || item.channel_id || item.id.toString(),
+            channelUrl: item.channel_url || '',
+            avatar: item.thumbnail_url || 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
+            subscriberCount: item.subscriber_count || 0,
+            lastCaptured: item.created_at || new Date().toISOString(),
+            status: 'active',
+            intervalMinutes: 0,
+            totalCaptured: item.video_count || 0
+          }));
+          setSavedChannels(fetchedChannels);
+        }
+      })
+      .catch(err => console.error("Failed to fetch saved channels", err));
   }, [refreshTrigger]);
 
   // Data Refresh Interval
@@ -171,6 +194,7 @@ export default function App() {
 
   // Datasets State
   const [sources, setSources] = useState<ContentSource[]>([]);
+  const [savedChannels, setSavedChannels] = useState<ContentSource[]>([]);
   const [captures, setCaptures] = useState<CapturedVideo[]>([]);
   const [jobs, setJobs] = useState<ScheduledJob[]>(INITIAL_JOBS);
   const [devices, setDevices] = useState<SmartDevice[]>(INITIAL_DEVICES);
@@ -374,6 +398,7 @@ export default function App() {
               language={language}
               sources={sources}
               setSources={setSources}
+              savedChannels={savedChannels}
               captures={captures}
               setCaptures={setCaptures}
               jobs={jobs}

@@ -109,13 +109,24 @@ async function startServer() {
   });
 
   /**
-   * GET /api/youtube/sources
+   * GET /api/youtube/monitored_channels
    * Lists monitored YouTube sources.
    */
-  app.get("/api/youtube/sources", (_req, res) => {
+  app.get("/api/youtube/monitored_channels", (_req, res) => {
     return res.json({
       success: true,
       data: youtubeSources
+    });
+  });
+
+  /**
+   * GET /api/youtube/channels
+   * Lists saved YouTube channels.
+   */
+  app.get("/api/youtube/channels", (_req, res) => {
+    return res.json({
+      success: true,
+      data: youtubeSources.map(s => ({ ...s, id: s.id + "-saved" })) // Mocking saved channels
     });
   });
 

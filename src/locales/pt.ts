@@ -24,6 +24,7 @@ export const pt = {
 
   // Tabs
   capturedFeeds: "Vídeos Ingeridos",
+  savedChannels: "Canais Salvos",
   sources: "Canais",
   cronJobs: "Cron Jobs",
 
@@ -70,7 +71,8 @@ export const pt = {
 
   // Sources Table
   tableChannelSource: "Canal / Fonte",
-  tableChannelName: "Nome do Canal",
+  tableChannelName: "Nome",
+  vidsSaved: "Vídeos Salvos",
   tableType: "Tipo",
   tableSubscribers: "Inscritos",
   tableInterval: "Intervalo Captura",

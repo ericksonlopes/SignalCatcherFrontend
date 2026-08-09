@@ -19,6 +19,7 @@ export interface ContentSource {
   name: string;
   url: string;
   channelId: string;
+  channelUrl?: string;
   avatar: string;
   subscriberCount: number;
   lastCaptured: string;

@@ -26,6 +26,7 @@ export const en: Record<TranslationKeys, string> = {
 
   // Tabs
   capturedFeeds: "Ingested Videos",
+  savedChannels: "Saved Channels",
   sources: "Channels",
   cronJobs: "Cron Jobs",
 
@@ -72,7 +73,8 @@ export const en: Record<TranslationKeys, string> = {
 
   // Sources Table
   tableChannelSource: "Channel / Source",
-  tableChannelName: "Channel Name",
+  tableChannelName: "Name",
+  vidsSaved: "Vids Saved",
   tableType: "Type",
   tableSubscribers: "Subscribers",
   tableInterval: "Capture Interval",
