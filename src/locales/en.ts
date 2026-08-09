@@ -72,6 +72,7 @@ export const en: Record<TranslationKeys, string> = {
 
   // Sources Table
   tableChannelSource: "Channel / Source",
+  tableChannelName: "Channel Name",
   tableType: "Type",
   tableSubscribers: "Subscribers",
   tableInterval: "Capture Interval",

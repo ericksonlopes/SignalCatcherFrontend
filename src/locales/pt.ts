@@ -70,6 +70,7 @@ export const pt = {
 
   // Sources Table
   tableChannelSource: "Canal / Fonte",
+  tableChannelName: "Nome do Canal",
   tableType: "Tipo",
   tableSubscribers: "Inscritos",
   tableInterval: "Intervalo Captura",

@@ -956,6 +956,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <thead>
                   <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-[11px] uppercase">
                     <th className="p-3">{t('tableChannelSource')}</th>
+                    <th className="p-3">{t('tableChannelName')}</th>
                     <th className="p-3">{t('tableLastCapture')}</th>
                     <th className="p-3">{t('tableStatus')}</th>
                     <th className="p-3 text-right">{t('tableAction')}</th>
@@ -967,11 +968,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       <td className="p-3 flex items-center gap-2.5">
                         <img src={source.avatar} alt="" className="w-7 h-7 rounded-full border border-slate-700" />
                         <div>
-                          <div className="font-semibold text-slate-200 font-sans">{source.name}</div>
                           <a href={source.url} target="_blank" rel="noreferrer" className="text-[10px] text-cyan-400 hover:underline">
                             {source.channelId}
                           </a>
                         </div>
+                      </td>
+                      <td className="p-3 font-semibold text-slate-200 font-sans">
+                        {source.name}
                       </td>
                       <td className="p-3 text-slate-400 text-[11px]">
                         {source.lastCaptured.replace('T', ' ').slice(0, 16)}
