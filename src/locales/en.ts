@@ -125,5 +125,11 @@ export const en: Record<TranslationKeys, string> = {
   notifGlobalRetryError: "Failed global reprocessing:",
   notifIndivRetryStart: "Resuming download for video",
   notifIndivRetrySuccess: "Resuming video download in the background!",
-  notifIndivRetryError: "Error resuming download:"
+  notifIndivRetryError: "Error resuming download:",
+  
+  // Delete Actions
+  btnConfirmDelete: "Confirm",
+  btnCancelDelete: "Cancel",
+  titleConfirmDelete: "Confirm Deletion?",
+  descConfirmDelete: "Are you sure you want to delete the video and its associated file? This action cannot be undone."
 };

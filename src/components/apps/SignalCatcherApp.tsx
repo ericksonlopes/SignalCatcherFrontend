@@ -18,7 +18,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Youtube
+  Youtube,
+  Trash
 } from 'lucide-react';
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
@@ -192,6 +193,8 @@ interface SignalCatcherAppProps {
   onPageChange?: (page: number) => void;
   limit?: number;
   onLimitChange?: (limit: number) => void;
+  stepFilter?: string;
+  onStepFilterChange?: (step: string) => void;
   onOpenNotifications?: () => void;
   onRefresh?: () => void;
   isLoadingData?: boolean;
@@ -235,6 +238,8 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   onPageChange,
   limit,
   onLimitChange,
+  stepFilter = '',
+  onStepFilterChange,
   onOpenNotifications,
   onRefresh,
   isLoadingData = false
@@ -263,6 +268,8 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   // Filtered captures
   const [isRetryingGlobal, setIsRetryingGlobal] = useState(false);
   const [retryingVideoIds, setRetryingVideoIds] = useState<Set<string>>(new Set());
+  const [deletingVideoIds, setDeletingVideoIds] = useState<Set<string>>(new Set());
+  const [videoToDelete, setVideoToDelete] = useState<CapturedVideo | null>(null);
 
   const handleGlobalRetry = async () => {
     setIsRetryingGlobal(true);
@@ -316,6 +323,44 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       onAddLog('SignalCatcher', 'error', `${t('notifIndivRetryError')} ${err}`);
     } finally {
       setRetryingVideoIds(prev => {
+        const next = new Set(prev);
+        next.delete(video.id);
+        return next;
+      });
+    }
+  };
+
+  const handleIndividualDelete = async (e: React.MouseEvent, video: CapturedVideo) => {
+    e.stopPropagation();
+    
+    let externalId = video.postgresRecordId || video.id;
+    if (video.videoUrl) {
+      const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
+      if (match) externalId = match[1];
+    }
+
+    setDeletingVideoIds(prev => new Set(prev).add(video.id));
+    onAddLog('SignalCatcher', 'info', `Excluindo vídeo e arquivo ${externalId}...`);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/content/${externalId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      
+      onAddLog('SignalCatcher', 'success', `Vídeo ${externalId} excluído com sucesso!`);
+      
+      setCaptures(prev => prev.map(v => 
+        v.id === video.id 
+          ? { ...v, status: 'DELETED' } 
+          : v
+      ));
+      
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `Falha ao excluir vídeo: ${err}`);
+    } finally {
+      setDeletingVideoIds(prev => {
         const next = new Set(prev);
         next.delete(video.id);
         return next;
@@ -672,6 +717,29 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 font-mono"
               />
             </div>
+            {onStepFilterChange && (
+              <select
+                value={stepFilter}
+                onChange={(e) => {
+                  onStepFilterChange(e.target.value);
+                  if (onPageChange) onPageChange(1); // Reset page on filter change
+                }}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
+              >
+                <option value="">Todos os Status</option>
+                <option value="STARTED">STARTED</option>
+                <option value="PENDING_METADATA_EXTRACTION">PENDING_METADATA_EXTRACTION</option>
+                <option value="EXTRACTING_METADATA">EXTRACTING_METADATA</option>
+                <option value="METADATA_EXTRACTED">METADATA_EXTRACTED</option>
+                <option value="PENDING_DOWNLOAD">PENDING_DOWNLOAD</option>
+                <option value="DOWNLOADING">DOWNLOADING</option>
+                <option value="DOWNLOADED">DOWNLOADED</option>
+                <option value="COMPLETED">COMPLETED</option>
+                <option value="ERROR">ERROR</option>
+                <option value="REPROCESSING">REPROCESSING</option>
+                <option value="DELETED">DELETED</option>
+              </select>
+            )}
           </div>
 
           {/* Videos Bento Grid */}
@@ -774,19 +842,30 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
                 {/* Card Footer: Abrir Button */}
                 <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-between">
-                  {video.status === 'ERROR' ? (
+                  <div className="flex items-center gap-1.5">
+                    {['ERROR', 'DELETED'].includes(video.status) && (
+                      <button
+                        onClick={(e) => handleIndividualRetry(e, video)}
+                        disabled={retryingVideoIds.has(video.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-[11px] transition-all disabled:opacity-50 shadow-sm bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 hover:shadow-rose-500/10`}
+                        title={t('titleReprocessVideo')}
+                      >
+                        <RefreshCw className={`w-3 h-3 ${retryingVideoIds.has(video.id) ? 'animate-spin' : ''}`} />
+                        <span className="hidden xl:inline">{t('btnReprocess')}</span>
+                      </button>
+                    )}
                     <button
-                      onClick={(e) => handleIndividualRetry(e, video)}
-                      disabled={retryingVideoIds.has(video.id)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-medium text-[11px] transition-all disabled:opacity-50 shadow-sm hover:shadow-rose-500/10"
-                      title={t('titleReprocessVideo')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setVideoToDelete(video);
+                      }}
+                      disabled={deletingVideoIds.has(video.id)}
+                      className="flex items-center justify-center p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 transition-all disabled:opacity-50 shadow-sm"
+                      title="Excluir Vídeo e Arquivo"
                     >
-                      <RefreshCw className={`w-3 h-3 ${retryingVideoIds.has(video.id) ? 'animate-spin' : ''}`} />
-                      <span>{t('btnReprocess')}</span>
+                      <Trash className={`w-3.5 h-3.5 ${deletingVideoIds.has(video.id) ? 'animate-pulse' : ''}`} />
                     </button>
-                  ) : (
-                    <div />
-                  )}
+                  </div>
                   <a
                     href={video.videoUrl}
                     target="_blank"
@@ -1261,6 +1340,60 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <span>{t('watchOnYouTube')}</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {videoToDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setVideoToDelete(null)}>
+          <div className="bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
+              <h3 className="text-zinc-100 font-bold flex items-center gap-2">
+                <Trash className="w-5 h-5 text-red-400" />
+                {t('titleConfirmDelete')}
+              </h3>
+              <button
+                onClick={() => setVideoToDelete(null)}
+                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-sm text-zinc-400 mb-4">
+                {t('descConfirmDelete')}
+              </p>
+              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                <p className="text-sm text-zinc-200 font-bold line-clamp-1">{videoToDelete.title}</p>
+                <p className="text-xs text-zinc-500 mt-1">{videoToDelete.sourceName}</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-zinc-900/30 border-t border-zinc-800/80 flex justify-end gap-3">
+              <button
+                onClick={() => setVideoToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700/80 transition-colors"
+              >
+                {t('btnCancelDelete')}
+              </button>
+              <button
+                onClick={(e) => {
+                  handleIndividualDelete(e, videoToDelete);
+                  setVideoToDelete(null);
+                }}
+                disabled={deletingVideoIds.has(videoToDelete.id)}
+                className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-md shadow-red-500/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {deletingVideoIds.has(videoToDelete.id) ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash className="w-4 h-4" />
+                )}
+                {t('btnConfirmDelete')}
+              </button>
             </div>
           </div>
         </div>

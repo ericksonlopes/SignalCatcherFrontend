@@ -50,6 +50,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit, setLimit] = useState(20);
+  const [stepFilter, setStepFilter] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isFetchingVideos, setIsFetchingVideos] = useState(false);
   const [isFetchingChannels, setIsFetchingChannels] = useState(false);
@@ -63,7 +64,8 @@ export default function App() {
     if (!initialVideosFetched.current) {
       setIsFetchingVideos(true);
     }
-    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}`)
+    const stepQuery = stepFilter ? `&step=${stepFilter}` : '';
+    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.items) {
@@ -98,7 +100,7 @@ export default function App() {
         setIsFetchingVideos(false);
         initialVideosFetched.current = true;
       });
-  }, [currentPage, refreshTrigger, limit]);
+  }, [currentPage, refreshTrigger, limit, stepFilter]);
 
   useEffect(() => {
     if (!initialChannelsFetched.current) {
@@ -370,6 +372,8 @@ export default function App() {
               onPageChange={setCurrentPage}
               limit={limit}
               onLimitChange={setLimit}
+              stepFilter={stepFilter}
+              onStepFilterChange={setStepFilter}
               onOpenNotifications={() => {
                 setIsNotificationsOpen(true);
                 setUnreadLogsCount(0);

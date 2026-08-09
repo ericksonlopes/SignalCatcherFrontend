@@ -123,7 +123,13 @@ export const pt = {
   notifGlobalRetryError: "Falha no reprocessamento global:",
   notifIndivRetryStart: "Retomando download para o vídeo",
   notifIndivRetrySuccess: "Retomando o download do vídeo em segundo plano!",
-  notifIndivRetryError: "Erro ao retomar download:"
+  notifIndivRetryError: "Erro ao retomar download:",
+  
+  // Delete Actions
+  btnConfirmDelete: "Confirmar",
+  btnCancelDelete: "Cancelar",
+  titleConfirmDelete: "Confirmar Exclusão?",
+  descConfirmDelete: "Você tem certeza que deseja excluir o vídeo e o arquivo associado? Essa ação não pode ser desfeita."
 };
 
 export type TranslationKeys = keyof typeof pt;
