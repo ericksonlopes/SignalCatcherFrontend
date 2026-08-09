@@ -195,6 +195,8 @@ interface SignalCatcherAppProps {
   onLimitChange?: (limit: number) => void;
   stepFilter?: string;
   onStepFilterChange?: (step: string) => void;
+  searchQuery?: string;
+  onSearchQueryChange?: (search: string) => void;
   onOpenNotifications?: () => void;
   onRefresh?: () => void;
   isLoadingData?: boolean;
@@ -240,6 +242,8 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   onLimitChange,
   stepFilter = '',
   onStepFilterChange,
+  searchQuery = '',
+  onSearchQueryChange,
   onOpenNotifications,
   onRefresh,
   isLoadingData = false
@@ -247,7 +251,14 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const { t } = getTranslation(language);
 
   const [subTab, setSubTab] = useState<'captures' | 'sources' | 'jobs' | 'stats'>('captures');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  
+  const query = onSearchQueryChange ? searchQuery : localSearchQuery;
+  const handleSearchChange = (val: string) => {
+    if (onSearchQueryChange) onSearchQueryChange(val);
+    else setLocalSearchQuery(val);
+  };
+
   const [isAddingSource, setIsAddingSource] = useState(false);
   const [isCapturingNow, setIsCapturingNow] = useState(false);
 
@@ -368,13 +379,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }
   };
 
-  // Filtered captures
-  const filteredCaptures = captures.filter((c) => {
-    const matchesQuery = 
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.sourceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.summary?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesQuery;
+  // Filtered captures (sources only, captures are pre-filtered by backend)
+  const filteredSources = sources.filter((s) => {
+    const q = query.toLowerCase();
+    return s.name.toLowerCase().includes(q) || s.channelId.toLowerCase().includes(q);
   });
 
   // Handler for POST /api/youtube/sources
@@ -711,9 +719,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('filterPlaceholder')}
+                value={query}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder={t('filterPlaceholder', 'Filtrar capturas por título...')}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 font-mono"
               />
             </div>
@@ -750,10 +758,15 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 Carregando Dados da API...
               </p>
             </div>
+          ) : captures.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/20 rounded-2xl border border-zinc-800/50 border-dashed">
+              <Search className="w-12 h-12 text-zinc-700 mb-4" />
+              <p className="text-zinc-500 font-mono text-sm">Nenhuma captura encontrada.</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-              {filteredCaptures.map((video) => (
-              <div
+              {captures.map((video) => (
+              <div 
                 key={video.id}
                 className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-lg cursor-pointer hover:-translate-y-1 relative"
                 onClick={() => setSelectedVideo(video)}
@@ -949,7 +962,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {sources.map((source) => (
+                  {filteredSources.map((source) => (
                     <tr key={source.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="p-3 flex items-center gap-2.5">
                         <img src={source.avatar} alt="" className="w-7 h-7 rounded-full border border-slate-700" />

@@ -54,6 +54,17 @@ export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isFetchingVideos, setIsFetchingVideos] = useState(false);
   const [isFetchingChannels, setIsFetchingChannels] = useState(false);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1); // Reset page on new search
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
 
@@ -65,7 +76,8 @@ export default function App() {
       setIsFetchingVideos(true);
     }
     const stepQuery = stepFilter ? `&step=${stepFilter}` : '';
-    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}`)
+    const searchQueryParam = debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : '';
+    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}${searchQueryParam}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.items) {
@@ -100,7 +112,7 @@ export default function App() {
         setIsFetchingVideos(false);
         initialVideosFetched.current = true;
       });
-  }, [currentPage, refreshTrigger, limit, stepFilter]);
+  }, [currentPage, refreshTrigger, limit, stepFilter, debouncedSearchQuery]);
 
   useEffect(() => {
     if (!initialChannelsFetched.current) {
@@ -374,6 +386,8 @@ export default function App() {
               onLimitChange={setLimit}
               stepFilter={stepFilter}
               onStepFilterChange={setStepFilter}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
               onOpenNotifications={() => {
                 setIsNotificationsOpen(true);
                 setUnreadLogsCount(0);
