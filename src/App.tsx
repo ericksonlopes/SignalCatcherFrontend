@@ -57,6 +57,8 @@ export default function App() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const [totalStatusCount, setTotalStatusCount] = useState<number>(0);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -105,6 +107,12 @@ export default function App() {
           setCaptures(fetchedCaptures);
           if (data.total_pages) {
             setTotalPages(data.total_pages);
+          }
+          if (data.status_counts) {
+            setStatusCounts(data.status_counts);
+          }
+          if (data.total_status_count !== undefined) {
+            setTotalStatusCount(data.total_status_count);
           }
         }
       })
@@ -420,6 +428,8 @@ export default function App() {
               }}
               onRefresh={() => setRefreshTrigger(prev => prev + 1)}
               isLoadingData={isFetchingVideos || isFetchingChannels}
+              statusCounts={statusCounts}
+              totalStatusCount={totalStatusCount}
             />
           )}
 

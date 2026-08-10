@@ -201,6 +201,8 @@ interface SignalCatcherAppProps {
   onOpenNotifications?: () => void;
   onRefresh?: () => void;
   isLoadingData?: boolean;
+  statusCounts?: Record<string, number>;
+  totalStatusCount?: number;
 }
 
 const getStatusColor = (status: string) => {
@@ -248,7 +250,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   onSearchQueryChange,
   onOpenNotifications,
   onRefresh,
-  isLoadingData = false
+  isLoadingData = false,
+  statusCounts = {},
+  totalStatusCount = 0
 }) => {
   const { t } = getTranslation(language);
   const [subTab, setSubTab] = useState<'captures' | 'saved_channels' | 'sources' | 'jobs'>('captures');
@@ -747,18 +751,18 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 }}
                 className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
               >
-                <option value="">Todos os Status</option>
-                <option value="STARTED">STARTED</option>
-                <option value="PENDING_METADATA_EXTRACTION">PENDING_METADATA_EXTRACTION</option>
-                <option value="EXTRACTING_METADATA">EXTRACTING_METADATA</option>
-                <option value="METADATA_EXTRACTED">METADATA_EXTRACTED</option>
-                <option value="PENDING_DOWNLOAD">PENDING_DOWNLOAD</option>
-                <option value="DOWNLOADING">DOWNLOADING</option>
-                <option value="DOWNLOADED">DOWNLOADED</option>
-                <option value="COMPLETED">COMPLETED</option>
-                <option value="ERROR">ERROR</option>
-                <option value="REPROCESSING">REPROCESSING</option>
-                <option value="DELETED">DELETED</option>
+                <option value="">Todos os Status ({totalStatusCount})</option>
+                <option value="STARTED">STARTED ({statusCounts['STARTED'] || 0})</option>
+                <option value="PENDING_METADATA_EXTRACTION">PENDING_METADATA_EXTRACTION ({statusCounts['PENDING_METADATA_EXTRACTION'] || 0})</option>
+                <option value="EXTRACTING_METADATA">EXTRACTING_METADATA ({statusCounts['EXTRACTING_METADATA'] || 0})</option>
+                <option value="METADATA_EXTRACTED">METADATA_EXTRACTED ({statusCounts['METADATA_EXTRACTED'] || 0})</option>
+                <option value="PENDING_DOWNLOAD">PENDING_DOWNLOAD ({statusCounts['PENDING_DOWNLOAD'] || 0})</option>
+                <option value="DOWNLOADING">DOWNLOADING ({statusCounts['DOWNLOADING'] || 0})</option>
+                <option value="DOWNLOADED">DOWNLOADED ({statusCounts['DOWNLOADED'] || 0})</option>
+                <option value="COMPLETED">COMPLETED ({statusCounts['COMPLETED'] || 0})</option>
+                <option value="ERROR">ERROR ({statusCounts['ERROR'] || 0})</option>
+                <option value="REPROCESSING">REPROCESSING ({statusCounts['REPROCESSING'] || 0})</option>
+                <option value="DELETED">DELETED ({statusCounts['DELETED'] || 0})</option>
               </select>
             )}
           </div>
