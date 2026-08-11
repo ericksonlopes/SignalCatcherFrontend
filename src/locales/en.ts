@@ -136,5 +136,18 @@ export const en: Record<TranslationKeys, string> = {
   btnConfirmDelete: "Confirm",
   btnCancelDelete: "Cancel",
   titleConfirmDelete: "Confirm Deletion?",
-  descConfirmDelete: "Are you sure you want to delete the video and its associated file? This action cannot be undone."
+  descConfirmDelete: "Are you sure you want to delete this video and its associated file? This action cannot be undone.",
+  
+  // Tracking Tab
+  tabTracking: "Tracking",
+  trackingPipelineTitle: "Pipeline Tracking",
+  trackingPipelineDesc: "Overview of the YouTube Catcher Engine processing flow",
+  trackingMainFlow: "Main Capture Flow",
+  trackingExceptions: "Exceptions and Terminal States",
+  trackingMaintenance: "Maintenance and Lifecycle",
+  btnExtract: "Extract",
+  btnDownload: "Download",
+  btnExecute: "Execute",
+  btnCompleted: "Completed",
+  btnInactive: "Inactive"
 };

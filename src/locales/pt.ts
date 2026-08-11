@@ -134,7 +134,20 @@ export const pt = {
   btnConfirmDelete: "Confirmar",
   btnCancelDelete: "Cancelar",
   titleConfirmDelete: "Confirmar Exclusão?",
-  descConfirmDelete: "Você tem certeza que deseja excluir o vídeo e o arquivo associado? Essa ação não pode ser desfeita."
+  descConfirmDelete: "Você tem certeza que deseja excluir o vídeo e o arquivo associado? Essa ação não pode ser desfeita.",
+  
+  // Tracking Tab
+  tabTracking: "Tracking",
+  trackingPipelineTitle: "Tracking de Pipeline",
+  trackingPipelineDesc: "Visão geral do processamento do YouTube Catcher Engine",
+  trackingMainFlow: "Fluxo Principal de Captura",
+  trackingExceptions: "Exceções e Estados Terminais",
+  trackingMaintenance: "Manutenção e Ciclo de Vida",
+  btnExtract: "Extrair",
+  btnDownload: "Baixar",
+  btnExecute: "Executar",
+  btnCompleted: "Finalizado",
+  btnInactive: "Inativo"
 };
 
 export type TranslationKeys = keyof typeof pt;

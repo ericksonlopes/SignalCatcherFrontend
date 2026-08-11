@@ -19,7 +19,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Youtube,
-  Trash
+  Trash,
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  ServerCrash
 } from 'lucide-react';
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
@@ -259,8 +263,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   totalMonitoredCount = 0
 }) => {
   const { t } = getTranslation(language);
-  const [subTab, setSubTab] = useState<'captures' | 'saved_channels' | 'sources' | 'jobs'>('captures');
+  const [subTab, setSubTab] = useState<'captures' | 'saved_channels' | 'sources' | 'jobs' | 'tracking'>('captures');
   const [localSearchQuery, setLocalSearchQuery] = useState('');
+  
+  const [isTriggeringMetadata, setIsTriggeringMetadata] = useState(false);
+  const [isTriggeringDownload, setIsTriggeringDownload] = useState(false);
   
   const query = onSearchQueryChange ? searchQuery : localSearchQuery;
   const handleSearchChange = (val: string) => {
@@ -603,6 +610,36 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }
   };
 
+  const handleTriggerMetadata = async () => {
+    setIsTriggeringMetadata(true);
+    onAddLog('SignalCatcher', 'info', 'Iniciando extração de metadados em lote...');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/content/trigger-metadata-extraction`, { method: 'POST' });
+      if (!response.ok) throw new Error('Falha ao acionar job de metadados');
+      onAddLog('SignalCatcher', 'success', 'Job de extração de metadados enfileirado com sucesso.');
+      onRefresh?.();
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `Erro ao acionar job de metadados: ${err}`);
+    } finally {
+      setIsTriggeringMetadata(false);
+    }
+  };
+
+  const handleTriggerDownload = async () => {
+    setIsTriggeringDownload(true);
+    onAddLog('SignalCatcher', 'info', 'Iniciando download de vídeos em lote...');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/youtube/content/trigger-downloads`, { method: 'POST' });
+      if (!response.ok) throw new Error('Falha ao acionar job de downloads');
+      onAddLog('SignalCatcher', 'success', 'Job de download de vídeos enfileirado com sucesso.');
+      onRefresh?.();
+    } catch (err) {
+      onAddLog('SignalCatcher', 'error', `Erro ao acionar job de downloads: ${err}`);
+    } finally {
+      setIsTriggeringDownload(false);
+    }
+  };
+
   const handleManualCaptureTrigger = () => {
     setIsCapturingNow(true);
     onAddLog('SignalCatcher', 'info', 'Iniciando captura manual de fontes em tempo real via FastAPI...');
@@ -654,16 +691,8 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             </p>
           </div>
         </div>
-
-        {/* Quick Stats Bento Metrics */}
-        <div className="grid grid-cols-1 gap-3 w-full lg:w-auto font-mono text-xs">
-          <div className="p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-center min-w-[120px]">
-            <div className="text-zinc-500 text-[10px] uppercase font-semibold tracking-wider">{t('activeSources')}</div>
-            <div className="text-lg font-bold text-indigo-400 mt-0.5">{sources.filter(s => s.status === 'active').length} / {sources.length}</div>
-          </div>
-        </div>
       </div>
-
+      
       {/* Sub-Navigation Bar */}
       <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
         <div className="flex items-center gap-2 text-xs font-mono">
@@ -703,6 +732,17 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             <span>{t('monitoredSources')} ({totalMonitoredCount || sources.length})</span>
           </button>
 
+          <button
+            onClick={() => setSubTab('tracking')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+              subTab === 'tracking'
+                ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
+                : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-fuchsia-400" />
+            <span>{t('tabTracking' as any) || 'Tracking'}</span>
+          </button>
         </div>
 
         {/* Action Trigger Buttons */}
@@ -730,6 +770,213 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           </button>
         </div>
       </div>
+      
+      {/* CONSTANTES PARA O TRACKING */}
+      {(() => {
+        if (subTab !== 'tracking') return null;
+        
+        const PIPELINE_MAIN_FLOW = [
+          { id: 'STARTED', label: 'STARTED', icon: PlayCircle, color: 'text-zinc-400', bg: 'bg-zinc-400/10', border: 'border-zinc-400/20', action: 'metadata' },
+          { id: 'PENDING_METADATA_EXTRACTION', label: 'PENDING METADATA EXTRACTION', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20', action: 'metadata' },
+          { id: 'EXTRACTING_METADATA', label: 'EXTRACTING METADATA', icon: Loader2, color: 'text-amber-300', bg: 'bg-amber-300/10', border: 'border-amber-300/20', action: 'metadata' },
+          { id: 'METADATA_EXTRACTED', label: 'METADATA EXTRACTED', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', action: 'download' },
+          { id: 'PENDING_DOWNLOAD', label: 'PENDING DOWNLOAD', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20', action: 'download' },
+          { id: 'DOWNLOADING', label: 'DOWNLOADING', icon: Loader2, color: 'text-blue-300', bg: 'bg-blue-300/10', border: 'border-blue-300/20', action: 'download' },
+          { id: 'DOWNLOADED', label: 'DOWNLOADED', icon: CheckCircle2, color: 'text-indigo-400', bg: 'bg-indigo-400/10', border: 'border-indigo-400/20', action: 'download' },
+          { id: 'COMPLETED', label: 'COMPLETED', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', action: 'completed' },
+        ];
+
+        const PIPELINE_EXCEPTIONS = [
+          { id: 'MEMBERS_ONLY', label: 'MEMBERS ONLY', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+          { id: 'AGE_RESTRICTED', label: 'AGE RESTRICTED', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+          { id: 'PRIVATE_VIDEO', label: 'PRIVATE VIDEO', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+          { id: 'COPYRIGHT_REMOVED', label: 'COPYRIGHT REMOVED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
+          { id: 'ACCOUNT_TERMINATED', label: 'ACCOUNT TERMINATED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
+          { id: 'VIDEO_REMOVED', label: 'VIDEO REMOVED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
+        ];
+        
+        const PIPELINE_OTHER = [
+          { id: 'ERROR', label: 'ERROR', icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20', action: 'retry' },
+          { id: 'REPROCESSING', label: 'REPROCESSING', icon: RefreshCw, color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', action: 'retry' },
+          { id: 'DELETED', label: 'DELETED', icon: Trash, color: 'text-zinc-600', bg: 'bg-zinc-600/10', border: 'border-zinc-600/20', action: 'none' },
+        ];
+        
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-zinc-900/80 border border-zinc-800 rounded-2xl shadow-sm gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-fuchsia-500/10 rounded-xl border border-fuchsia-500/20 text-fuchsia-400">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-zinc-100">{t('trackingPipelineTitle' as any) || 'Tracking de Pipeline'}</h3>
+                  <p className="text-xs text-zinc-400 font-mono mt-0.5">{t('trackingPipelineDesc' as any) || 'Visão geral do processamento do YouTube Catcher Engine'}</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={handleGlobalRetry}
+                disabled={isRetryingGlobal}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 font-medium text-xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRetryingGlobal ? 'animate-spin' : ''}`} />
+                <span>Reprocessar Todas as Falhas</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-6">
+              {/* FLUXO PRINCIPAL */}
+              <div className="bg-zinc-950/40 p-4 rounded-3xl border border-zinc-800/60">
+                <h4 className="text-[11px] font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  {t('trackingMainFlow' as any) || 'Fluxo Principal de Captura'}
+                </h4>
+                
+                <div className="flex items-center justify-between w-full gap-2 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900/50">
+                  {PIPELINE_MAIN_FLOW.map((step, idx) => {
+                    const count = statusCounts[step.id] || 0;
+                    const hasNext = idx < PIPELINE_MAIN_FLOW.length - 1;
+                    
+                    return (
+                      <React.Fragment key={step.id}>
+                        <div className="flex-1 min-w-[155px] bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-zinc-700 transition-all shadow-sm shrink-0 relative">
+                          <div className="flex items-start justify-between">
+                            <div className={`p-2.5 rounded-xl border ${step.bg} ${step.border} ${step.color}`}>
+                              <step.icon className={`w-4 h-4 ${step.animate ? 'animate-spin' : ''}`} />
+                            </div>
+                            
+                            {step.action === 'metadata' && (
+                              <button 
+                                onClick={handleTriggerMetadata} 
+                                disabled={isTriggeringMetadata || count === 0}
+                                className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-amber-500/20 text-amber-400 rounded-md border border-amber-500/30 hover:bg-amber-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isTriggeringMetadata ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                                {t('btnExtract' as any) || 'Extrair'}
+                              </button>
+                            )}
+                            {step.action === 'download' && (
+                              <button 
+                                onClick={handleTriggerDownload} 
+                                disabled={isTriggeringDownload || count === 0}
+                                className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-blue-500/20 text-blue-400 rounded-md border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isTriggeringDownload ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                                {t('btnDownload' as any) || 'Baixar'}
+                              </button>
+                            )}
+                            {step.action === 'completed' && (
+                              <button 
+                                disabled
+                                className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-emerald-500/10 text-emerald-500/50 rounded-md border border-emerald-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
+                              >
+                                {t('btnCompleted' as any) || 'Finalizado'}
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <div className="text-3xl font-black text-zinc-100 tracking-tight">{count}</div>
+                            <div className="text-[10px] font-bold text-zinc-400 mt-1 uppercase tracking-wider leading-tight h-8 flex items-center">{step.label}</div>
+                          </div>
+                        </div>
+                        
+                        {hasNext && (
+                          <div className="flex shrink-0 text-zinc-700 mx-1">
+                            <ChevronRight className="w-5 h-5" />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* CONTROLE E MANUTENÇÃO */}
+              <div className="bg-zinc-950/40 p-4 rounded-3xl border border-zinc-800/60">
+                <h4 className="text-[11px] font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+                  {t('trackingMaintenance' as any) || 'Manutenção e Ciclo de Vida'}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {PIPELINE_OTHER.map((step) => {
+                    const count = statusCounts[step.id] || 0;
+                    return (
+                      <div key={step.id} className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3 hover:border-zinc-700 transition-all shadow-sm">
+                        <div className="flex items-start justify-between">
+                          <div className={`p-2.5 rounded-xl border ${step.bg} ${step.border} ${step.color}`}>
+                            <step.icon className={`w-5 h-5 ${step.animate ? 'animate-spin' : ''}`} />
+                          </div>
+                          {step.action === 'retry' && (
+                            <button 
+                              onClick={handleGlobalRetry} 
+                              disabled={isRetryingGlobal || count === 0}
+                              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isRetryingGlobal ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                              {t('btnExecute' as any) || 'Executar'}
+                            </button>
+                          )}
+                          {step.action === 'none' && (
+                            <button 
+                              disabled
+                              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-zinc-500/10 text-zinc-500/50 rounded-md border border-zinc-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
+                            >
+                              {t('btnInactive' as any) || 'Inativo'}
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <div className="text-2xl font-black text-zinc-100 tracking-tight">{count}</div>
+                          <div className="text-[10px] font-bold text-zinc-400 mt-1 uppercase tracking-wider h-6 flex items-center">{step.label}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* EXCEÇÕES E ESTADOS TERMINAIS */}
+              <div className="bg-zinc-950/40 p-4 rounded-3xl border border-zinc-800/60">
+                <h4 className="text-[11px] font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                  {t('trackingExceptions' as any) || 'Exceções e Estados Terminais'}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {PIPELINE_EXCEPTIONS.map((step) => {
+                    const count = statusCounts[step.id] || 0;
+                    return (
+                      <div key={step.id} className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3 hover:border-zinc-700 transition-all shadow-sm">
+                        <div className="flex items-start justify-between">
+                          <div className={`p-2.5 rounded-xl border ${step.bg} ${step.border} ${step.color}`}>
+                            <step.icon className={`w-5 h-5 ${step.animate ? 'animate-spin' : ''}`} />
+                          </div>
+                          {step.action === 'retry' && (
+                            <button 
+                              onClick={handleGlobalRetry} 
+                              disabled={isRetryingGlobal || count === 0}
+                              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isRetryingGlobal ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                              {t('btnExecute' as any) || 'Executar'}
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <div className="text-2xl font-black text-zinc-100 tracking-tight">{count}</div>
+                          <div className="text-[10px] font-bold text-zinc-400 mt-1 uppercase tracking-wider h-6 flex items-center">{step.label}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* SUB-TAB 1: CAPTURED VIDEOS FEED */}
       {subTab === 'captures' && (

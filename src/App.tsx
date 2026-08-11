@@ -50,7 +50,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit, setLimit] = useState(20);
-  const [stepFilter, setStepFilter] = useState('');
+  const [stepFilter, setStepFilter] = useState('COMPLETED');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isFetchingVideos, setIsFetchingVideos] = useState(false);
   const [isFetchingChannels, setIsFetchingChannels] = useState(false);
