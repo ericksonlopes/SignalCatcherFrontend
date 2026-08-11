@@ -59,6 +59,8 @@ export default function App() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [totalStatusCount, setTotalStatusCount] = useState<number>(0);
+  const [totalSavedCount, setTotalSavedCount] = useState<number>(0);
+  const [totalMonitoredCount, setTotalMonitoredCount] = useState<number>(0);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -174,6 +176,19 @@ export default function App() {
         }
       })
       .catch(err => console.error("Failed to fetch saved channels", err));
+      
+    // Fetch Global Stats
+    fetch(`${API_BASE_URL}/api/youtube/content/status-count`)
+      .then(res => res.json())
+      .then(data => {
+        if (data) {
+          if (data.status_counts) setStatusCounts(data.status_counts);
+          if (data.total_videos !== undefined) setTotalStatusCount(data.total_videos);
+          if (data.total_saved_channels !== undefined) setTotalSavedCount(data.total_saved_channels);
+          if (data.total_monitored_channels !== undefined) setTotalMonitoredCount(data.total_monitored_channels);
+        }
+      })
+      .catch(err => console.error("Failed to fetch stats", err));
   }, [refreshTrigger]);
 
   // Data Refresh Interval
@@ -430,6 +445,8 @@ export default function App() {
               isLoadingData={isFetchingVideos || isFetchingChannels}
               statusCounts={statusCounts}
               totalStatusCount={totalStatusCount}
+              totalSavedCount={totalSavedCount}
+              totalMonitoredCount={totalMonitoredCount}
             />
           )}
 

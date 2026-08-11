@@ -203,6 +203,8 @@ interface SignalCatcherAppProps {
   isLoadingData?: boolean;
   statusCounts?: Record<string, number>;
   totalStatusCount?: number;
+  totalSavedCount?: number;
+  totalMonitoredCount?: number;
 }
 
 const getStatusColor = (status: string) => {
@@ -252,7 +254,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   onRefresh,
   isLoadingData = false,
   statusCounts = {},
-  totalStatusCount = 0
+  totalStatusCount = 0,
+  totalSavedCount = 0,
+  totalMonitoredCount = 0
 }) => {
   const { t } = getTranslation(language);
   const [subTab, setSubTab] = useState<'captures' | 'saved_channels' | 'sources' | 'jobs'>('captures');
@@ -672,7 +676,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             }`}
           >
             <Video className="w-3.5 h-3.5 text-indigo-400" />
-            <span>{t('capturedFeeds')} ({captures.length})</span>
+            <span>{t('capturedFeeds')} ({totalStatusCount || captures.length})</span>
           </button>
 
           <button
@@ -684,7 +688,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             }`}
           >
             <Youtube className="w-3.5 h-3.5 text-red-500" />
-            <span>{t('savedChannels')} ({savedChannels.length})</span>
+            <span>{t('savedChannels')} ({totalSavedCount || savedChannels.length})</span>
           </button>
 
           <button
@@ -696,7 +700,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             }`}
           >
             <Radio className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{t('monitoredSources')} ({sources.length})</span>
+            <span>{t('monitoredSources')} ({totalMonitoredCount || sources.length})</span>
           </button>
 
         </div>
@@ -761,6 +765,12 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <option value="DOWNLOADED">DOWNLOADED ({statusCounts['DOWNLOADED'] || 0})</option>
                 <option value="COMPLETED">COMPLETED ({statusCounts['COMPLETED'] || 0})</option>
                 <option value="ERROR">ERROR ({statusCounts['ERROR'] || 0})</option>
+                <option value="MEMBERS_ONLY">MEMBERS_ONLY ({statusCounts['MEMBERS_ONLY'] || 0})</option>
+                <option value="AGE_RESTRICTED">AGE_RESTRICTED ({statusCounts['AGE_RESTRICTED'] || 0})</option>
+                <option value="PRIVATE_VIDEO">PRIVATE_VIDEO ({statusCounts['PRIVATE_VIDEO'] || 0})</option>
+                <option value="COPYRIGHT_REMOVED">COPYRIGHT_REMOVED ({statusCounts['COPYRIGHT_REMOVED'] || 0})</option>
+                <option value="ACCOUNT_TERMINATED">ACCOUNT_TERMINATED ({statusCounts['ACCOUNT_TERMINATED'] || 0})</option>
+                <option value="VIDEO_REMOVED">VIDEO_REMOVED ({statusCounts['VIDEO_REMOVED'] || 0})</option>
                 <option value="REPROCESSING">REPROCESSING ({statusCounts['REPROCESSING'] || 0})</option>
                 <option value="DELETED">DELETED ({statusCounts['DELETED'] || 0})</option>
               </select>
