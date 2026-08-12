@@ -38,7 +38,7 @@ export interface CapturedVideo {
   thumbnail: string;
   createdAt?: string;
   publishedAt: string;
-  duration: string;
+  duration: number | string;
   views: number;
   likes: number;
   commentsCount: number;

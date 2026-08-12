@@ -30,6 +30,25 @@ import {getTranslation} from '../../locales';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
 
+const formatDuration = (duration: number | string | undefined | null): string => {
+  if (duration == null) return '00:00';
+  if (typeof duration === 'string') {
+    if (duration.includes(':')) return duration;
+    const parsed = parseInt(duration, 10);
+    if (isNaN(parsed)) return duration;
+    duration = parsed;
+  }
+  
+  const h = Math.floor(duration / 3600);
+  const m = Math.floor((duration % 3600) / 60);
+  const s = duration % 60;
+  
+  if (h > 0) {
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
 const VideoTrackingViewer: React.FC<{ video: CapturedVideo }> = ({ video }) => {
   const [tracking, setTracking] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1068,7 +1087,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     
                     {/* Duration Badge */}
                     <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-zinc-950/90 text-white font-mono text-[10px] border border-zinc-700">
-                      {video.duration}
+                      {formatDuration(video.duration)}
                     </span>
 
                     {/* Step Badge */}
@@ -1624,7 +1643,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       <Youtube className="w-16 h-16 text-zinc-700 opacity-50" />
                     </div>
                   )}
-                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-[10px] border border-zinc-700/50">{selectedVideo.duration}</span>
+                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-[10px] border border-zinc-700/50">{formatDuration(selectedVideo.duration)}</span>
                 </div>
                 <div className="flex flex-col gap-3">
                   <h3 className="text-lg font-bold text-zinc-100 leading-tight">{selectedVideo.title}</h3>
