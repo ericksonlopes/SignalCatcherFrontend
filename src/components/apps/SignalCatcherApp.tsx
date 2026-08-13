@@ -31,9 +31,18 @@ import {getTranslation} from '../../locales';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
 
 const formatDuration = (duration: number | string | undefined | null): string => {
-  if (duration == null) return '00:00';
+  if (duration == null) return '00:00:00';
   if (typeof duration === 'string') {
-    if (duration.includes(':')) return duration;
+    if (duration.includes(':')) {
+      const parts = duration.split(':');
+      if (parts.length === 2) {
+        return `00:${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+      }
+      if (parts.length === 3) {
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+      }
+      return duration;
+    }
     const parsed = parseInt(duration, 10);
     if (isNaN(parsed)) return duration;
     duration = parsed;
@@ -41,12 +50,9 @@ const formatDuration = (duration: number | string | undefined | null): string =>
   
   const h = Math.floor(duration / 3600);
   const m = Math.floor((duration % 3600) / 60);
-  const s = duration % 60;
+  const s = Math.floor(duration % 60);
   
-  if (h > 0) {
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
 const VideoTrackingViewer: React.FC<{ video: CapturedVideo }> = ({ video }) => {

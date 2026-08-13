@@ -7,7 +7,8 @@ import {
   Terminal, 
   Plus, 
   LayoutGrid,
-  Sparkles
+  Sparkles,
+  Mic
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { CommandPalette } from './components/CommandPalette';
@@ -17,6 +18,7 @@ import { SmartHomeApp } from './components/apps/SmartHomeApp';
 import { FollowerAnalyticsApp } from './components/apps/FollowerAnalyticsApp';
 import { CreatorDashboardsApp } from './components/apps/CreatorDashboardsApp';
 import { CustomAppBuilderModal } from './components/apps/CustomAppBuilderModal';
+import { DiarizationApp } from './components/apps/DiarizationApp';
 
 import { 
   AppTab, 
@@ -336,6 +338,7 @@ export default function App() {
       case 'followers': return <TrendingDown className="w-4 h-4" />;
       case 'creatordash': return <BarChart3 className="w-4 h-4" />;
       case 'fastapi': return <Terminal className="w-4 h-4" />;
+      case 'diarization': return <Mic className="w-4 h-4" />;
       default: return <Sparkles className="w-4 h-4" />;
     }
   };
@@ -371,6 +374,7 @@ export default function App() {
 
           {[
             { id: 'signalcatcher', name: 'SignalCatcher', disabled: false },
+            { id: 'diarization', name: 'Diarização', disabled: false },
             { id: 'smarthome', name: 'Casa Inteligente', disabled: true },
             { id: 'followers', name: 'Seguidores', disabled: true },
             { id: 'creatordash', name: 'Criadores', disabled: true }
@@ -467,6 +471,13 @@ export default function App() {
 
           {activeTab.appId === 'creatordash' && (
             <CreatorDashboardsApp creators={creators} />
+          )}
+
+          {activeTab.appId === 'diarization' && (
+            <DiarizationApp 
+              language={language}
+              onAddLog={addLog}
+            />
           )}
         </main>
       </div>
