@@ -48,6 +48,7 @@ export interface CapturedVideo {
   summary?: string;
   description?: string;
   sentimentScore?: number; // -1 to 1
+  language?: string;
 }
 
 export interface ScheduledJob {

@@ -23,12 +23,13 @@ import {
   Activity,
   AlertCircle,
   CheckCircle2,
-  ServerCrash
+  ServerCrash,
+  ListMusic
 } from 'lucide-react';
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 const formatDuration = (duration: number | string | undefined | null): string => {
   if (duration == null) return '00:00:00';
@@ -55,157 +56,7 @@ const formatDuration = (duration: number | string | undefined | null): string =>
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
-const VideoTrackingViewer: React.FC<{ video: CapturedVideo }> = ({ video }) => {
-  const [tracking, setTracking] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const scrollRef = React.useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!scrollRef.current) return;
-    setIsDragging(true);
-    setStartX(e.pageX - scrollRef.current.offsetLeft);
-    setScrollLeft(scrollRef.current.scrollLeft);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !scrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 2;
-    scrollRef.current.scrollLeft = scrollLeft - walk;
-  };
-
-  useEffect(() => {
-    let externalId = video.postgresRecordId || video.id;
-    if (video.videoUrl) {
-      const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
-      if (match) externalId = match[1];
-    }
-    
-    setTracking([]);
-    setLoading(true);
-    
-    fetch(`${API_BASE_URL}/api/youtube/content/${externalId}/tracking`, { cache: 'no-store' })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch tracking');
-        return res.json();
-      })
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-            const unifiedSteps = [];
-            data.forEach(item => {
-                unifiedSteps.push({
-                    step: item.new_step,
-                    changed_at: item.changed_at
-                });
-            });
-            setTracking(unifiedSteps);
-        } else {
-            throw new Error('No tracking');
-        }
-      })
-      .catch(() => {
-        // Sem tracking retornado pela API, mostramos apenas o início e o status atual para não parecer duplicado
-        setTracking([
-          { step: 'START', changed_at: new Date(Date.now() - 60000).toISOString() },
-          { step: video.status || 'PENDING', changed_at: new Date().toISOString() }
-        ]);
-      })
-      .finally(() => setLoading(false));
-  }, [video]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3 mt-2 mb-2">
-      <h4 className="text-[11px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
-        <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
-        Status de Processamento
-      </h4>
-      <div 
-        ref={scrollRef}
-        onMouseDown={handleMouseDown}
-        onMouseLeave={handleMouseLeave}
-        onMouseUp={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        className={`bg-zinc-900/50 p-6 rounded-xl border border-zinc-800/80 overflow-x-auto scrollbar-none shadow-inner ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
-      >
-        <div className="relative flex items-center justify-center w-max mx-auto pb-12 pt-2 px-4">
-          
-          {tracking.map((item, idx) => {
-            const isLast = idx === tracking.length - 1;
-            const isSuccess = item.step === 'COMPLETED';
-            const isError = item.step === 'ERROR' || item.step?.includes('REMOVED') || item.step?.includes('RESTRICTED');
-            const isActive = isLast && !isSuccess && !isError;
-            const hasNext = idx < tracking.length - 1;
-            
-            return (
-              <div key={idx} className="flex items-center">
-                {/* Node Container */}
-                <div className="relative flex flex-col items-center z-10">
-                  {/* Node Circle */}
-                  <div className={`w-6 h-6 rounded-full border-[3px] flex items-center justify-center transition-all bg-zinc-950 ${
-                    isSuccess ? 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' :
-                    isError ? 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]' :
-                    isActive ? 'border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.5)] animate-pulse' :
-                    'border-indigo-500/40'
-                  }`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${
-                      isSuccess ? 'bg-emerald-400' : 
-                      isError ? 'bg-rose-400' : 
-                      isActive ? 'bg-indigo-300' : 
-                      'bg-indigo-500/50'
-                    }`}></div>
-                  </div>
-                  
-                  {/* Status text (absolute positioned to avoid breaking flex layout) */}
-                  <div className="absolute top-8 flex flex-col items-center text-center w-32">
-                    <span className={`text-[9px] font-bold uppercase font-mono tracking-wider leading-tight ${
-                      isActive ? 'text-indigo-300 drop-shadow-[0_0_8px_rgba(99,102,241,0.8)]' : 
-                      isSuccess ? 'text-emerald-400' : 
-                      isError ? 'text-rose-400' : 
-                      'text-zinc-400'
-                    }`}>
-                      {item.step ? item.step.replace(/_/g, ' ') : 'START'}
-                    </span>
-                    <span className="text-[8px] text-zinc-600 font-mono mt-1 bg-zinc-950/80 px-1.5 py-0.5 rounded border border-zinc-800/50">
-                      {new Date(item.changed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Connecting Line to next node */}
-                {hasNext && (
-                  <div className={`w-16 sm:w-24 h-[2px] -mx-1 z-0 ${
-                    isError ? 'bg-rose-900/50' : 
-                    'bg-indigo-500/70'
-                  }`}></div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 interface SignalCatcherAppProps {
   language?: LanguageMode;
@@ -323,6 +174,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [deletingVideoIds, setDeletingVideoIds] = useState<Set<string>>(new Set());
   const [videoToDelete, setVideoToDelete] = useState<CapturedVideo | null>(null);
 
+  const [diarizationModalVideo, setDiarizationModalVideo] = useState<CapturedVideo | null>(null);
+  const [diarizationLanguage, setDiarizationLanguage] = useState<string>('');
+  const [isDiarizing, setIsDiarizing] = useState(false);
+
   const handleGlobalRetry = async () => {
     setIsRetryingGlobal(true);
     onAddLog('SignalCatcher', 'info', t('notifGlobalRetryStart'));
@@ -420,6 +275,46 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }
   };
 
+  const handleDiarizationClick = (e: React.MouseEvent, video: CapturedVideo) => {
+    e.stopPropagation();
+    setDiarizationModalVideo(video);
+    setDiarizationLanguage(video.language || '');
+  };
+
+  const confirmDiarization = async () => {
+    if (!diarizationModalVideo) return;
+    
+    let externalId = diarizationModalVideo.postgresRecordId || diarizationModalVideo.id;
+    if (diarizationModalVideo.videoUrl) {
+      const match = diarizationModalVideo.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
+      if (match) externalId = match[1];
+    }
+
+    onAddLog('SignalCatcher', 'info', `Iniciando diarização para o vídeo ${externalId}...`);
+    setIsDiarizing(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/diarization/youtube/${externalId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: diarizationLanguage || null }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      
+      onAddLog('SignalCatcher', 'success', `Diarização iniciada com sucesso (Task ID: ${data.task_id})`);
+      setDiarizationModalVideo(null);
+      
+    } catch (err: any) {
+      onAddLog('SignalCatcher', 'error', `Falha ao iniciar diarização: ${err.message || err}`);
+    } finally {
+      setIsDiarizing(false);
+    }
+  };
+
   // Filtered captures (sources only, captures are pre-filtered by backend)
   const filteredSources = sources.filter((s) => {
     const q = query.toLowerCase();
@@ -477,7 +372,16 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorDetail = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.detail) {
+            errorDetail = errorData.detail;
+          }
+        } catch (e) {
+          // Ignore json parse error
+        }
+        throw new Error(errorDetail);
       }
 
       const resData = await response.json();
@@ -495,7 +399,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       setManualUrl('');
       setIsIngestionModalOpen(false);
     } catch (err) {
-      onAddLog('SignalCatcher', 'error', `${t('notifErrorVideo')} ${err}`);
+      onAddLog('SignalCatcher', 'error', `${t('notifErrorVideo')} ${err instanceof Error ? err.message : String(err)}`);
+      if (onOpenNotifications) {
+        onOpenNotifications();
+      }
     } finally {
       setIsProcessingManual(false);
     }
@@ -1166,17 +1073,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                         <span className="hidden xl:inline">{t('btnReprocess')}</span>
                       </button>
                     )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setVideoToDelete(video);
-                      }}
-                      disabled={deletingVideoIds.has(video.id)}
-                      className="flex items-center justify-center p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 transition-all disabled:opacity-50 shadow-sm"
-                      title="Excluir Vídeo e Arquivo"
-                    >
-                      <Trash className={`w-3.5 h-3.5 ${deletingVideoIds.has(video.id) ? 'animate-pulse' : ''}`} />
-                    </button>
+
                   </div>
                   <a
                     href={video.videoUrl}
@@ -1712,28 +1609,50 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 </div>
               </div>
 
-              <div className="w-full">
-                <VideoTrackingViewer video={selectedVideo} />
-              </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-zinc-800/80 flex items-center justify-end gap-3 bg-zinc-950">
-              <button
-                onClick={() => setSelectedVideo(null)}
-                className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs font-bold transition-all"
-              >
-                {t('closeDetails')}
-              </button>
-              <a
-                href={selectedVideo.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 hover:scale-[1.02] hover:shadow-indigo-600/40"
-              >
-                <span>{t('watchOnYouTube')}</span>
-                <ExternalLink className="w-4 h-4" />
-              </a>
+            <div className="p-4 border-t border-zinc-800/80 flex items-center justify-between bg-zinc-950">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedVideo(null);
+                    setVideoToDelete(selectedVideo);
+                  }}
+                  disabled={deletingVideoIds.has(selectedVideo.id)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 text-xs font-bold transition-all disabled:opacity-50"
+                >
+                  <Trash className={`w-4 h-4 ${deletingVideoIds.has(selectedVideo.id) ? 'animate-pulse' : ''}`} />
+                  <span>Excluir</span>
+                </button>
+                {selectedVideo.status === 'COMPLETED' && (
+                  <button 
+                      onClick={(e) => handleDiarizationClick(e, selectedVideo)}
+                      className="px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold shadow-sm shadow-purple-500/10 transition-colors flex items-center gap-1.5 border border-purple-500/20"
+                    >
+                      <ListMusic className="w-3.5 h-3.5" />
+                      Diarização
+                    </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedVideo(null)}
+                  className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs font-bold transition-all"
+                >
+                  {t('closeDetails')}
+                </button>
+                <a
+                  href={selectedVideo.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 hover:scale-[1.02] hover:shadow-indigo-600/40"
+                >
+                  <span>{t('watchOnYouTube')}</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -1787,6 +1706,74 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   <Trash className="w-4 h-4" />
                 )}
                 {t('btnConfirmDelete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Diarization Config Modal */}
+      {diarizationModalVideo && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDiarizationModalVideo(null)}>
+          <div className="bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
+              <h3 className="text-zinc-100 font-bold flex items-center gap-2">
+                <ListMusic className="w-5 h-5 text-purple-400" />
+                Configurar Diarização
+              </h3>
+              <button
+                onClick={() => setDiarizationModalVideo(null)}
+                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-sm text-zinc-400 mb-4">
+                Confirme as configurações antes de enviar para o modelo de separação de vozes.
+              </p>
+              
+              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 mb-4">
+                <p className="text-sm text-zinc-200 font-bold line-clamp-1">{diarizationModalVideo.title}</p>
+                <p className="text-xs text-zinc-500 mt-1">{diarizationModalVideo.sourceName}</p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                  Idioma (Language)
+                </label>
+                <input
+                  type="text"
+                  value={diarizationLanguage}
+                  onChange={(e) => setDiarizationLanguage(e.target.value)}
+                  placeholder="pt, en, es, etc."
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                />
+                <p className="text-[10px] text-zinc-500 mt-1">
+                  Deixe em branco ou insira o código do idioma (ex: pt) para ajudar na precisão.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-zinc-900/30 border-t border-zinc-800/80 flex justify-end gap-3">
+              <button
+                onClick={() => setDiarizationModalVideo(null)}
+                className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700/80 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDiarization}
+                disabled={isDiarizing}
+                className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold shadow-md shadow-purple-500/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isDiarizing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ListMusic className="w-4 h-4" />
+                )}
+                Confirmar Diarização
               </button>
             </div>
           </div>

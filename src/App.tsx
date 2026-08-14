@@ -106,7 +106,8 @@ export default function App() {
             tags: item.tags || [],
             summary: '',
             description: item.description || '',
-            sentimentScore: 0
+            sentimentScore: 0,
+            language: item.language
           }));
           setCaptures(fetchedCaptures);
           if (data.total_pages) {
