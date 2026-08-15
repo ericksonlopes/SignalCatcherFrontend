@@ -199,8 +199,9 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
       {/* Main Content / Detail View */}
       <div className={`flex-1 flex flex-col transition-all duration-300 ${!selectedVideo ? 'hidden lg:flex' : 'flex'}`}>
         {selectedVideo ? (
-          <DiarizationViewer video={selectedVideo} onClose={() => setSelectedVideo(null)} />
+          <DiarizationViewer key={selectedVideo.id} video={selectedVideo} onClose={() => setSelectedVideo(null)} />
         ) : (
+
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/10 p-8 text-center">
             <div className="w-24 h-24 mb-6 rounded-full bg-zinc-900/50 border border-zinc-800/80 flex items-center justify-center">
               <Mic className="w-10 h-10 text-zinc-600" />

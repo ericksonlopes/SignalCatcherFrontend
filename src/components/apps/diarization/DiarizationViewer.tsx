@@ -38,10 +38,31 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
   });
   
   const [expandedSegments, setExpandedSegments] = useState<Record<string, boolean>>({});
+  const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+
+  React.useEffect(() => {
+    if (video.result_json?.speakers) {
+      const colors = ['bg-indigo-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500', 'bg-purple-500', 'bg-blue-500'];
+      setSpeakers(
+        video.result_json.speakers.map((id: string, index: number) => ({
+          id,
+          name: id === 'UNKNOWN' ? 'Desconhecido' : `Locutor ${index + 1}`,
+          color: colors[index % colors.length]
+        }))
+      );
+    } else {
+      setSpeakers([]);
+    }
+    setExpandedSegments({});
+    setEditingSpeakerId(null);
+    setEditName('');
+  }, [video.id, video.result_json]);
 
   const toggleSegment = (id: string) => {
     setExpandedSegments(prev => ({ ...prev, [id]: !prev[id] }));
   };
+
   
   const segments: DiarizationSegment[] = React.useMemo(() => {
     if (video.result_json?.segments) {
@@ -71,10 +92,9 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
     }
     return [];
   }, [video.result_json]);
-  const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
 
   const formatTime = (seconds: number) => {
+
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = Math.floor(seconds % 60).toString().padStart(2, '0');
     return `${m}:${s}`;

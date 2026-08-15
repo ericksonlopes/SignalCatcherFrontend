@@ -53,6 +53,7 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(1);
   const [limit, setLimit] = useState(20);
   const [stepFilter, setStepFilter] = useState('COMPLETED');
+  const [channelFilter, setChannelFilter] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isFetchingVideos, setIsFetchingVideos] = useState(false);
   const [isFetchingChannels, setIsFetchingChannels] = useState(false);
@@ -83,7 +84,8 @@ export default function App() {
     }
     const stepQuery = stepFilter ? `&step=${stepFilter}` : '';
     const searchQueryParam = debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : '';
-    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}${searchQueryParam}`)
+    const channelQueryParam = channelFilter ? `&channel=${encodeURIComponent(channelFilter)}` : '';
+    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}${searchQueryParam}${channelQueryParam}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.items) {
@@ -129,7 +131,8 @@ export default function App() {
         setIsFetchingVideos(false);
         initialVideosFetched.current = true;
       });
-  }, [currentPage, refreshTrigger, limit, stepFilter, debouncedSearchQuery]);
+  }, [currentPage, refreshTrigger, limit, stepFilter, debouncedSearchQuery, channelFilter]);
+
 
   useEffect(() => {
     if (!initialChannelsFetched.current) {
@@ -443,7 +446,10 @@ export default function App() {
               onLimitChange={setLimit}
               stepFilter={stepFilter}
               onStepFilterChange={setStepFilter}
+              channelFilter={channelFilter}
+              onChannelFilterChange={setChannelFilter}
               searchQuery={searchQuery}
+
               onSearchQueryChange={setSearchQuery}
               onOpenNotifications={() => {
                 setIsNotificationsOpen(true);

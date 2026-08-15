@@ -79,7 +79,10 @@ interface SignalCatcherAppProps {
   onLimitChange?: (limit: number) => void;
   stepFilter?: string;
   onStepFilterChange?: (step: string) => void;
+  channelFilter?: string;
+  onChannelFilterChange?: (channel: string) => void;
   searchQuery?: string;
+
   onSearchQueryChange?: (search: string) => void;
   onOpenNotifications?: () => void;
   onRefresh?: () => void;
@@ -131,7 +134,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   onLimitChange,
   stepFilter = '',
   onStepFilterChange,
+  channelFilter = '',
+  onChannelFilterChange,
   searchQuery = '',
+
   onSearchQueryChange,
   onOpenNotifications,
   onRefresh,
@@ -970,7 +976,35 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <option value="DELETED">DELETED ({statusCounts['DELETED'] || 0})</option>
               </select>
             )}
+
+            {onChannelFilterChange && (
+              <select
+                value={channelFilter}
+                onChange={(e) => {
+                  onChannelFilterChange(e.target.value);
+                  if (onPageChange) onPageChange(1); // Reset page on filter change
+                }}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
+              >
+                <option value="">Todos os Canais</option>
+                {Array.from(
+                  new Set([
+                    ...sources.map((s) => s.name),
+                    ...(savedChannels || []).map((s) => s.name),
+                    ...captures.map((c) => c.sourceName),
+                  ])
+                )
+                  .filter(Boolean)
+                  .sort()
+                  .map((channelName) => (
+                    <option key={channelName} value={channelName}>
+                      {channelName}
+                    </option>
+                  ))}
+              </select>
+            )}
           </div>
+
 
           {/* Videos Bento Grid */}
           {isLoadingData ? (

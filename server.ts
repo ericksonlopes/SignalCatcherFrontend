@@ -253,12 +253,18 @@ async function startServer() {
    * GET /api/youtube/content
    * Lists ingested YouTube contents.
    */
-  app.get("/api/youtube/content", (_req, res) => {
+  app.get("/api/youtube/content", (req, res) => {
+    let items = youtubeContents;
+    const channelQuery = (req.query.channel as string || "").toLowerCase();
+    if (channelQuery) {
+      items = items.filter(i => (i.sourceName || "").toLowerCase().includes(channelQuery));
+    }
     return res.json({
       success: true,
-      data: youtubeContents
+      data: items
     });
   });
+
 
   // Health check
   app.get("/api/health", (_req, res) => {
