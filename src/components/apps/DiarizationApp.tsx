@@ -31,6 +31,31 @@ interface DiarizationAppProps {
   onAddLog: (app: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
 }
 
+const formatDuration = (duration: number | string | undefined | null): string => {
+  if (duration == null) return '00:00';
+  if (typeof duration === 'string') {
+    if (duration.includes(':')) {
+      const parts = duration.split(':');
+      if (parts.length === 3 && parts[0] === '00') {
+        return `${parts[1]}:${parts[2]}`;
+      }
+      return duration;
+    }
+    const parsed = parseInt(duration, 10);
+    if (isNaN(parsed)) return duration;
+    duration = parsed;
+  }
+
+  const h = Math.floor(duration / 3600);
+  const m = Math.floor((duration % 3600) / 60);
+  const s = Math.floor(duration % 60);
+
+  if (h > 0) {
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
 export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddLog }) => {
   const [videos, setVideos] = useState<DiarizationVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<DiarizationVideo | null>(null);
@@ -175,7 +200,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
                   <div className="relative w-24 h-14 shrink-0 rounded-lg overflow-hidden bg-zinc-800 shadow-inner">
                     <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
                     <div className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-[9px] font-mono font-bold text-zinc-300">
-                      {video.duration}
+                      {formatDuration(video.duration)}
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col min-w-0 justify-center">
