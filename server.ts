@@ -65,7 +65,10 @@ async function startServer() {
     tags: string[];
     summary: string;
     sentimentScore: number;
+    is_diarized?: boolean;
+    diarization_status?: string | null;
   }> = [];
+
 
   // API Routes
 

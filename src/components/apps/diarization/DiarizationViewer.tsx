@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, FastForward, Rewind, Download, Edit3, Settings, Check, X } from 'lucide-react';
+import { Play, Pause, FastForward, Rewind, Download, Edit3, Settings, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { DiarizationVideo } from '../DiarizationApp';
 
 interface DiarizationSegment {
@@ -8,6 +8,7 @@ interface DiarizationSegment {
   startTime: number; // in seconds
   endTime: number; // in seconds
   text: string;
+  subSegments?: DiarizationSegment[];
 }
 
 interface Speaker {
@@ -24,8 +25,6 @@ interface DiarizationViewerProps {
 }
 
 export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onClose }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(15); // dummy time for visual demo
   const [speakers, setSpeakers] = useState<Speaker[]>(() => {
     if (video.result_json?.speakers) {
       const colors = ['bg-indigo-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500', 'bg-purple-500', 'bg-blue-500'];
@@ -38,15 +37,37 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
     return [];
   });
   
+  const [expandedSegments, setExpandedSegments] = useState<Record<string, boolean>>({});
+
+  const toggleSegment = (id: string) => {
+    setExpandedSegments(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+  
   const segments: DiarizationSegment[] = React.useMemo(() => {
     if (video.result_json?.segments) {
-      return video.result_json.segments.map((seg: any, idx: number) => ({
-        id: `seg-${idx}`,
-        speakerId: seg.speaker,
-        startTime: seg.start,
-        endTime: seg.end,
-        text: seg.text
-      }));
+      const merged: DiarizationSegment[] = [];
+      video.result_json.segments.forEach((seg: any, idx: number) => {
+        const last = merged[merged.length - 1];
+        const currentSeg: DiarizationSegment = {
+          id: `seg-${idx}`,
+          speakerId: seg.speaker,
+          startTime: seg.start,
+          endTime: seg.end,
+          text: (seg.text || '').trim()
+        };
+
+        if (last && last.speakerId === seg.speaker) {
+          if (!last.subSegments) {
+            last.subSegments = [ { ...last } ]; // copy original state
+          }
+          last.endTime = seg.end;
+          last.text = `${last.text} ${currentSeg.text}`.trim();
+          last.subSegments.push(currentSeg);
+        } else {
+          merged.push(currentSeg);
+        }
+      });
+      return merged;
     }
     return [];
   }, [video.result_json]);
@@ -98,61 +119,68 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
         {/* Main Transcript Area */}
         <div className="flex-1 flex flex-col min-w-0">
           
-          {/* Audio Player (Mock) */}
-          <div className="flex flex-col gap-3 p-6 border-b border-zinc-800/80 bg-zinc-900/30">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="w-12 h-12 flex items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-transform active:scale-95"
-              >
-                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
-              </button>
-              
-              <div className="flex-1 flex flex-col gap-2">
-                <div className="flex justify-between text-xs font-mono text-zinc-400">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(video.result_json?.duration || 0)}</span>
-                </div>
-                <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden relative cursor-pointer">
-                  <div className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full" style={{ width: '25%' }} />
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Transcript List */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {segments.map((segment) => {
               const speaker = speakers.find(s => s.id === segment.speakerId);
-              const isActive = currentTime >= segment.startTime && currentTime <= segment.endTime;
+              const isExpanded = expandedSegments[segment.id];
+              const hasSubSegments = segment.subSegments && segment.subSegments.length > 0;
               
               return (
                 <div 
                   key={segment.id} 
-                  className={`flex gap-4 p-4 rounded-2xl border transition-all duration-300 ${
-                    isActive 
-                      ? 'bg-zinc-800/50 border-indigo-500/30 shadow-sm' 
-                      : 'bg-zinc-900/20 border-transparent hover:bg-zinc-900/40'
-                  }`}
+                  onClick={() => { if (hasSubSegments) toggleSegment(segment.id); }}
+                  className={`flex flex-col gap-4 p-4 rounded-2xl border transition-all duration-300 ${hasSubSegments ? 'cursor-pointer hover:border-zinc-700/50 hover:bg-zinc-800/40' : ''} bg-zinc-900/20 border-transparent hover:bg-zinc-900/40`}
                 >
-                  {/* Speaker Avatar / Badge */}
-                  <div className="shrink-0 flex flex-col items-center gap-2">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner ${speaker?.color || 'bg-zinc-600'}`}>
-                      {speaker?.name.charAt(0).toUpperCase()}
+                  <div className="flex gap-4">
+                    {/* Speaker Avatar / Badge */}
+                    <div className="shrink-0 flex flex-col items-center gap-2">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner ${speaker?.color || 'bg-zinc-600'}`}>
+                        {speaker?.name.charAt(0).toUpperCase()}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="font-semibold text-sm text-zinc-200">{speaker?.name || segment.speakerId}</span>
-                      <span className="text-[11px] font-mono text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
-                        {formatTime(segment.startTime)} - {formatTime(segment.endTime)}
-                      </span>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-zinc-200">{speaker?.name || segment.speakerId}</span>
+                          <span className="text-[11px] font-mono text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
+                            {formatTime(segment.startTime)} - {formatTime(segment.endTime)}
+                          </span>
+                        </div>
+                        {hasSubSegments && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); toggleSegment(segment.id); }}
+                            className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-indigo-400 hover:text-indigo-300 transition-colors"
+                          >
+                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            {isExpanded ? 'Ocultar' : 'Expandir frases'}
+                          </button>
+                        )}
+                      </div>
+                      {isExpanded && hasSubSegments ? (
+                        <div className="flex flex-col gap-4 mt-2">
+                          {segment.subSegments!.map(subSeg => {
+                            return (
+                              <div key={subSeg.id} className="flex flex-col gap-1">
+                                <span className="text-[10px] font-mono text-zinc-500 bg-zinc-900/30 w-fit px-1.5 py-0.5 rounded">
+                                  {formatTime(subSeg.startTime)} - {formatTime(subSeg.endTime)}
+                                </span>
+                                <p className={`text-base leading-relaxed text-zinc-300`}>
+                                  {subSeg.text}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className={`text-base leading-relaxed text-zinc-300`}>
+                          {segment.text}
+                        </p>
+                      )}
                     </div>
-                    <p className={`text-base leading-relaxed ${isActive ? 'text-zinc-100' : 'text-zinc-400'}`}>
-                      {segment.text}
-                    </p>
                   </div>
                 </div>
               );

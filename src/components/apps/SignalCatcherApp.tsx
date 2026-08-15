@@ -24,8 +24,11 @@ import {
   AlertCircle,
   CheckCircle2,
   ServerCrash,
-  ListMusic
+  ListMusic,
+  Mic,
+  MicOff
 } from 'lucide-react';
+
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
 
@@ -306,7 +309,20 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       const data = await response.json();
       
       onAddLog('SignalCatcher', 'success', `Diarização iniciada com sucesso (Task ID: ${data.task_id})`);
+      setCaptures((prevCaptures) =>
+        prevCaptures.map((c) =>
+          c.id === diarizationModalVideo.id
+            ? { ...c, isDiarized: false, diarizationStatus: 'PENDING' }
+            : c
+        )
+      );
+      if (selectedVideo && selectedVideo.id === diarizationModalVideo.id) {
+        setSelectedVideo((prev) =>
+          prev ? { ...prev, isDiarized: false, diarizationStatus: 'PENDING' } : null
+        );
+      }
       setDiarizationModalVideo(null);
+
       
     } catch (err: any) {
       onAddLog('SignalCatcher', 'error', `Falha ao iniciar diarização: ${err.message || err}`);
@@ -1003,7 +1019,36 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       {formatDuration(video.duration)}
                     </span>
 
+                    {/* Diarization Badge */}
+                    {(video.isDiarized || video.diarizationStatus) && (
+                      <div className={`absolute bottom-2 left-2 flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm ${
+                        video.isDiarized || video.diarizationStatus === 'COMPLETED'
+                          ? 'bg-purple-950/90 text-purple-300 border-purple-500/40'
+                          : video.diarizationStatus === 'ERROR'
+                          ? 'bg-rose-950/90 text-rose-300 border-rose-500/40'
+                          : 'bg-amber-950/90 text-amber-300 border-amber-500/40'
+                      }`}>
+                        {video.isDiarized || video.diarizationStatus === 'COMPLETED' ? (
+                          <>
+                            <Mic className="w-3 h-3 text-purple-400" />
+                            <span>Diarizado</span>
+                          </>
+                        ) : video.diarizationStatus === 'ERROR' ? (
+                          <>
+                            <MicOff className="w-3 h-3 text-rose-400" />
+                            <span>Erro Diarização</span>
+                          </>
+                        ) : (
+                          <>
+                            <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+                            <span>Diarizando...</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     {/* Step Badge */}
+
                     {video.status && (
                       <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${getStatusColor(video.status)} text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
                         <span>{video.status.replace(/_/g, ' ')}</span>
@@ -1560,6 +1605,32 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     <span className={`px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 ${getStatusColor(selectedVideo.status)} text-[10px] uppercase font-mono font-bold tracking-wider shadow-sm`}>
                       {selectedVideo.status.replace(/_/g, ' ')}
                     </span>
+                    {(selectedVideo.isDiarized || selectedVideo.diarizationStatus) && (
+                      <span className={`px-2.5 py-1 rounded-md border text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${
+                        selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED'
+                          ? 'bg-purple-950/90 border-purple-500/40 text-purple-300'
+                          : selectedVideo.diarizationStatus === 'ERROR'
+                          ? 'bg-rose-950/90 border-rose-500/40 text-rose-300'
+                          : 'bg-amber-950/90 border-amber-500/40 text-amber-300'
+                      }`}>
+                        {selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED' ? (
+                          <>
+                            <Mic className="w-3 h-3 text-purple-400" />
+                            <span>Diarizado</span>
+                          </>
+                        ) : selectedVideo.diarizationStatus === 'ERROR' ? (
+                          <>
+                            <MicOff className="w-3 h-3 text-rose-400" />
+                            <span>Erro Diarização</span>
+                          </>
+                        ) : (
+                          <>
+                            <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+                            <span>Diarizando...</span>
+                          </>
+                        )}
+                      </span>
+                    )}
                     {selectedVideo.publishedAt && (
                       <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5 ml-2 bg-zinc-900/50 px-2 py-1 rounded-md border border-zinc-800/50">
                         <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
@@ -1632,9 +1703,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       className="px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold shadow-sm shadow-purple-500/10 transition-colors flex items-center gap-1.5 border border-purple-500/20"
                     >
                       <ListMusic className="w-3.5 h-3.5" />
-                      Diarização
+                      {selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED' ? 'Refazer Diarização' : 'Diarização'}
                     </button>
                 )}
+
               </div>
               <div className="flex items-center gap-3">
                 <button

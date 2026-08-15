@@ -107,8 +107,11 @@ export default function App() {
             summary: '',
             description: item.description || '',
             sentimentScore: 0,
-            language: item.language
+            language: item.language,
+            isDiarized: item.is_diarized ?? item.isDiarized ?? false,
+            diarizationStatus: item.diarization_status || item.diarizationStatus || null
           }));
+
           setCaptures(fetchedCaptures);
           if (data.total_pages) {
             setTotalPages(data.total_pages);

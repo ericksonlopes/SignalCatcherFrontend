@@ -49,7 +49,10 @@ export interface CapturedVideo {
   description?: string;
   sentimentScore?: number; // -1 to 1
   language?: string;
+  isDiarized?: boolean;
+  diarizationStatus?: string | null;
 }
+
 
 export interface ScheduledJob {
   id: string;
