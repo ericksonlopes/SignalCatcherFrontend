@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import {
   Clock,
   Database,
@@ -172,6 +172,42 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [manualUrl, setManualUrl] = useState('');
   const [saveInPlaylistFolder, setSaveInPlaylistFolder] = useState(false);
   const [isProcessingManual, setIsProcessingManual] = useState(false);
+
+  // Map channel external_id -> display title/name for select filter and display
+  const channelOptions = useMemo(() => {
+    const map = new Map<string, string>(); // external_id -> display_name
+
+    // 1. Saved channels
+    (savedChannels || []).forEach((c) => {
+      if (c.channelId) {
+        map.set(c.channelId, c.name || c.channelId);
+      }
+    });
+
+    // 2. Monitored sources
+    (sources || []).forEach((s) => {
+      if (s.channelId) {
+        if (!map.has(s.channelId) || map.get(s.channelId) === s.channelId) {
+          map.set(s.channelId, s.name || s.channelId);
+        }
+      }
+    });
+
+    // 3. Captures (for any external_id not in saved/monitored channels)
+    (captures || []).forEach((c) => {
+      if (c.sourceName && !map.has(c.sourceName)) {
+        map.set(c.sourceName, c.sourceName);
+      }
+    });
+
+    return Array.from(map.entries()).sort((a, b) =>
+      a[1].localeCompare(b[1], undefined, { sensitivity: 'base' })
+    );
+  }, [savedChannels, sources, captures]);
+
+  const channelMap = useMemo(() => {
+    return new Map(channelOptions);
+  }, [channelOptions]);
 
   // New source form state
   const [newSourceName, setNewSourceName] = useState('');
@@ -987,20 +1023,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
               >
                 <option value="">Todos os Canais</option>
-                {Array.from(
-                  new Set([
-                    ...sources.map((s) => s.name),
-                    ...(savedChannels || []).map((s) => s.name),
-                    ...captures.map((c) => c.sourceName),
-                  ])
-                )
-                  .filter(Boolean)
-                  .sort()
-                  .map((channelName) => (
-                    <option key={channelName} value={channelName}>
-                      {channelName}
-                    </option>
-                  ))}
+                {channelOptions.map(([externalId, displayName]) => (
+                  <option key={externalId} value={externalId}>
+                    {displayName}
+                  </option>
+                ))}
               </select>
             )}
           </div>
@@ -1030,7 +1057,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <div className="flex flex-col flex-1">
                   {/* Card Header: Channel Info */}
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-semibold text-zinc-200">{video.sourceName}</span>
+                    <span className="text-xs font-semibold text-zinc-200">{channelMap.get(video.sourceName) || video.sourceName}</span>
                   </div>
 
                   {/* Thumbnail & Badges */}
