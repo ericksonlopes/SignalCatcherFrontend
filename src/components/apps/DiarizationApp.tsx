@@ -8,7 +8,8 @@ import {
   Play,
   Filter,
   RefreshCw,
-  Check
+  Check,
+  X
 } from 'lucide-react';
 import { LanguageMode } from '../../types';
 import { DiarizationViewer } from './diarization/DiarizationViewer';
@@ -63,7 +64,8 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
   });
 
   const getStepBadge = (step: DiarizationVideo['step']) => {
-    switch (step) {
+    const normalizedStep = (step || '').toUpperCase();
+    switch (normalizedStep) {
       case 'STARTED':
         return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> Iniciado</span>;
       case 'PENDING':
@@ -78,6 +80,8 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
         return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-wider"><Check className="w-3 h-3" /> Concluído</span>;
       case 'ERROR':
         return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider"><X className="w-3 h-3" /> Erro</span>;
+      default:
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-400 border border-zinc-700 uppercase tracking-wider">{normalizedStep}</span>;
     }
   };
 
@@ -106,16 +110,40 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
               />
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setStepFilter('ALL')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Todas
               </button>
               <button
+                onClick={() => setStepFilter('PENDING')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+              >
+                Pendentes
+              </button>
+              <button
+                onClick={() => setStepFilter('TRANSCRIPTION')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'TRANSCRIPTION' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+              >
+                Transcrevendo
+              </button>
+              <button
+                onClick={() => setStepFilter('DIARIZATION')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'DIARIZATION' ? 'bg-purple-500/20 text-purple-400 shadow-sm border border-purple-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+              >
+                Separando
+              </button>
+              <button
+                onClick={() => setStepFilter('ERROR')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+              >
+                Erro
+              </button>
+              <button
                 onClick={() => setStepFilter('COMPLETED')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Concluídos
               </button>
