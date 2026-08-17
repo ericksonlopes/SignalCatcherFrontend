@@ -118,11 +118,17 @@ export const pt = {
   notifSuccessSource: "Fonte registrada com sucesso! (ID:",
   notifErrorSource: "Erro ao registrar fonte:",
 
-  // Retry Actions
+  // Retry & Diarization Actions
   btnReprocessFailures: "Reprocessar Falhas",
   titleReprocessFailures: "Reprocessar todas as falhas de captura",
   btnReprocess: "Reprocessar",
   titleReprocessVideo: "Reprocessar Vídeo",
+  btnDiarize: "Diarização",
+  btnRediarize: "Refazer Diarização",
+  btnStartDiarization: "Iniciar Diarização",
+  diarizing: "Diarizando...",
+  diarized: "Diarizado",
+  diarizationError: "Erro Diarização",
   notifGlobalRetryStart: "Iniciando reprocessamento global de erros...",
   notifGlobalRetrySuccess: "Reprocessamento iniciado em segundo plano!",
   notifGlobalRetryError: "Falha no reprocessamento global:",

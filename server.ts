@@ -265,6 +265,27 @@ async function startServer() {
     });
   });
 
+  /**
+   * POST /api/diarization/youtube/:id
+   * Triggers audio diarization for a YouTube video.
+   */
+  app.post("/api/diarization/youtube/:id", (req, res) => {
+    const { id } = req.params;
+    const { language } = req.body || {};
+
+    const video = youtubeContents.find(v => v.id === id || v.postgresRecordId === id);
+    if (video) {
+      video.is_diarized = false;
+      video.diarization_status = 'PENDING';
+    }
+
+    return res.json({
+      success: true,
+      task_id: `task-diarize-${Date.now()}`,
+      message: `Diarização iniciada para o vídeo ${id} (Idioma: ${language || 'Auto'})`
+    });
+  });
+
 
   // Health check
   app.get("/api/health", (_req, res) => {

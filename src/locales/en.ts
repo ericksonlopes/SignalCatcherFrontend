@@ -120,11 +120,17 @@ export const en: Record<TranslationKeys, string> = {
   notifSuccessSource: "Source successfully registered! (ID:",
   notifErrorSource: "Error registering source:",
 
-  // Retry Actions
+  // Retry & Diarization Actions
   btnReprocessFailures: "Reprocess Failures",
   titleReprocessFailures: "Reprocess all capture failures",
   btnReprocess: "Reprocess",
   titleReprocessVideo: "Reprocess Video",
+  btnDiarize: "Diarization",
+  btnRediarize: "Redo Diarization",
+  btnStartDiarization: "Start Diarization",
+  diarizing: "Diarizing...",
+  diarized: "Diarized",
+  diarizationError: "Diarization Error",
   notifGlobalRetryStart: "Starting global error reprocessing...",
   notifGlobalRetrySuccess: "Reprocessing started in the background!",
   notifGlobalRetryError: "Failed global reprocessing:",

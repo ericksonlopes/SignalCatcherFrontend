@@ -220,7 +220,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [videoToDelete, setVideoToDelete] = useState<CapturedVideo | null>(null);
 
   const [diarizationModalVideo, setDiarizationModalVideo] = useState<CapturedVideo | null>(null);
-  const [diarizationLanguage, setDiarizationLanguage] = useState<string>('');
+  const [diarizationLanguage, setDiarizationLanguage] = useState<string>('en');
   const [isDiarizing, setIsDiarizing] = useState(false);
 
   const handleGlobalRetry = async () => {
@@ -323,7 +323,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const handleDiarizationClick = (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
     setDiarizationModalVideo(video);
-    setDiarizationLanguage(video.language || '');
+    setDiarizationLanguage(video.language || 'en');
   };
 
   const confirmDiarization = async () => {
@@ -342,7 +342,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       const response = await fetch(`${API_BASE_URL}/api/diarization/youtube/${externalId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: diarizationLanguage || null }),
+        body: JSON.stringify({ language: diarizationLanguage || 'en' }),
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -1165,9 +1165,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   </div>
                 </div>
 
-                {/* Card Footer: Abrir Button */}
-                <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
+                {/* Card Footer: Buttons */}
+                <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 overflow-hidden">
                     {['ERROR', 'DELETED'].includes(video.status) && (
                       <button
                         onClick={(e) => handleIndividualRetry(e, video)}
@@ -1180,13 +1180,52 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       </button>
                     )}
 
+                    {video.status === 'COMPLETED' && (() => {
+                      const isPending = ['PENDING', 'STARTED', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'IN_PROGRESS', 'PROCESSING'].includes(video.diarizationStatus || '') || (isDiarizing && diarizationModalVideo?.id === video.id);
+                      const isCompleted = video.isDiarized || video.diarizationStatus === 'COMPLETED';
+                      const isError = video.diarizationStatus === 'ERROR';
+
+                      let btnStyle = "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 hover:text-purple-200";
+                      let btnTitle = t('btnStartDiarization');
+                      let btnText = t('btnStartDiarization');
+                      let btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400" />;
+
+                      if (isPending) {
+                        btnStyle = "bg-amber-500/10 border-amber-500/30 text-amber-300 cursor-not-allowed opacity-90";
+                        btnTitle = t('diarizing');
+                        btnText = t('diarizing');
+                        btnIcon = <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />;
+                      } else if (isCompleted) {
+                        btnStyle = "bg-purple-500/10 border-purple-500/30 text-purple-400/80 cursor-not-allowed opacity-75";
+                        btnTitle = t('diarized');
+                        btnText = t('diarized');
+                        btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400/70" />;
+                      } else if (isError) {
+                        btnStyle = "bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-300 hover:text-rose-200";
+                        btnTitle = t('btnRediarize');
+                        btnText = t('diarizationError');
+                        btnIcon = <MicOff className="w-3.5 h-3.5 text-rose-400" />;
+                      }
+
+                      return (
+                        <button
+                          onClick={(e) => handleDiarizationClick(e, video)}
+                          disabled={isPending || isCompleted}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-[11px] border transition-all shadow-sm ${btnStyle}`}
+                          title={btnTitle}
+                        >
+                          {btnIcon}
+                          <span>{btnText}</span>
+                        </button>
+                      );
+                    })()}
                   </div>
                   <a
                     href={video.videoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-sm hover:scale-[1.02]"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-sm hover:scale-[1.02] shrink-0"
                   >
                     <span>{t('openVideo')}</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -1880,11 +1919,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   type="text"
                   value={diarizationLanguage}
                   onChange={(e) => setDiarizationLanguage(e.target.value)}
-                  placeholder="pt, en, es, etc."
+                  placeholder="en, pt, es, etc."
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                 />
                 <p className="text-[10px] text-zinc-500 mt-1">
-                  Deixe em branco ou insira o código do idioma (ex: pt) para ajudar na precisão.
+                  Idioma padrão selecionado como 'en' (Inglês) para maior precisão, podendo ser alterado.
                 </p>
               </div>
             </div>
