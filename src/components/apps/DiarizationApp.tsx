@@ -9,7 +9,9 @@ import {
   Filter,
   RefreshCw,
   Check,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { LanguageMode } from '../../types';
 import { DiarizationViewer } from './diarization/DiarizationViewer';
@@ -20,7 +22,7 @@ export interface DiarizationVideo {
   thumbnail: string;
   channelName: string;
   duration: string;
-  step: 'STARTED' | 'PENDING' | 'TRANSCRIPTION' | 'ALIGNMENT' | 'DIARIZATION' | 'COMPLETED' | 'ERROR';
+  step: 'STARTED' | 'PENDING' | 'TRANSCRIPTION' | 'ALIGNMENT' | 'DIARIZATION' | 'COMPLETED' | 'ERROR' | string;
   result_json?: any;
 }
 
@@ -62,31 +64,62 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
   const [searchQuery, setSearchQuery] = useState('');
   const [stepFilter, setStepFilter] = useState<string>('ALL');
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(20);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalItems, setTotalItems] = useState<number>(0);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchDiarizations = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/diarization/list`);
+        const params = new URLSearchParams();
+        params.append('page', currentPage.toString());
+        params.append('limit', limit.toString());
+        if (stepFilter && stepFilter !== 'ALL') {
+          params.append('step', stepFilter);
+        }
+        if (searchQuery.trim()) {
+          params.append('search', searchQuery.trim());
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/diarization/list?${params.toString()}`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
-        setVideos(data.diarizations || []);
+        
+        if (isMounted) {
+          setVideos(data.items || data.diarizations || []);
+          if (data.total_pages !== undefined) setTotalPages(data.total_pages);
+          if (data.total !== undefined) setTotalItems(data.total);
+        }
       } catch (err) {
-        onAddLog('Diarization', 'error', `Falha ao carregar diarizações: ${err}`);
+        if (isMounted) {
+          onAddLog('Diarization', 'error', `Falha ao carregar diarizações: ${err}`);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
+
     fetchDiarizations();
     const interval = setInterval(fetchDiarizations, 5000);
-    return () => clearInterval(interval);
-  }, [onAddLog]);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentPage, limit, stepFilter, searchQuery, onAddLog]);
 
-  const filteredVideos = videos.filter(v => {
-    const matchesSearch = v.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          v.channelName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStep = stepFilter === 'ALL' || v.step === stepFilter;
-    return matchesSearch && matchesStep;
-  });
+  const handleStepFilterChange = (newStep: string) => {
+    setStepFilter(newStep);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (newSearch: string) => {
+    setSearchQuery(newSearch);
+    setCurrentPage(1);
+  };
 
   const getStepBadge = (step: DiarizationVideo['step']) => {
     const normalizedStep = (step || '').toUpperCase();
@@ -130,44 +163,44 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
                 type="text"
                 placeholder="Buscar por título ou canal..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-zinc-900/50 border border-zinc-800 rounded-xl text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all shadow-inner"
               />
             </div>
             
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setStepFilter('ALL')}
+                onClick={() => handleStepFilterChange('ALL')}
                 className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Todas
               </button>
               <button
-                onClick={() => setStepFilter('PENDING')}
+                onClick={() => handleStepFilterChange('PENDING')}
                 className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Pendentes
               </button>
               <button
-                onClick={() => setStepFilter('TRANSCRIPTION')}
+                onClick={() => handleStepFilterChange('TRANSCRIPTION')}
                 className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'TRANSCRIPTION' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Transcrevendo
               </button>
               <button
-                onClick={() => setStepFilter('DIARIZATION')}
+                onClick={() => handleStepFilterChange('DIARIZATION')}
                 className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'DIARIZATION' ? 'bg-purple-500/20 text-purple-400 shadow-sm border border-purple-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Separando
               </button>
               <button
-                onClick={() => setStepFilter('ERROR')}
+                onClick={() => handleStepFilterChange('ERROR')}
                 className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Erro
               </button>
               <button
-                onClick={() => setStepFilter('COMPLETED')}
+                onClick={() => handleStepFilterChange('COMPLETED')}
                 className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
               >
                 Concluídos
@@ -178,13 +211,13 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
 
         {/* List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {filteredVideos.length === 0 ? (
+          {videos.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
               <Mic className="w-10 h-10 mb-3 opacity-20" />
               <p className="text-sm">Nenhuma diarização encontrada.</p>
             </div>
           ) : (
-            filteredVideos.map(video => (
+            videos.map(video => (
               <div 
                 key={video.id}
                 onClick={() => video.step === 'COMPLETED' ? setSelectedVideo(video) : null}
@@ -219,6 +252,48 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
             ))
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 0 && (
+          <div className="p-3 border-t border-zinc-800/80 bg-zinc-900/30 flex items-center justify-between text-xs text-zinc-400">
+            <div className="flex items-center gap-1.5 font-mono text-[11px]">
+              <span>{totalItems} total</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage <= 1 || isLoading}
+                className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Página Anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="font-mono text-[11px] text-zinc-300">
+                {currentPage} / {totalPages || 1}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages || isLoading}
+                className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Próxima Página"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-[10px] rounded px-1.5 py-0.5 outline-none focus:border-indigo-500 font-mono ml-1"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content / Detail View */}

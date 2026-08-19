@@ -266,6 +266,113 @@ async function startServer() {
   });
 
   /**
+   * GET /api/diarization/list
+   * Returns a paginated list of diarizations.
+   */
+  const mockDiarizations = [
+    {
+      id: "diar-1",
+      step: "COMPLETED",
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+      entity_id: "vid-sample-1",
+      entity_type: "YOUTUBE_VIDEO",
+      title: "Top 10 AI Tools You Need in 2026",
+      channelName: "Fireship",
+      thumbnail: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=300&auto=format&fit=crop&q=80",
+      duration: "08:42",
+      result_json: {
+        segments: [
+          { speaker: "SPEAKER_00", start: 0.0, end: 4.5, text: "Welcome back! Today we are looking at the newest AI tools for developers." },
+          { speaker: "SPEAKER_01", start: 4.8, end: 9.2, text: "Let us dive straight into tool number one, which completely transforms debugging." }
+        ]
+      }
+    },
+    {
+      id: "diar-2",
+      step: "TRANSCRIPTION",
+      created_at: new Date(Date.now() - 1800000).toISOString(),
+      entity_id: "vid-sample-2",
+      entity_type: "YOUTUBE_VIDEO",
+      title: "Python FastAPI 2.0 Full Architecture Guide",
+      channelName: "Python Mastery",
+      thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=300&auto=format&fit=crop&q=80",
+      duration: "24:15",
+      result_json: null
+    },
+    {
+      id: "diar-3",
+      step: "DIARIZATION",
+      created_at: new Date(Date.now() - 900000).toISOString(),
+      entity_id: "vid-sample-3",
+      entity_type: "YOUTUBE_VIDEO",
+      title: "Building Microservices with Docker & Postgres",
+      channelName: "TechLead",
+      thumbnail: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80",
+      duration: "15:30",
+      result_json: null
+    }
+  ];
+
+  app.get(["/api/diarization/list", "/api/diarization"], (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 20));
+    const stepFilter = (req.query.step as string || "").toUpperCase();
+    const searchQuery = (req.query.search as string || "").toLowerCase();
+
+    let items = [...mockDiarizations];
+
+    // Combine with any dynamically triggered diarizations from youtubeContents
+    youtubeContents.forEach(v => {
+      if (v.diarization_status && !items.some(d => d.entity_id === v.id || d.entity_id === v.postgresRecordId)) {
+        items.unshift({
+          id: `diar-${v.id}`,
+          step: v.diarization_status,
+          created_at: new Date().toISOString(),
+          entity_id: v.postgresRecordId || v.id,
+          entity_type: "YOUTUBE_VIDEO",
+          title: v.title,
+          channelName: v.sourceName,
+          thumbnail: v.thumbnail,
+          duration: v.duration,
+          result_json: null
+        });
+      }
+    });
+
+    if (stepFilter && stepFilter !== "ALL") {
+      items = items.filter(d => (d.step || "").toUpperCase() === stepFilter);
+    }
+
+    if (searchQuery) {
+      items = items.filter(d =>
+        (d.title || "").toLowerCase().includes(searchQuery) ||
+        (d.channelName || "").toLowerCase().includes(searchQuery)
+      );
+    }
+
+    const total = items.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const offset = (page - 1) * limit;
+    const paginatedItems = items.slice(offset, offset + limit);
+
+    const statusCounts: Record<string, number> = {};
+    for (const d of mockDiarizations) {
+      statusCounts[d.step] = (statusCounts[d.step] || 0) + 1;
+    }
+
+    return res.json({
+      items: paginatedItems,
+      diarizations: paginatedItems,
+      total,
+      page,
+      limit,
+      total_pages: totalPages,
+      status_counts: statusCounts,
+      total_status_count: total
+    });
+  });
+
+  /**
    * POST /api/diarization/youtube/:id
    * Triggers audio diarization for a YouTube video.
    */

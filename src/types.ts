@@ -53,6 +53,29 @@ export interface CapturedVideo {
   diarizationStatus?: string | null;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  status_counts?: Record<string, number>;
+  total_status_count?: number;
+}
+
+export interface DiarizationItem {
+  id: string;
+  step: 'STARTED' | 'PENDING' | 'TRANSCRIPTION' | 'ALIGNMENT' | 'DIARIZATION' | 'COMPLETED' | 'ERROR' | string;
+  created_at?: string | null;
+  entity_id?: string | null;
+  entity_type?: string | null;
+  title: string;
+  channelName: string;
+  thumbnail: string;
+  duration: string;
+  result_json?: any;
+}
+
 
 export interface ScheduledJob {
   id: string;
