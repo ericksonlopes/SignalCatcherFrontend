@@ -3,17 +3,18 @@ import { en } from './en';
 import { LanguageMode } from '../types';
 
 export const translations = {
-  pt,
   en,
+  pt,
 };
 
-export function getTranslation(lang: LanguageMode = 'pt') {
-  const currentLocale = translations[lang] || translations.pt;
+export function getTranslation(lang: LanguageMode | string = 'en') {
+  const selectedLang: LanguageMode = lang === 'pt' ? 'pt' : 'en';
+  const currentLocale = translations[selectedLang] || translations.en;
 
   return {
     t: (key: TranslationKeys): string => {
-      return currentLocale[key] || translations.pt[key] || key;
+      return currentLocale[key] || translations.en[key] || key;
     },
-    lang,
+    lang: selectedLang,
   };
 }

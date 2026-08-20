@@ -28,13 +28,13 @@ export const FollowerAnalyticsApp: React.FC<FollowerAnalyticsAppProps> = ({
   const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'youtube' | 'instagram' | 'xTwitter' | 'tiktok'>('all');
 
   const latestStats = history[history.length - 1] || {
-    youtube: 1422950,
-    instagram: 311300,
-    xTwitter: 190450,
-    tiktok: 524100,
-    gained: 1120,
-    lost: 140,
-    netChange: 980
+    youtube: 0,
+    instagram: 0,
+    xTwitter: 0,
+    tiktok: 0,
+    gained: 0,
+    lost: 0,
+    netChange: 0
   };
 
   const totalFollowers = latestStats.youtube + latestStats.instagram + latestStats.xTwitter + latestStats.tiktok;

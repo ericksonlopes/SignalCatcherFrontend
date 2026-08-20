@@ -153,7 +153,41 @@ export const pt = {
   btnDownload: "Baixar",
   btnExecute: "Executar",
   btnCompleted: "Finalizado",
-  btnInactive: "Inativo"
+  btnInactive: "Inativo",
+
+  // Diarization & Audio Processing
+  diarizationAppTitle: "Diarizações",
+  diarizationAppSubtitle: "Diarização",
+  searchDiarizationsPlaceholder: "Buscar por título ou canal...",
+  noDiarizationsFound: "Nenhuma diarização encontrada.",
+  diarizationWorkspaceTitle: "Workspace de Diarização",
+  diarizationWorkspaceDesc: "Selecione uma diarização concluída na lista ao lado para visualizar a transcrição separada por locutores.",
+  diarizationCompletedStatus: "Diarização Concluída",
+  exportBtn: "Exportar",
+  speakersTitle: "Locutores",
+  speakerUnknown: "Desconhecido",
+  speakerLabel: "Locutor",
+  hidePhrases: "Ocultar",
+  expandPhrases: "Expandir frases",
+  diarizationModalSubtitle: "Confirme as configurações antes de enviar para o modelo de separação de vozes.",
+  diarizationModalLangLabel: "Idioma (Language)",
+  diarizationModalLangDesc: "Idioma padrão selecionado como 'en' (Inglês) para maior precisão, podendo ser alterado.",
+  confirmDiarizationBtn: "Confirmar Diarização",
+  stepStarted: "Iniciado",
+  stepPending: "Pendente",
+  stepProcessing: "Processando",
+  stepTranscription: "Transcrevendo",
+  stepAlignment: "Alinhando",
+  stepDiarization: "Separando Vozes",
+  stepCompleted: "Concluído",
+  stepError: "Erro",
+  stepAll: "Todas",
+  stepPendingPlural: "Pendentes",
+  stepErrorsPlural: "Erros",
+  stepCompletedPlural: "Concluídos",
+  prevPage: "Página Anterior",
+  nextPage: "Próxima Página",
+  loadDiarizationsError: "Falha ao carregar diarizações:"
 };
 
 export type TranslationKeys = keyof typeof pt;

@@ -14,6 +14,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { LanguageMode } from '../../types';
+import { getTranslation } from '../../locales';
 import { DiarizationViewer } from './diarization/DiarizationViewer';
 
 export interface DiarizationVideo {
@@ -29,7 +30,7 @@ export interface DiarizationVideo {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 interface DiarizationAppProps {
-  language: LanguageMode;
+  language?: LanguageMode;
   onAddLog: (app: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
 }
 
@@ -58,7 +59,8 @@ const formatDuration = (duration: number | string | undefined | null): string =>
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
-export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddLog }) => {
+export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en', onAddLog }) => {
+  const { t } = getTranslation(language);
   const [videos, setVideos] = useState<DiarizationVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<DiarizationVideo | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,7 +96,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
         }
       } catch (err) {
         if (isMounted) {
-          onAddLog('Diarization', 'error', `Falha ao carregar diarizações: ${err}`);
+          onAddLog('Diarization', 'error', `${t('loadDiarizationsError')} ${err}`);
         }
       } finally {
         if (isMounted) {
@@ -125,21 +127,21 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
     const normalizedStep = (step || '').toUpperCase();
     switch (normalizedStep) {
       case 'STARTED':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> Iniciado</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepStarted')}</span>;
       case 'PENDING':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> Pendente</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepPending')}</span>;
       case 'PROCESSING':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> Processando</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepProcessing')}</span>;
       case 'TRANSCRIPTION':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> Transcrevendo</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepTranscription')}</span>;
       case 'ALIGNMENT':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> Alinhando</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepAlignment')}</span>;
       case 'DIARIZATION':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-500 border border-purple-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> Separando Vozes</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-500 border border-purple-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepDiarization')}</span>;
       case 'COMPLETED':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-wider"><Check className="w-3 h-3" /> Concluído</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-wider"><Check className="w-3 h-3" /> {t('stepCompleted')}</span>;
       case 'ERROR':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider"><X className="w-3 h-3" /> Erro</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider"><X className="w-3 h-3" /> {t('stepError')}</span>;
       default:
         return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-400 border border-zinc-700 uppercase tracking-wider">{normalizedStep}</span>;
     }
@@ -155,7 +157,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
         <div className="p-6 border-b border-zinc-800/80 bg-zinc-900/30">
           <h1 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2 mb-4">
             <Mic className="w-5 h-5 text-indigo-500" />
-            Diarizações
+            {t('diarizationAppTitle')}
           </h1>
           
           <div className="flex flex-col gap-3">
@@ -163,7 +165,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
               <input
                 type="text"
-                placeholder="Buscar por título ou canal..."
+                placeholder={t('searchDiarizationsPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-zinc-900/50 border border-zinc-800 rounded-xl text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all shadow-inner"
@@ -176,19 +178,19 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
                   onClick={() => handleStepFilterChange('ALL')}
                   className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
-                  Todas
+                  {t('stepAll')}
                 </button>
                 <button
                   onClick={() => handleStepFilterChange('PENDING')}
                   className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
-                  Pendentes
+                  {t('stepPendingPlural')}
                 </button>
                 <button
                   onClick={() => handleStepFilterChange('PROCESSING')}
                   className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PROCESSING' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
-                  Processando
+                  {t('stepProcessing')}
                 </button>
               </div>
               <div className="flex items-center gap-2">
@@ -196,13 +198,13 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
                   onClick={() => handleStepFilterChange('ERROR')}
                   className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
-                  Erros
+                  {t('stepErrorsPlural')}
                 </button>
                 <button
                   onClick={() => handleStepFilterChange('COMPLETED')}
                   className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
-                  Concluídos
+                  {t('stepCompletedPlural')}
                 </button>
               </div>
             </div>
@@ -214,7 +216,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
           {videos.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
               <Mic className="w-10 h-10 mb-3 opacity-20" />
-              <p className="text-sm">Nenhuma diarização encontrada.</p>
+              <p className="text-sm">{t('noDiarizationsFound')}</p>
             </div>
           ) : (
             videos.map(video => (
@@ -264,7 +266,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage <= 1 || isLoading}
                 className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title="Página Anterior"
+                title={t('prevPage')}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -275,7 +277,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages || isLoading}
                 className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title="Próxima Página"
+                title={t('nextPage')}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -299,16 +301,16 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
       {/* Main Content / Detail View */}
       <div className={`flex-1 flex flex-col transition-all duration-300 ${!selectedVideo ? 'hidden lg:flex' : 'flex'}`}>
         {selectedVideo ? (
-          <DiarizationViewer key={selectedVideo.id} video={selectedVideo} onClose={() => setSelectedVideo(null)} />
+          <DiarizationViewer key={selectedVideo.id} video={selectedVideo} language={language} onClose={() => setSelectedVideo(null)} />
         ) : (
 
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/10 p-8 text-center">
             <div className="w-24 h-24 mb-6 rounded-full bg-zinc-900/50 border border-zinc-800/80 flex items-center justify-center">
               <Mic className="w-10 h-10 text-zinc-600" />
             </div>
-            <h2 className="text-xl font-bold text-zinc-300 mb-2">Workspace de Diarização</h2>
+            <h2 className="text-xl font-bold text-zinc-300 mb-2">{t('diarizationWorkspaceTitle')}</h2>
             <p className="max-w-md text-sm text-zinc-500 leading-relaxed">
-              Selecione uma diarização concluída na lista ao lado para visualizar a transcrição separada por locutores.
+              {t('diarizationWorkspaceDesc')}
             </p>
           </div>
         )}

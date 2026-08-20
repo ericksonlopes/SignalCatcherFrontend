@@ -11,7 +11,7 @@ export interface AppTab {
 }
 
 export type ThemeMode = 'cyberpunk' | 'oled' | 'light';
-export type LanguageMode = 'pt' | 'en';
+export type LanguageMode = 'en' | 'pt';
 
 // SignalCatcher Types
 export interface ContentSource {

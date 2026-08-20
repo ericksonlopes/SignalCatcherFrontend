@@ -20,32 +20,7 @@ async function startServer() {
     lastCaptured: string;
     status: string;
     totalCaptured: number;
-  }> = [
-    {
-      id: "src-1",
-      name: "Fireship (Tech Highlights)",
-      url: "https://www.youtube.com/@Fireship",
-      type: "youtube",
-      channelId: "UCsBjURrPoezykLs9EqgamOA",
-      avatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
-      subscriberCount: 3200000,
-      lastCaptured: new Date().toISOString(),
-      status: "active",
-      totalCaptured: 142
-    },
-    {
-      id: "src-2",
-      name: "Curso em Vídeo (Gustavo Guanabara)",
-      url: "https://www.youtube.com/@cursoemvideo",
-      type: "youtube",
-      channelId: "UC217i3aIu_p39YVshY60jkw",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      subscriberCount: 2100000,
-      lastCaptured: new Date().toISOString(),
-      status: "active",
-      totalCaptured: 98
-    }
-  ];
+  }> = [];
 
   const youtubeContents: Array<{
     id: string;
@@ -269,49 +244,18 @@ async function startServer() {
    * GET /api/diarization/list
    * Returns a paginated list of diarizations.
    */
-  const mockDiarizations = [
-    {
-      id: "diar-1",
-      step: "COMPLETED",
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      entity_id: "vid-sample-1",
-      entity_type: "YOUTUBE_VIDEO",
-      title: "Top 10 AI Tools You Need in 2026",
-      channelName: "Fireship",
-      thumbnail: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=300&auto=format&fit=crop&q=80",
-      duration: "08:42",
-      result_json: {
-        segments: [
-          { speaker: "SPEAKER_00", start: 0.0, end: 4.5, text: "Welcome back! Today we are looking at the newest AI tools for developers." },
-          { speaker: "SPEAKER_01", start: 4.8, end: 9.2, text: "Let us dive straight into tool number one, which completely transforms debugging." }
-        ]
-      }
-    },
-    {
-      id: "diar-2",
-      step: "TRANSCRIPTION",
-      created_at: new Date(Date.now() - 1800000).toISOString(),
-      entity_id: "vid-sample-2",
-      entity_type: "YOUTUBE_VIDEO",
-      title: "Python FastAPI 2.0 Full Architecture Guide",
-      channelName: "Python Mastery",
-      thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=300&auto=format&fit=crop&q=80",
-      duration: "24:15",
-      result_json: null
-    },
-    {
-      id: "diar-3",
-      step: "DIARIZATION",
-      created_at: new Date(Date.now() - 900000).toISOString(),
-      entity_id: "vid-sample-3",
-      entity_type: "YOUTUBE_VIDEO",
-      title: "Building Microservices with Docker & Postgres",
-      channelName: "TechLead",
-      thumbnail: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80",
-      duration: "15:30",
-      result_json: null
-    }
-  ];
+  const mockDiarizations: Array<{
+    id: string;
+    step: string;
+    created_at: string;
+    entity_id: string;
+    entity_type: string;
+    title: string;
+    channelName: string;
+    thumbnail: string;
+    duration: string;
+    result_json: any;
+  }> = [];
 
   app.get(["/api/diarization/list", "/api/diarization"], (req, res) => {
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
@@ -329,7 +273,7 @@ async function startServer() {
           step: v.diarization_status,
           created_at: new Date().toISOString(),
           entity_id: v.postgresRecordId || v.id,
-          entity_type: "YOUTUBE_VIDEO",
+          entity_type: "YOUTUBE",
           title: v.title,
           channelName: v.sourceName,
           thumbnail: v.thumbnail,

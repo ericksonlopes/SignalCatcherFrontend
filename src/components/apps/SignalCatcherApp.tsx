@@ -117,7 +117,7 @@ const getStatusColor = (status: string) => {
 };
 
 export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
-  language = 'pt',
+  language = 'en',
   sources,
   setSources,
   savedChannels = [],
@@ -159,9 +159,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     if (onSearchQueryChange) onSearchQueryChange(val);
     else setLocalSearchQuery(val);
   };
-
-  const [isAddingSource, setIsAddingSource] = useState(false);
-  const [isCapturingNow, setIsCapturingNow] = useState(false);
 
   // Modal State
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState(false);
@@ -509,74 +506,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }
   };
 
-  const handleAddSourceFromModal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSourceName || !newSourceUrl) return;
-
-    onAddLog('SignalCatcher', 'info', `Enviando POST /api/youtube/sources: { name: "${newSourceName}", url: "${newSourceUrl}" }`);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/sources`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newSourceName, url: newSourceUrl })
-      });
-
-      const resData = await response.json();
-      const apiSource = resData.data;
-
-      const newSource: ContentSource = {
-        id: apiSource?.id || `src-${Date.now()}`,
-        name: apiSource?.name || newSourceName,
-        type: 'youtube',
-        url: apiSource?.url || newSourceUrl,
-        channelId: apiSource?.channelId || `UC_${Math.random().toString(36).substring(2, 9)}`,
-        avatar: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
-        subscriberCount: apiSource?.subscriberCount || 25000,
-        lastCaptured: new Date().toISOString(),
-        status: 'active',
-        intervalMinutes: newSourceInterval,
-        totalCaptured: 0
-      };
-
-      setSources([newSource, ...sources]);
-      onAddLog('SignalCatcher', 'success', `POST /api/youtube/sources 201 Created: Fonte ${newSource.name} registrada!`);
-    } catch (err) {
-      onAddLog('SignalCatcher', 'warning', `Falha ao conectar na API backend, inserido em memória.`);
-    } finally {
-      setNewSourceName('');
-      setNewSourceUrl('');
-      setIsIngestionModalOpen(false);
-    }
-  };
-
-  const handleAddSource = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSourceName || !newSourceUrl) return;
-
-    const newSource: ContentSource = {
-      id: `src-${Date.now()}`,
-      name: newSourceName,
-      type: newSourceType,
-      url: newSourceUrl,
-      channelId: `UC_${Math.random().toString(36).substring(2, 9)}`,
-      avatar: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
-      subscriberCount: 15000,
-      lastCaptured: new Date().toISOString(),
-      status: 'active',
-      intervalMinutes: newSourceInterval,
-      totalCaptured: 0
-    };
-
-    setSources([newSource, ...sources]);
-    onAddLog('SignalCatcher', 'success', `Nova fonte registrada: ${newSourceName} (${newSourceType.toUpperCase()})`);
-    
-    // Reset form
-    setNewSourceName('');
-    setNewSourceUrl('');
-    setIsAddingSource(false);
-  };
-
   const handleToggleSourceStatus = async (id: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/youtube/monitored_channels/${id}/status`, {
@@ -628,37 +557,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     } finally {
       setIsTriggeringDownload(false);
     }
-  };
-
-  const handleManualCaptureTrigger = () => {
-    setIsCapturingNow(true);
-    onAddLog('SignalCatcher', 'info', 'Iniciando captura manual de fontes em tempo real via FastAPI...');
-
-    setTimeout(() => {
-      const mockNewVideo: CapturedVideo = {
-        id: `vid-${Date.now()}`,
-        sourceId: sources[0]?.id || 'src-1',
-        sourceName: sources[0]?.name || 'Tech Source',
-        sourceAvatar: sources[0]?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        title: `NOVO: Análise Automatizada de Fontes e FastAPI #${Math.floor(Math.random() * 100)}`,
-        videoUrl: 'https://youtube.com',
-        thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80',
-        publishedAt: new Date().toISOString(),
-        duration: '06:30',
-        views: 1200,
-        likes: 180,
-        commentsCount: 24,
-        status: 'ingested',
-        postgresRecordId: `pg_uuid_${Math.floor(Math.random() * 8999 + 1000)}`,
-        tags: ['PostgreSQL', 'FastAPI', 'Automation', 'YouTube'],
-        summary: 'Vídeo recém-capturado em lote pelo SignalCatcher cron job e gravado na tabela PostgreSQL signalcatcher_captures.',
-        sentimentScore: 0.91
-      };
-
-      setCaptures([mockNewVideo, ...captures]);
-      setIsCapturingNow(false);
-      onAddLog('SignalCatcher', 'success', `Nova captura registrada no PostgreSQL: ${mockNewVideo.postgresRecordId}`);
-    }, 1200);
   };
 
   return (
@@ -1903,7 +1801,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             
             <div className="p-6">
               <p className="text-sm text-zinc-400 mb-4">
-                Confirme as configurações antes de enviar para o modelo de separação de vozes.
+                {t('diarizationModalSubtitle')}
               </p>
               
               <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 mb-4">
@@ -1913,7 +1811,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                  Idioma (Language)
+                  {t('diarizationModalLangLabel')}
                 </label>
                 <input
                   type="text"
@@ -1923,7 +1821,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                 />
                 <p className="text-[10px] text-zinc-500 mt-1">
-                  Idioma padrão selecionado como 'en' (Inglês) para maior precisão, podendo ser alterado.
+                  {t('diarizationModalLangDesc')}
                 </p>
               </div>
             </div>
@@ -1933,7 +1831,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 onClick={() => setDiarizationModalVideo(null)}
                 className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700/80 transition-colors"
               >
-                Cancelar
+                {t('cancel')}
               </button>
               <button
                 onClick={confirmDiarization}
@@ -1945,7 +1843,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 ) : (
                   <ListMusic className="w-4 h-4" />
                 )}
-                Confirmar Diarização
+                {t('confirmDiarizationBtn')}
               </button>
             </div>
           </div>

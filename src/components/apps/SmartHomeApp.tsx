@@ -31,16 +31,8 @@ export const SmartHomeApp: React.FC<SmartHomeAppProps> = ({
 }) => {
   const [selectedRoom, setSelectedRoom] = useState<string>('All');
 
-  // Simulated telemetry data for room temperatures & energy consumption
-  const telemetryData = [
-    { time: '00:00', tempServer: 36.2, tempStudio: 22.0, powerWatts: 580 },
-    { time: '04:00', tempServer: 35.8, tempStudio: 21.5, powerWatts: 540 },
-    { time: '08:00', tempServer: 37.5, tempStudio: 22.8, powerWatts: 720 },
-    { time: '12:00', tempServer: 40.1, tempStudio: 24.2, powerWatts: 980 },
-    { time: '16:00', tempServer: 39.4, tempStudio: 23.5, powerWatts: 910 },
-    { time: '20:00', tempServer: 38.5, tempStudio: 22.2, powerWatts: 840 },
-    { time: '24:00', tempServer: 37.0, tempStudio: 21.8, powerWatts: 620 }
-  ];
+  // Telemetry data for room temperatures & energy consumption
+  const telemetryData: { time: string; tempServer: number; tempStudio: number; powerWatts: number }[] = [];
 
   const handleToggleDevice = (id: string) => {
     setDevices(devices.map((d) => {
@@ -191,51 +183,57 @@ export const SmartHomeApp: React.FC<SmartHomeAppProps> = ({
         </div>
 
         {/* Devices Bento Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {filteredDevices.map((device) => (
-            <div
-              key={device.id}
-              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
-                device.status
-                  ? 'bg-zinc-900/90 border-emerald-500/40 shadow-sm'
-                  : 'bg-zinc-950/60 border-zinc-800/80 opacity-60'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-950 text-zinc-400 border border-zinc-800">
-                    {device.room}
-                  </span>
-                  <button
-                    onClick={() => handleToggleDevice(device.id)}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      device.status
-                        ? 'bg-emerald-500 text-zinc-950'
-                        : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <Power className="w-4 h-4" />
-                  </button>
+        {filteredDevices.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800 text-center text-zinc-500 font-mono text-xs">
+            Nenhum dispositivo encontrado para o filtro selecionado.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {filteredDevices.map((device) => (
+              <div
+                key={device.id}
+                className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                  device.status
+                    ? 'bg-zinc-900/90 border-emerald-500/40 shadow-sm'
+                    : 'bg-zinc-950/60 border-zinc-800/80 opacity-60'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-950 text-zinc-400 border border-zinc-800">
+                      {device.room}
+                    </span>
+                    <button
+                      onClick={() => handleToggleDevice(device.id)}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        device.status
+                          ? 'bg-emerald-500 text-zinc-950'
+                          : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Power className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <h4 className="font-bold text-xs text-zinc-200 mb-1">{device.name}</h4>
+
+                  {device.value !== undefined && (
+                    <div className="text-sm font-mono font-bold text-emerald-400 mb-2">
+                      {device.value} {device.unit}
+                    </div>
+                  )}
                 </div>
 
-                <h4 className="font-bold text-xs text-zinc-200 mb-1">{device.name}</h4>
-
-                {device.value !== undefined && (
-                  <div className="text-sm font-mono font-bold text-emerald-400 mb-2">
-                    {device.value} {device.unit}
-                  </div>
-                )}
+                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                  <span>{device.powerUsageWatts} W</span>
+                  <span className={device.status ? 'text-emerald-400 font-bold' : 'text-zinc-500'}>
+                    {device.status ? 'ON' : 'OFF'}
+                  </span>
+                </div>
               </div>
-
-              <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                <span>{device.powerUsageWatts} W</span>
-                <span className={device.status ? 'text-emerald-400 font-bold' : 'text-zinc-500'}>
-                  {device.status ? 'ON' : 'OFF'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

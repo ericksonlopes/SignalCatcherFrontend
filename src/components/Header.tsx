@@ -37,7 +37,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   theme,
   setTheme,
-  language = 'pt',
+  language = 'en',
   setLanguage,
   isBackendConnected,
   setIsBackendConnected,

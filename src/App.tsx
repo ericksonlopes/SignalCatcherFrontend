@@ -210,7 +210,18 @@ export default function App() {
 
   // Theme & Language State
   const [theme, setTheme] = useState<ThemeMode>('cyberpunk');
-  const [language, setLanguage] = useState<LanguageMode>('pt');
+  const [language, setLanguage] = useState<LanguageMode>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('signalcatcher_language') : null;
+    return (saved === 'pt' || saved === 'en') ? (saved as LanguageMode) : 'en';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('signalcatcher_language', language);
+    } catch {
+      // ignore storage errors
+    }
+  }, [language]);
   
   // Backend Status Simulation
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(true);
@@ -381,10 +392,10 @@ export default function App() {
 
           {[
             { id: 'signalcatcher', name: 'SignalCatcher', disabled: false },
-            { id: 'diarization', name: 'Diarização', disabled: false },
-            { id: 'smarthome', name: 'Casa Inteligente', disabled: true },
-            { id: 'followers', name: 'Seguidores', disabled: true },
-            { id: 'creatordash', name: 'Criadores', disabled: true }
+            { id: 'diarization', name: language === 'pt' ? 'Diarização' : 'Diarization', disabled: false },
+            { id: 'smarthome', name: language === 'pt' ? 'Casa Inteligente' : 'Smart Home', disabled: true },
+            { id: 'followers', name: language === 'pt' ? 'Seguidores' : 'Followers', disabled: true },
+            { id: 'creatordash', name: language === 'pt' ? 'Criadores' : 'Creators', disabled: true }
           ].map((app) => {
             const isAppActive = activeTab.appId === app.id;
             const existingTab = tabs.find((t) => t.appId === app.id);

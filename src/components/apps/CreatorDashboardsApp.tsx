@@ -29,10 +29,10 @@ export const CreatorDashboardsApp: React.FC<CreatorDashboardsAppProps> = ({ crea
   const viewsChartData = daysOfWeek.map((day, idx) => {
     return {
       day,
-      TechLead: creators[0]?.weeklyViews[idx] || 0,
-      Fireship: creators[1]?.weeklyViews[idx] || 0,
-      LexFridman: creators[2]?.weeklyViews[idx] || 0,
-      MKBHD: creators[3]?.weeklyViews[idx] || 0
+      TechLead: creators[0]?.weeklyViews?.[idx] || 0,
+      Fireship: creators[1]?.weeklyViews?.[idx] || 0,
+      LexFridman: creators[2]?.weeklyViews?.[idx] || 0,
+      MKBHD: creators[3]?.weeklyViews?.[idx] || 0
     };
   });
 
@@ -76,42 +76,48 @@ export const CreatorDashboardsApp: React.FC<CreatorDashboardsAppProps> = ({ crea
       </div>
 
       {/* Creators Profile Cards Bento Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {creators.map((creator) => (
-          <div
-            key={creator.id}
-            onClick={() => setSelectedCreatorId(creator.id)}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-              selectedCreatorId === creator.id || selectedCreatorId === 'all'
-                ? 'bg-zinc-900/90 border-indigo-500/40 shadow-sm'
-                : 'bg-zinc-950/60 border-zinc-800/80 opacity-60'
-            }`}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <img src={creator.avatar} alt="" className="w-10 h-10 rounded-full border border-indigo-500/40" />
-              <div className="min-w-0">
-                <h4 className="font-bold text-sm text-zinc-100 truncate">{creator.creatorName}</h4>
-                <div className="text-xs font-mono text-indigo-400">{creator.handle}</div>
+      {creators.length === 0 ? (
+        <div className="p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800 text-center text-zinc-500 font-mono text-xs">
+          Nenhum criador registrado no momento.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {creators.map((creator) => (
+            <div
+              key={creator.id}
+              onClick={() => setSelectedCreatorId(creator.id)}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                selectedCreatorId === creator.id || selectedCreatorId === 'all'
+                  ? 'bg-zinc-900/90 border-indigo-500/40 shadow-sm'
+                  : 'bg-zinc-950/60 border-zinc-800/80 opacity-60'
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <img src={creator.avatar} alt="" className="w-10 h-10 rounded-full border border-indigo-500/40" />
+                <div className="min-w-0">
+                  <h4 className="font-bold text-sm text-zinc-100 truncate">{creator.creatorName}</h4>
+                  <div className="text-xs font-mono text-indigo-400">{creator.handle}</div>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-1.5 text-xs font-mono border-t border-zinc-800/80 pt-2.5">
-              <div className="flex justify-between">
-                <span className="text-zinc-500">Inscritos:</span>
-                <span className="font-bold text-indigo-400">{(creator.subscribers / 1000000).toFixed(2)}M</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-500">Taxa de Engajamento:</span>
-                <span className="font-bold text-emerald-400">{creator.engagementRate}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-500">Consistência Upload:</span>
-                <span className="font-bold text-cyan-400">{creator.uploadConsistency}%</span>
+              <div className="space-y-1.5 text-xs font-mono border-t border-zinc-800/80 pt-2.5">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Inscritos:</span>
+                  <span className="font-bold text-indigo-400">{(creator.subscribers / 1000000).toFixed(2)}M</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Taxa de Engajamento:</span>
+                  <span className="font-bold text-emerald-400">{creator.engagementRate}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Consistência Upload:</span>
+                  <span className="font-bold text-cyan-400">{creator.uploadConsistency}%</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Recharts Weekly Views Trend & D3 Heatmap Bento Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

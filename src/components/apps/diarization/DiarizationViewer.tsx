@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Play, Pause, FastForward, Rewind, Download, Edit3, Settings, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { DiarizationVideo } from '../DiarizationApp';
+import { LanguageMode } from '../../../types';
+import { getTranslation } from '../../../locales';
 
 interface DiarizationSegment {
   id: string;
@@ -17,20 +19,20 @@ interface Speaker {
   color: string;
 }
 
-
-
 interface DiarizationViewerProps {
   video: DiarizationVideo;
+  language?: LanguageMode;
   onClose?: () => void;
 }
 
-export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onClose }) => {
+export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, language = 'en', onClose }) => {
+  const { t } = getTranslation(language);
   const [speakers, setSpeakers] = useState<Speaker[]>(() => {
     if (video.result_json?.speakers) {
       const colors = ['bg-indigo-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500', 'bg-purple-500', 'bg-blue-500'];
       return video.result_json.speakers.map((id: string, index: number) => ({
         id,
-        name: id === 'UNKNOWN' ? 'Desconhecido' : `Locutor ${index + 1}`,
+        name: id === 'UNKNOWN' ? t('speakerUnknown') : `${t('speakerLabel')} ${index + 1}`,
         color: colors[index % colors.length]
       }));
     }
@@ -47,7 +49,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
       setSpeakers(
         video.result_json.speakers.map((id: string, index: number) => ({
           id,
-          name: id === 'UNKNOWN' ? 'Desconhecido' : `Locutor ${index + 1}`,
+          name: id === 'UNKNOWN' ? t('speakerUnknown') : `${t('speakerLabel')} ${index + 1}`,
           color: colors[index % colors.length]
         }))
       );
@@ -57,7 +59,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
     setExpandedSegments({});
     setEditingSpeakerId(null);
     setEditName('');
-  }, [video.id, video.result_json]);
+  }, [video.id, video.result_json, language]);
 
   const toggleSegment = (id: string) => {
     setExpandedSegments(prev => ({ ...prev, [id]: !prev[id] }));
@@ -118,11 +120,11 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
       <div className="flex items-center justify-between p-6 border-b border-zinc-800/80 bg-zinc-900/50">
         <div className="flex flex-col">
           <h2 className="text-xl font-bold text-zinc-100">{video.title}</h2>
-          <span className="text-sm text-zinc-400 mt-1">{video.channelName} • Diarização Concluída</span>
+          <span className="text-sm text-zinc-400 mt-1">{video.channelName} • {t('diarizationCompletedStatus')}</span>
         </div>
         <div className="flex items-center gap-3">
           <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 text-zinc-300 transition-colors text-sm font-medium">
-            <Download className="w-4 h-4" /> Exportar
+            <Download className="w-4 h-4" /> {t('exportBtn')}
           </button>
           {onClose && (
             <button 
@@ -176,7 +178,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
                             className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-indigo-400 hover:text-indigo-300 transition-colors"
                           >
                             {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                            {isExpanded ? 'Ocultar' : 'Expandir frases'}
+                            {isExpanded ? t('hidePhrases') : t('expandPhrases')}
                           </button>
                         )}
                       </div>
@@ -211,7 +213,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, onC
         {/* Sidebar: Speaker Management */}
         <div className="w-80 border-l border-zinc-800/80 bg-zinc-900/20 flex flex-col hidden xl:flex">
           <div className="p-6 border-b border-zinc-800/80 flex items-center justify-between">
-            <h3 className="font-bold text-zinc-200">Locutores</h3>
+            <h3 className="font-bold text-zinc-200">{t('speakersTitle')}</h3>
             <Settings className="w-4 h-4 text-zinc-500" />
           </div>
           <div className="p-4 space-y-3 overflow-y-auto">
