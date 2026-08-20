@@ -128,6 +128,8 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
         return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> Iniciado</span>;
       case 'PENDING':
         return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> Pendente</span>;
+      case 'PROCESSING':
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> Processando</span>;
       case 'TRANSCRIPTION':
         return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> Transcrevendo</span>;
       case 'ALIGNMENT':
@@ -168,43 +170,41 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language, onAddL
               />
             </div>
             
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleStepFilterChange('ALL')}
-                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-              >
-                Todas
-              </button>
-              <button
-                onClick={() => handleStepFilterChange('PENDING')}
-                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-              >
-                Pendentes
-              </button>
-              <button
-                onClick={() => handleStepFilterChange('TRANSCRIPTION')}
-                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'TRANSCRIPTION' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-              >
-                Transcrevendo
-              </button>
-              <button
-                onClick={() => handleStepFilterChange('DIARIZATION')}
-                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'DIARIZATION' ? 'bg-purple-500/20 text-purple-400 shadow-sm border border-purple-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-              >
-                Separando
-              </button>
-              <button
-                onClick={() => handleStepFilterChange('ERROR')}
-                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-              >
-                Erro
-              </button>
-              <button
-                onClick={() => handleStepFilterChange('COMPLETED')}
-                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-              >
-                Concluídos
-              </button>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleStepFilterChange('ALL')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => handleStepFilterChange('PENDING')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                >
+                  Pendentes
+                </button>
+                <button
+                  onClick={() => handleStepFilterChange('PROCESSING')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PROCESSING' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                >
+                  Processando
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleStepFilterChange('ERROR')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                >
+                  Erros
+                </button>
+                <button
+                  onClick={() => handleStepFilterChange('COMPLETED')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                >
+                  Concluídos
+                </button>
+              </div>
             </div>
           </div>
         </div>

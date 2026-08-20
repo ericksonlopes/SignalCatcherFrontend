@@ -340,7 +340,18 @@ async function startServer() {
     });
 
     if (stepFilter && stepFilter !== "ALL") {
-      items = items.filter(d => (d.step || "").toUpperCase() === stepFilter);
+      if (stepFilter === "PENDING") {
+        items = items.filter(d => (d.step || "").toUpperCase() === "PENDING");
+      } else if (stepFilter === "PROCESSING") {
+        const processingSteps = ["STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION", "PROCESSING"];
+        items = items.filter(d => processingSteps.includes((d.step || "").toUpperCase()));
+      } else if (stepFilter === "ERROR") {
+        items = items.filter(d => (d.step || "").toUpperCase() === "ERROR");
+      } else if (stepFilter === "COMPLETED") {
+        items = items.filter(d => (d.step || "").toUpperCase() === "COMPLETED");
+      } else {
+        items = items.filter(d => (d.step || "").toUpperCase() === stepFilter);
+      }
     }
 
     if (searchQuery) {
