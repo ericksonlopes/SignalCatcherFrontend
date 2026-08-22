@@ -193,5 +193,13 @@ export const en: Record<TranslationKeys, string> = {
   btnReprocessDiarization: "Reprocess",
   reprocessingDiarization: "Reprocessing...",
   notifReprocessDiarizationSuccess: "Diarization sent for reprocessing (Status: Pending)!",
-  notifReprocessDiarizationError: "Failed to reprocess diarization:"
+  notifReprocessDiarizationError: "Failed to reprocess diarization:",
+
+  // Toasts
+  toastViewLogs: "View Logs",
+  toastClearAll: "Clear all",
+  toastSuccess: "Success",
+  toastError: "Error",
+  toastWarning: "Warning",
+  toastInfo: "Information"
 };

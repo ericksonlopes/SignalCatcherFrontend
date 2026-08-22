@@ -19,6 +19,7 @@ import { FollowerAnalyticsApp } from './components/apps/FollowerAnalyticsApp';
 import { CreatorDashboardsApp } from './components/apps/CreatorDashboardsApp';
 import { CustomAppBuilderModal } from './components/apps/CustomAppBuilderModal';
 import { DiarizationApp } from './components/apps/DiarizationApp';
+import { ToastProvider, useToast, ToastContainer } from './components/toast';
 
 import { 
   AppTab, 
@@ -44,7 +45,9 @@ import {
   FASTAPI_ENDPOINTS 
 } from './data/initialData';
 
-export default function App() {
+function SignalCatcherHub() {
+  const { toast } = useToast();
+
   useEffect(() => {
     document.title = "SignalCatcher";
   }, []);
@@ -264,6 +267,17 @@ export default function App() {
     };
     setLogs((prev) => [newLog, ...prev]);
     setUnreadLogsCount((prev) => prev + 1);
+
+    // Trigger reactive Toast notification
+    toast[level](message, sourceApp, {
+      action: {
+        label: language === 'pt' ? 'Ver Logs' : 'View Logs',
+        onClick: () => {
+          setIsNotificationsOpen(true);
+          setUnreadLogsCount(0);
+        }
+      }
+    });
   };
 
   // Live Stream Event Simulation Effect
@@ -528,6 +542,18 @@ export default function App() {
         onClose={() => setIsNewAppModalOpen(false)}
         onAddTab={handleAddTab}
       />
+
+      {/* Global Reactive Toast Notifications */}
+      <ToastContainer />
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <SignalCatcherHub />
+    </ToastProvider>
+  );
+}
+

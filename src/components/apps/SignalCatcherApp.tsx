@@ -663,18 +663,29 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       {(() => {
         if (subTab !== 'tracking') return null;
         
-        const PIPELINE_MAIN_FLOW = [
+        interface PipelineStepDef {
+          id: string;
+          label: string;
+          icon: React.ComponentType<{ className?: string }>;
+          color: string;
+          bg: string;
+          border: string;
+          action?: string;
+          animate?: boolean;
+        }
+
+        const PIPELINE_MAIN_FLOW: PipelineStepDef[] = [
           { id: 'STARTED', label: 'STARTED', icon: PlayCircle, color: 'text-zinc-400', bg: 'bg-zinc-400/10', border: 'border-zinc-400/20', action: 'metadata' },
           { id: 'PENDING_METADATA_EXTRACTION', label: 'PENDING METADATA EXTRACTION', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20', action: 'metadata' },
-          { id: 'EXTRACTING_METADATA', label: 'EXTRACTING METADATA', icon: Loader2, color: 'text-amber-300', bg: 'bg-amber-300/10', border: 'border-amber-300/20', action: 'metadata' },
+          { id: 'EXTRACTING_METADATA', label: 'EXTRACTING METADATA', icon: Loader2, color: 'text-amber-300', bg: 'bg-amber-300/10', border: 'border-amber-300/20', action: 'metadata', animate: true },
           { id: 'METADATA_EXTRACTED', label: 'METADATA EXTRACTED', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', action: 'download' },
           { id: 'PENDING_DOWNLOAD', label: 'PENDING DOWNLOAD', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20', action: 'download' },
-          { id: 'DOWNLOADING', label: 'DOWNLOADING', icon: Loader2, color: 'text-blue-300', bg: 'bg-blue-300/10', border: 'border-blue-300/20', action: 'download' },
+          { id: 'DOWNLOADING', label: 'DOWNLOADING', icon: Loader2, color: 'text-blue-300', bg: 'bg-blue-300/10', border: 'border-blue-300/20', action: 'download', animate: true },
           { id: 'DOWNLOADED', label: 'DOWNLOADED', icon: CheckCircle2, color: 'text-indigo-400', bg: 'bg-indigo-400/10', border: 'border-indigo-400/20', action: 'download' },
           { id: 'COMPLETED', label: 'COMPLETED', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', action: 'completed' },
         ];
 
-        const PIPELINE_EXCEPTIONS = [
+        const PIPELINE_EXCEPTIONS: PipelineStepDef[] = [
           { id: 'MEMBERS_ONLY', label: 'MEMBERS ONLY', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
           { id: 'AGE_RESTRICTED', label: 'AGE RESTRICTED', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
           { id: 'PRIVATE_VIDEO', label: 'PRIVATE VIDEO', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
@@ -683,9 +694,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           { id: 'VIDEO_REMOVED', label: 'VIDEO REMOVED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
         ];
         
-        const PIPELINE_OTHER = [
+        const PIPELINE_OTHER: PipelineStepDef[] = [
           { id: 'ERROR', label: 'ERROR', icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20', action: 'retry' },
-          { id: 'REPROCESSING', label: 'REPROCESSING', icon: RefreshCw, color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', action: 'retry' },
+          { id: 'REPROCESSING', label: 'REPROCESSING', icon: RefreshCw, color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', action: 'retry', animate: true },
           { id: 'DELETED', label: 'DELETED', icon: Trash, color: 'text-zinc-600', bg: 'bg-zinc-600/10', border: 'border-zinc-600/20', action: 'none' },
         ];
         
@@ -877,7 +888,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 type="text"
                 value={query}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder={t('filterPlaceholder', 'Filtrar capturas por título...')}
+                placeholder={t('filterPlaceholder')}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 font-mono"
               />
             </div>

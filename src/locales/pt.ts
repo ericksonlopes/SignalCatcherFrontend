@@ -191,7 +191,15 @@ export const pt = {
   btnReprocessDiarization: "Reprocessar",
   reprocessingDiarization: "Reprocessando...",
   notifReprocessDiarizationSuccess: "Diarização enviada para reprocessamento (Status: Pendente)!",
-  notifReprocessDiarizationError: "Erro ao reprocessar diarização:"
+  notifReprocessDiarizationError: "Erro ao reprocessar diarização:",
+  
+  // Toasts
+  toastViewLogs: "Ver Logs",
+  toastClearAll: "Limpar todos",
+  toastSuccess: "Sucesso",
+  toastError: "Erro",
+  toastWarning: "Aviso",
+  toastInfo: "Informação"
 };
 
 export type TranslationKeys = keyof typeof pt;

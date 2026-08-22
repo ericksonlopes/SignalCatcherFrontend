@@ -23,7 +23,7 @@ export interface ContentSource {
   avatar: string;
   subscriberCount: number;
   lastCaptured: string;
-  status: 'active' | 'paused' | 'error';
+  status: 'active' | 'paused' | 'error' | 'inactive';
   intervalMinutes: number;
   totalCaptured: number;
 }
@@ -144,5 +144,21 @@ export interface ApiEndpoint {
   description: string;
   parameters?: { name: string; type: string; required: boolean; desc: string }[];
   requestBodyExample?: any;
-  responseExample: any;
+  responseExample?: any;
 }
+
+export type ToastType = 'info' | 'success' | 'warning' | 'error';
+
+export interface ToastNotification {
+  id: string;
+  type: ToastType;
+  title?: string;
+  message: string;
+  duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+  createdAt?: number;
+}
+
