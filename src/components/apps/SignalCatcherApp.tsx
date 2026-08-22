@@ -990,17 +990,17 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                         {video.isDiarized || video.diarizationStatus === 'COMPLETED' ? (
                           <>
                             <Mic className="w-3 h-3 text-purple-400" />
-                            <span>Diarizado</span>
+                            <span>{t('diarized')}</span>
                           </>
                         ) : video.diarizationStatus === 'ERROR' ? (
                           <>
                             <MicOff className="w-3 h-3 text-rose-400" />
-                            <span>Erro Diarização</span>
+                            <span>{t('diarizationError')}</span>
                           </>
                         ) : (
                           <>
                             <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
-                            <span>Diarizando...</span>
+                            <span>{t('diarizing')}</span>
                           </>
                         )}
                       </div>
@@ -1614,17 +1614,17 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                         {selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED' ? (
                           <>
                             <Mic className="w-3 h-3 text-purple-400" />
-                            <span>Diarizado</span>
+                            <span>{t('diarized')}</span>
                           </>
                         ) : selectedVideo.diarizationStatus === 'ERROR' ? (
                           <>
                             <MicOff className="w-3 h-3 text-rose-400" />
-                            <span>Erro Diarização</span>
+                            <span>{t('diarizationError')}</span>
                           </>
                         ) : (
                           <>
                             <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
-                            <span>Diarizando...</span>
+                            <span>{t('diarizing')}</span>
                           </>
                         )}
                       </span>

@@ -348,6 +348,32 @@ async function startServer() {
     });
   });
 
+  /**
+   * POST /api/diarization/:id/reprocess & /api/diarization/:id/retry
+   * Resets a diarization task back to PENDING step for reprocessing.
+   */
+  app.post(["/api/diarization/:id/reprocess", "/api/diarization/:id/retry"], (req, res) => {
+    const { id } = req.params;
+
+    const diar = mockDiarizations.find(d => d.id === id || d.entity_id === id);
+    if (diar) {
+      diar.step = "PENDING";
+      diar.result_json = null;
+    }
+
+    const video = youtubeContents.find(v => v.id === id || v.postgresRecordId === id || `diar-${v.id}` === id);
+    if (video) {
+      video.is_diarized = false;
+      video.diarization_status = "PENDING";
+    }
+
+    return res.json({
+      success: true,
+      message: `Diarização ${id} enviada para reprocessamento (Status: Pendente)`,
+      task_id: diar?.id || id,
+      step: "PENDING"
+    });
+  });
 
   // Health check
   app.get("/api/health", (_req, res) => {

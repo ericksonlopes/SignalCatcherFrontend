@@ -187,7 +187,11 @@ export const pt = {
   stepCompletedPlural: "Concluídos",
   prevPage: "Página Anterior",
   nextPage: "Próxima Página",
-  loadDiarizationsError: "Falha ao carregar diarizações:"
+  loadDiarizationsError: "Falha ao carregar diarizações:",
+  btnReprocessDiarization: "Reprocessar",
+  reprocessingDiarization: "Reprocessando...",
+  notifReprocessDiarizationSuccess: "Diarização enviada para reprocessamento (Status: Pendente)!",
+  notifReprocessDiarizationError: "Erro ao reprocessar diarização:"
 };
 
 export type TranslationKeys = keyof typeof pt;

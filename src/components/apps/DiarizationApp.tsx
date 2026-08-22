@@ -24,6 +24,8 @@ export interface DiarizationVideo {
   channelName: string;
   duration: string;
   step: 'STARTED' | 'PENDING' | 'TRANSCRIPTION' | 'ALIGNMENT' | 'DIARIZATION' | 'COMPLETED' | 'ERROR' | string;
+  entity_id?: string;
+  entity_type?: string;
   result_json?: any;
 }
 
@@ -70,6 +72,37 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
   const [limit, setLimit] = useState<number>(20);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalItems, setTotalItems] = useState<number>(0);
+  const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set());
+
+  const handleReprocessDiarization = async (e: React.MouseEvent, video: DiarizationVideo) => {
+    e.stopPropagation();
+    const videoId = video.id;
+    setReprocessingIds(prev => new Set(prev).add(videoId));
+    onAddLog('Diarization', 'info', `${t('btnReprocessDiarization')} (${video.title})...`);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/diarization/${videoId}/reprocess`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${res.status}`);
+      }
+
+      onAddLog('Diarization', 'success', `${t('notifReprocessDiarizationSuccess')} (${video.title})`);
+      setVideos(prev =>
+        prev.map(v => (v.id === videoId ? { ...v, step: 'PENDING' } : v))
+      );
+    } catch (err: any) {
+      onAddLog('Diarization', 'error', `${t('notifReprocessDiarizationError')} ${err.message || err}`);
+    } finally {
+      setReprocessingIds(prev => {
+        const next = new Set(prev);
+        next.delete(videoId);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -228,7 +261,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
                     ? 'bg-indigo-500/10 border-indigo-500/30 shadow-sm' 
                     : video.step === 'COMPLETED'
                       ? 'bg-zinc-900/40 border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700 cursor-pointer'
-                      : 'bg-zinc-900/20 border-transparent opacity-60 cursor-not-allowed'
+                      : 'bg-zinc-900/30 border-zinc-800/40 hover:border-zinc-700/60 cursor-default'
                 }`}
               >
                 <div className="flex gap-3">
@@ -245,8 +278,34 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
                     <p className="text-xs text-zinc-500 truncate mt-0.5">
                       {video.channelName}
                     </p>
-                    <div className="mt-2 flex items-center justify-between">
-                      {getStepBadge(video.step)}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="shrink-0">{getStepBadge(video.step)}</div>
+                      {(() => {
+                        const stepUpper = (video.step || '').toUpperCase();
+                        if (stepUpper === 'COMPLETED') return null;
+
+                        const isError = stepUpper === 'ERROR';
+                        const isPending = stepUpper === 'PENDING';
+
+                        const colorClasses = isError
+                          ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border-rose-500/40'
+                          : isPending
+                          ? 'bg-zinc-800/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
+                          : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border-amber-500/40';
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => handleReprocessDiarization(e, video)}
+                            disabled={reprocessingIds.has(video.id)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all shrink-0 disabled:opacity-50 shadow-sm cursor-pointer ${colorClasses}`}
+                            title={t('btnReprocessDiarization')}
+                          >
+                            <RefreshCw className={`w-3 h-3 ${reprocessingIds.has(video.id) ? 'animate-spin' : ''}`} />
+                            <span>{reprocessingIds.has(video.id) ? t('reprocessingDiarization') : t('btnReprocessDiarization')}</span>
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

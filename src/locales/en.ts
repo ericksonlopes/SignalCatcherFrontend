@@ -189,5 +189,9 @@ export const en: Record<TranslationKeys, string> = {
   stepCompletedPlural: "Completed",
   prevPage: "Previous Page",
   nextPage: "Next Page",
-  loadDiarizationsError: "Failed to load diarizations:"
+  loadDiarizationsError: "Failed to load diarizations:",
+  btnReprocessDiarization: "Reprocess",
+  reprocessingDiarization: "Reprocessing...",
+  notifReprocessDiarizationSuccess: "Diarization sent for reprocessing (Status: Pending)!",
+  notifReprocessDiarizationError: "Failed to reprocess diarization:"
 };
