@@ -219,6 +219,8 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [diarizationModalVideo, setDiarizationModalVideo] = useState<CapturedVideo | null>(null);
   const [diarizationLanguage, setDiarizationLanguage] = useState<string>('en');
   const [isDiarizing, setIsDiarizing] = useState(false);
+  const [hoveredDiarBtnId, setHoveredDiarBtnId] = useState<string | null>(null);
+  const [cancellingDiarIds, setCancellingDiarIds] = useState<Set<string>>(new Set());
 
   const handleGlobalRetry = async () => {
     setIsRetryingGlobal(true);
@@ -367,6 +369,52 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       onAddLog('SignalCatcher', 'error', `Falha ao iniciar diarização: ${err.message || err}`);
     } finally {
       setIsDiarizing(false);
+    }
+  };
+
+  const handleCancelDiarization = async (e: React.MouseEvent, video: CapturedVideo) => {
+    e.stopPropagation();
+
+    let externalId = video.postgresRecordId || video.id;
+    if (video.videoUrl) {
+      const match = video.videoUrl.match(/(?:v=|\/)([\\w-]{11})(?:\\?|&|$)/);
+      if (match) externalId = match[1];
+    }
+
+    setCancellingDiarIds(prev => new Set(prev).add(video.id));
+    onAddLog('SignalCatcher', 'info', `Cancelando diarização para o vídeo ${externalId}...`);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/diarization/${externalId}/cancel`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      onAddLog('SignalCatcher', 'success', t('notifCancelDiarizationSuccess'));
+      setCaptures(prev =>
+        prev.map(c =>
+          c.id === video.id
+            ? { ...c, isDiarized: false, diarizationStatus: 'CANCELLED' }
+            : c
+        )
+      );
+      if (selectedVideo && selectedVideo.id === video.id) {
+        setSelectedVideo(prev =>
+          prev ? { ...prev, isDiarized: false, diarizationStatus: 'CANCELLED' } : null
+        );
+      }
+    } catch (err: any) {
+      onAddLog('SignalCatcher', 'error', `${t('notifCancelDiarizationError')} ${err.message || err}`);
+    } finally {
+      setCancellingDiarIds(prev => {
+        const next = new Set(prev);
+        next.delete(video.id);
+        return next;
+      });
+      setHoveredDiarBtnId(null);
     }
   };
 
@@ -1093,14 +1141,34 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       const isPending = ['PENDING', 'STARTED', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'IN_PROGRESS', 'PROCESSING'].includes(video.diarizationStatus || '') || (isDiarizing && diarizationModalVideo?.id === video.id);
                       const isCompleted = video.isDiarized || video.diarizationStatus === 'COMPLETED';
                       const isError = video.diarizationStatus === 'ERROR';
+                      const isCancelled = video.diarizationStatus === 'CANCELLED';
+                      const isCancelling = cancellingDiarIds.has(video.id);
+                      const isHovered = hoveredDiarBtnId === video.id;
+
+                      // When pending and hovered → show cancel button
+                      const showCancel = isPending && isHovered;
 
                       let btnStyle = "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 hover:text-purple-200";
                       let btnTitle = t('btnStartDiarization');
                       let btnText = t('btnStartDiarization');
                       let btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400" />;
+                      let btnDisabled = false;
+                      let btnOnClick = (e: React.MouseEvent) => handleDiarizationClick(e, video);
 
-                      if (isPending) {
-                        btnStyle = "bg-amber-500/10 border-amber-500/30 text-amber-300 cursor-not-allowed opacity-90";
+                      if (isCancelling) {
+                        btnStyle = "bg-rose-500/10 border-rose-500/30 text-rose-300 cursor-not-allowed opacity-70";
+                        btnTitle = t('btnCancelDiarization');
+                        btnText = t('btnCancelDiarization');
+                        btnIcon = <Loader2 className="w-3.5 h-3.5 text-rose-400 animate-spin" />;
+                        btnDisabled = true;
+                      } else if (showCancel) {
+                        btnStyle = "bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/40 text-rose-300 hover:text-rose-200";
+                        btnTitle = t('btnCancelDiarization');
+                        btnText = t('btnCancelDiarization');
+                        btnIcon = <X className="w-3.5 h-3.5 text-rose-400" />;
+                        btnOnClick = (e: React.MouseEvent) => handleCancelDiarization(e, video);
+                      } else if (isPending) {
+                        btnStyle = "bg-amber-500/10 border-amber-500/30 text-amber-300 cursor-default opacity-90";
                         btnTitle = t('diarizing');
                         btnText = t('diarizing');
                         btnIcon = <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />;
@@ -1109,17 +1177,25 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                         btnTitle = t('diarized');
                         btnText = t('diarized');
                         btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400/70" />;
+                        btnDisabled = true;
                       } else if (isError) {
                         btnStyle = "bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-300 hover:text-rose-200";
                         btnTitle = t('btnRediarize');
                         btnText = t('diarizationError');
                         btnIcon = <MicOff className="w-3.5 h-3.5 text-rose-400" />;
+                      } else if (isCancelled) {
+                        btnStyle = "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 hover:text-purple-200";
+                        btnTitle = t('btnStartDiarization');
+                        btnText = t('btnStartDiarization');
+                        btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400" />;
                       }
 
                       return (
                         <button
-                          onClick={(e) => handleDiarizationClick(e, video)}
-                          disabled={isPending || isCompleted}
+                          onClick={btnOnClick}
+                          disabled={btnDisabled}
+                          onMouseEnter={() => setHoveredDiarBtnId(video.id)}
+                          onMouseLeave={() => setHoveredDiarBtnId(null)}
                           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-[11px] border transition-all shadow-sm ${btnStyle}`}
                           title={btnTitle}
                         >

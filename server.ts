@@ -375,6 +375,44 @@ async function startServer() {
     });
   });
 
+  /**
+   * POST /api/diarization/:id/cancel
+   * Cancels a diarization task that is currently in progress.
+   */
+  app.post("/api/diarization/:id/cancel", (req, res) => {
+    const { id } = req.params;
+    const cancellableSteps = new Set(["PENDING", "STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION"]);
+
+    const diar = mockDiarizations.find(d => d.id === id || d.entity_id === id);
+    const video = youtubeContents.find(v => v.id === id || v.postgresRecordId === id || `diar-${v.id}` === id);
+
+    if (!diar && !video) {
+      return res.status(404).json({ detail: "Diarization task not found" });
+    }
+
+    if (diar && !cancellableSteps.has(diar.step)) {
+      return res.status(409).json({
+        detail: `Diarization task cannot be cancelled (current step: ${diar.step})`
+      });
+    }
+
+    if (diar) {
+      diar.step = "CANCELLED";
+    }
+    if (video) {
+      video.is_diarized = false;
+      video.diarization_status = "CANCELLED";
+    }
+
+    return res.json({
+      success: true,
+      message: `Diarização ${id} cancelada com sucesso`,
+      task_id: diar?.id || id,
+      entity_id: diar?.entity_id || id,
+      step: "CANCELLED"
+    });
+  });
+
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
