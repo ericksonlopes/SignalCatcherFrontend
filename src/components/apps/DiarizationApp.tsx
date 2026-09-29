@@ -1,21 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Mic,
-  Search,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Play,
-  Filter,
-  RefreshCw,
-  Check,
-  X,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
-import { LanguageMode } from '../../types';
-import { getTranslation } from '../../locales';
-import { DiarizationViewer } from './diarization/DiarizationViewer';
+import {API_BASE_URL, apiFetch} from '../../api';
+import React, {useEffect, useState} from 'react';
+import {Check, ChevronLeft, ChevronRight, Mic, Play, RefreshCw, Search, X} from 'lucide-react';
+import {LanguageMode} from '../../types';
+import {getTranslation} from '../../locales';
+import {DiarizationViewer} from './diarization/DiarizationViewer';
 
 export interface DiarizationVideo {
   id: string;
@@ -29,7 +17,7 @@ export interface DiarizationVideo {
   result_json?: any;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+
 
 interface DiarizationAppProps {
   language?: LanguageMode;
@@ -81,7 +69,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
     onAddLog('Diarization', 'info', `${t('btnReprocessDiarization')} (${video.title})...`);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/diarization/${videoId}/reprocess`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/diarization/${videoId}/reprocess`, {
         method: 'POST',
       });
       if (!res.ok) {
@@ -118,7 +106,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
           params.append('search', searchQuery.trim());
         }
 
-        const res = await fetch(`${API_BASE_URL}/api/diarization/list?${params.toString()}`);
+        const res = await apiFetch(`${API_BASE_URL}/api/diarization/list?${params.toString()}`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
         
@@ -160,23 +148,23 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
     const normalizedStep = (step || '').toUpperCase();
     switch (normalizedStep) {
       case 'STARTED':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepStarted')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepStarted')}</span>;
       case 'PENDING':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepPending')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepPending')}</span>;
       case 'PROCESSING':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepProcessing')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepProcessing')}</span>;
       case 'TRANSCRIPTION':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepTranscription')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepTranscription')}</span>;
       case 'ALIGNMENT':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepAlignment')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepAlignment')}</span>;
       case 'DIARIZATION':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-500 border border-purple-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepDiarization')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-purple-500/10 text-purple-500 border border-purple-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepDiarization')}</span>;
       case 'COMPLETED':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-wider"><Check className="w-3 h-3" /> {t('stepCompleted')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-wider"><Check className="w-3 h-3" /> {t('stepCompleted')}</span>;
       case 'ERROR':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider"><X className="w-3 h-3" /> {t('stepError')}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider"><X className="w-3 h-3" /> {t('stepError')}</span>;
       default:
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-800/80 text-zinc-400 border border-zinc-700 uppercase tracking-wider">{normalizedStep}</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-zinc-800/80 text-zinc-400 border border-zinc-700 uppercase tracking-wider">{normalizedStep}</span>;
     }
   };
 
@@ -209,19 +197,19 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleStepFilterChange('ALL')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
                   {t('stepAll')}
                 </button>
                 <button
                   onClick={() => handleStepFilterChange('PENDING')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
                   {t('stepPendingPlural')}
                 </button>
                 <button
                   onClick={() => handleStepFilterChange('PROCESSING')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PROCESSING' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PROCESSING' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
                   {t('stepProcessing')}
                 </button>
@@ -229,13 +217,13 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleStepFilterChange('ERROR')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
                   {t('stepErrorsPlural')}
                 </button>
                 <button
                   onClick={() => handleStepFilterChange('COMPLETED')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
                 >
                   {t('stepCompletedPlural')}
                 </button>
@@ -267,7 +255,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
                 <div className="flex gap-3">
                   <div className="relative w-24 h-14 shrink-0 rounded-lg overflow-hidden bg-zinc-800 shadow-inner">
                     <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
-                    <div className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-[9px] font-mono font-bold text-zinc-300">
+                    <div className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-xs font-mono font-bold text-zinc-300">
                       {formatDuration(video.duration)}
                     </div>
                   </div>
@@ -298,7 +286,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
                             type="button"
                             onClick={(e) => handleReprocessDiarization(e, video)}
                             disabled={reprocessingIds.has(video.id)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all shrink-0 disabled:opacity-50 shadow-sm cursor-pointer ${colorClasses}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all shrink-0 disabled:opacity-50 shadow-sm cursor-pointer ${colorClasses}`}
                             title={t('btnReprocessDiarization')}
                           >
                             <RefreshCw className={`w-3 h-3 ${reprocessingIds.has(video.id) ? 'animate-spin' : ''}`} />
@@ -317,7 +305,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
         {/* Pagination Controls */}
         {totalPages > 0 && (
           <div className="p-3 border-t border-zinc-800/80 bg-zinc-900/30 flex items-center justify-between text-xs text-zinc-400">
-            <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <div className="flex items-center gap-1.5 font-mono text-xs">
               <span>{totalItems} total</span>
             </div>
             <div className="flex items-center gap-2">
@@ -329,7 +317,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="font-mono text-[11px] text-zinc-300">
+              <span className="font-mono text-xs text-zinc-300">
                 {currentPage} / {totalPages || 1}
               </span>
               <button
@@ -346,7 +334,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
                   setLimit(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-[10px] rounded px-1.5 py-0.5 outline-none focus:border-indigo-500 font-mono ml-1"
+                className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs rounded px-1.5 py-0.5 outline-none focus:border-indigo-500 font-mono ml-1"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>

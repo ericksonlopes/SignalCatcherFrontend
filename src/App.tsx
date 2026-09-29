@@ -1,48 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Radio, 
-  Home, 
-  TrendingDown, 
-  BarChart3, 
-  Terminal, 
-  Plus, 
-  LayoutGrid,
-  Sparkles,
-  Mic
-} from 'lucide-react';
-import { Header } from './components/Header';
-import { CommandPalette } from './components/CommandPalette';
-import { NotificationDrawer } from './components/NotificationDrawer';
-import { SignalCatcherApp } from './components/apps/SignalCatcherApp';
-import { SmartHomeApp } from './components/apps/SmartHomeApp';
-import { FollowerAnalyticsApp } from './components/apps/FollowerAnalyticsApp';
-import { CreatorDashboardsApp } from './components/apps/CreatorDashboardsApp';
-import { CustomAppBuilderModal } from './components/apps/CustomAppBuilderModal';
-import { DiarizationApp } from './components/apps/DiarizationApp';
-import { ToastProvider, useToast, ToastContainer } from './components/toast';
+import {API_BASE_URL, apiFetch} from './api';
+import React, {useEffect, useRef, useState} from 'react';
+import {BarChart3, Home, Mic, Radio, Sparkles, Terminal, TrendingDown} from 'lucide-react';
+import {Header} from './components/Header';
+import {CommandPalette} from './components/CommandPalette';
+import {NotificationDrawer} from './components/NotificationDrawer';
+import {SignalCatcherApp} from './components/apps/SignalCatcherApp';
+import {SmartHomeApp} from './components/apps/SmartHomeApp';
+import {FollowerAnalyticsApp} from './components/apps/FollowerAnalyticsApp';
+import {CreatorDashboardsApp} from './components/apps/CreatorDashboardsApp';
+import {CustomAppBuilderModal} from './components/apps/CustomAppBuilderModal';
+import {DiarizationApp} from './components/apps/DiarizationApp';
+import {ToastContainer, ToastProvider, useToast} from './components/toast';
 
-import { 
-  AppTab, 
-  ThemeMode, 
+import {
+  AppTab,
+  CapturedVideo,
+  ContentSource,
+  CreatorMetric,
+  FollowerStats,
   LanguageMode,
-  ContentSource, 
-  CapturedVideo, 
-  ScheduledJob, 
-  SmartDevice, 
-  FollowerStats, 
-  CreatorMetric, 
-  SystemLog 
+  ScheduledJob,
+  SmartDevice,
+  SystemLog,
+  ThemeMode
 } from './types';
 
-import { 
-  INITIAL_SOURCES, 
-  INITIAL_CAPTURES, 
-  INITIAL_JOBS, 
-  INITIAL_DEVICES, 
-  INITIAL_FOLLOWER_HISTORY, 
-  INITIAL_CREATORS, 
-  INITIAL_LOGS, 
-  FASTAPI_ENDPOINTS 
+import {
+  FASTAPI_ENDPOINTS,
+  INITIAL_CREATORS,
+  INITIAL_DEVICES,
+  INITIAL_FOLLOWER_HISTORY,
+  INITIAL_JOBS,
+  INITIAL_LOGS
 } from './data/initialData';
 
 function SignalCatcherHub() {
@@ -76,7 +65,7 @@ function SignalCatcherHub() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://eriberry.local:5001';
+
 
   const initialVideosFetched = useRef(false);
   const initialChannelsFetched = useRef(false);
@@ -88,7 +77,7 @@ function SignalCatcherHub() {
     const stepQuery = stepFilter ? `&step=${stepFilter}` : '';
     const searchQueryParam = debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : '';
     const channelQueryParam = channelFilter ? `&channel=${encodeURIComponent(channelFilter)}` : '';
-    fetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}${searchQueryParam}${channelQueryParam}`)
+    apiFetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}${searchQueryParam}${channelQueryParam}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.items) {
@@ -113,6 +102,10 @@ function SignalCatcherHub() {
             description: item.description || '',
             sentimentScore: 0,
             language: item.language,
+            deletionRequested: item.deletion_requested ?? false,
+            attemptCount: item.attempt_count ?? 0,
+            nextRetryAt: item.next_retry_at ?? null,
+            errorInfo: item.error_info ?? null,
             isDiarized: item.is_diarized ?? item.isDiarized ?? false,
             diarizationStatus: item.diarization_status || item.diarizationStatus || null
           }));
@@ -141,7 +134,7 @@ function SignalCatcherHub() {
     if (!initialChannelsFetched.current) {
       setIsFetchingChannels(true);
     }
-    fetch(`${API_BASE_URL}/api/youtube/monitored_channels`)
+    apiFetch(`${API_BASE_URL}/api/youtube/monitored_channels`)
       .then(res => res.json())
       .then(data => {
         if (data && Array.isArray(data)) {
@@ -167,7 +160,7 @@ function SignalCatcherHub() {
       });
       
     // Fetch Saved Channels
-    fetch(`${API_BASE_URL}/api/youtube/channels`)
+    apiFetch(`${API_BASE_URL}/api/youtube/channels`)
       .then(res => res.json())
       .then(data => {
         if (data && Array.isArray(data)) {
@@ -190,7 +183,7 @@ function SignalCatcherHub() {
       .catch(err => console.error("Failed to fetch saved channels", err));
       
     // Fetch Global Stats
-    fetch(`${API_BASE_URL}/api/youtube/content/status-count`)
+    apiFetch(`${API_BASE_URL}/api/youtube/content/status-count`)
       .then(res => res.json())
       .then(data => {
         if (data) {
@@ -329,28 +322,15 @@ function SignalCatcherHub() {
     addLog('Hub Workspace', 'info', `Aba criada: ${title}`);
   };
 
-  const handleTriggerJob = (jobId: string) => {
-    setJobs(
-      jobs.map((j) => {
-        if (j.id === jobId) {
-          addLog('SignalCatcher', 'info', `Disparando job de background [${j.name}] via FastAPI...`);
-          return {
-            ...j,
-            status: 'running',
-            lastRun: new Date().toISOString(),
-            executionCount: j.executionCount + 1
-          };
-        }
-        return j;
-      })
-    );
-
-    setTimeout(() => {
-      setJobs((prevJobs) =>
-        prevJobs.map((j) => (j.id === jobId ? { ...j, status: 'idle' } : j))
-      );
-      addLog('SignalCatcher', 'success', `Job de background [${jobId}] executado com sucesso e persistido no PostgreSQL.`);
-    }, 1500);
+  const handleTriggerJob = async (jobId: string) => {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/scheduler/jobs/${encodeURIComponent(jobId)}/run`, {method: 'POST'});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setJobs(previous => previous.map(job => job.id === jobId ? {...job, status: 'scheduled'} : job));
+      addLog('SignalCatcher', 'info', `Job ${jobId}: queued`);
+    } catch (reason) {
+      addLog('SignalCatcher', 'error', String(reason));
+    }
   };
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
@@ -376,7 +356,7 @@ function SignalCatcherHub() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
+    <div data-theme={theme} className={`min-h-screen flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
       {/* Top Header */}
       <Header
         theme={theme}
@@ -397,10 +377,10 @@ function SignalCatcherHub() {
       />
 
       {/* Main Workspace with Side Rail + Bento Content Area */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         {/* Bento Mini Side Rail */}
-        <aside className="hidden md:flex flex-col items-center py-4 px-2 w-16 bg-[#09090b] border-r border-zinc-800/80 gap-3 shrink-0">
-          <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest text-center mb-1">
+        <aside aria-label={language === 'pt' ? 'Aplicações' : 'Applications'} className="flex md:flex-col items-center py-2 md:py-4 px-2 md:w-16 overflow-x-auto bg-[#09090b] border-b md:border-b-0 md:border-r border-zinc-800/80 gap-3 shrink-0">
+          <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest text-center mb-1 hidden md:block">
             APPS
           </div>
 
@@ -417,6 +397,8 @@ function SignalCatcherHub() {
             return (
               <button
                 key={app.id}
+                aria-label={app.name}
+                aria-current={isAppActive ? 'page' : undefined}
                 disabled={app.disabled}
                 onClick={() => {
                   if (existingTab) {
@@ -438,11 +420,11 @@ function SignalCatcherHub() {
                 
                 {/* Active Indicator Dot */}
                 {isAppActive && (
-                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 )}
 
                 {/* Tooltip */}
-                <span className="absolute left-16 bg-zinc-900 text-zinc-100 text-xs px-2.5 py-1 rounded-md border border-zinc-700 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-mono shadow-lg">
+                <span className="absolute hidden md:block left-16 bg-zinc-900 text-zinc-100 text-xs px-2.5 py-1 rounded-md border border-zinc-700 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-mono shadow-lg">
                   {app.name}
                 </span>
               </button>
@@ -451,7 +433,7 @@ function SignalCatcherHub() {
         </aside>
 
         {/* Workspace Active Tab View */}
-        <main className="flex-1 overflow-y-auto relative p-2 sm:p-4 md:p-6 bg-[#09090b]">
+        <main className="flex-1 min-w-0 overflow-y-auto relative p-2 sm:p-4 md:p-6 bg-[#09090b]">
           {activeTab.appId === 'signalcatcher' && (
             <SignalCatcherApp
               language={language}

@@ -1,10 +1,19 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import {API_BASE_URL, apiFetch} from '../../api';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Database,
   ExternalLink,
+  ListMusic,
   ListVideo,
   Loader2,
+  Mic,
+  MicOff,
   PauseCircle,
   Play,
   PlayCircle,
@@ -12,27 +21,19 @@ import {
   Radio,
   RefreshCw,
   Search,
+  ServerCrash,
   Sparkles,
+  Trash,
   UploadCloud,
   Video,
   X,
-  ChevronLeft,
-  ChevronRight,
-  Youtube,
-  Trash,
-  Activity,
-  AlertCircle,
-  CheckCircle2,
-  ServerCrash,
-  ListMusic,
-  Mic,
-  MicOff
+  Youtube
 } from 'lucide-react';
 
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
+import {OperationsPanel} from './OperationsPanel';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 const formatDuration = (duration: number | string | undefined | null): string => {
   if (duration == null) return '00:00:00';
@@ -51,11 +52,11 @@ const formatDuration = (duration: number | string | undefined | null): string =>
     if (isNaN(parsed)) return duration;
     duration = parsed;
   }
-  
+
   const h = Math.floor(duration / 3600);
   const m = Math.floor((duration % 3600) / 60);
   const s = Math.floor(duration % 60);
-  
+
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
@@ -105,11 +106,13 @@ const getStatusColor = (status: string) => {
     case 'MEMBERS_ONLY':
       return 'text-rose-400';
     case 'REPROCESSING':
-      return 'text-cyan-400';
-    case 'PENDING_DOWNLOAD':
     case 'DOWNLOADING':
-    case 'PENDING_METADATA_EXTRACTION':
     case 'EXTRACTING_METADATA':
+      return 'text-blue-400';
+    case 'PENDING_DOWNLOAD':
+    case 'PENDING_METADATA_EXTRACTION':
+    case 'STARTED':
+    case 'METADATA_EXTRACTED':
       return 'text-amber-400';
     default:
       return 'text-zinc-400';
@@ -150,10 +153,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const { t } = getTranslation(language);
   const [subTab, setSubTab] = useState<'captures' | 'saved_channels' | 'sources' | 'jobs' | 'tracking'>('captures');
   const [localSearchQuery, setLocalSearchQuery] = useState('');
-  
+
   const [isTriggeringMetadata, setIsTriggeringMetadata] = useState(false);
   const [isTriggeringDownload, setIsTriggeringDownload] = useState(false);
-  
+
   const query = onSearchQueryChange ? searchQuery : localSearchQuery;
   const handleSearchChange = (val: string) => {
     if (onSearchQueryChange) onSearchQueryChange(val);
@@ -215,6 +218,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [retryingVideoIds, setRetryingVideoIds] = useState<Set<string>>(new Set());
   const [deletingVideoIds, setDeletingVideoIds] = useState<Set<string>>(new Set());
   const [videoToDelete, setVideoToDelete] = useState<CapturedVideo | null>(null);
+  useEffect(() => {
+    setSelectedVideo(previous => previous ? captures.find(video => video.id === previous.id) || previous : null);
+  }, [captures]);
 
   const [diarizationModalVideo, setDiarizationModalVideo] = useState<CapturedVideo | null>(null);
   const [diarizationLanguage, setDiarizationLanguage] = useState<string>('en');
@@ -225,14 +231,14 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const handleGlobalRetry = async () => {
     setIsRetryingGlobal(true);
     onAddLog('SignalCatcher', 'info', t('notifGlobalRetryStart'));
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/content/retry-errors`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content/retry-errors`, {
         method: 'POST',
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      
+
       onAddLog('SignalCatcher', 'success', t('notifGlobalRetrySuccess'));
       if (onRefresh) onRefresh();
       if (onOpenNotifications) onOpenNotifications();
@@ -245,7 +251,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
   const handleIndividualRetry = async (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
-    
+
     let externalId = video.postgresRecordId || video.id;
     if (video.videoUrl) {
       const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
@@ -254,22 +260,22 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
     setRetryingVideoIds(prev => new Set(prev).add(video.id));
     onAddLog('SignalCatcher', 'info', `${t('notifIndivRetryStart')} ${externalId}...`);
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/content/${externalId}/retry`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content/${externalId}/retry`, {
         method: 'POST',
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      
+
       onAddLog('SignalCatcher', 'success', t('notifIndivRetrySuccess'));
-      
-      setCaptures(prev => prev.map(v => 
-        v.id === video.id 
-          ? { ...v, status: 'REPROCESSING' } 
+
+      setCaptures(prev => prev.map(v =>
+        v.id === video.id
+          ? { ...v, status: 'REPROCESSING' }
           : v
       ));
-      
+
     } catch (err) {
       onAddLog('SignalCatcher', 'error', `${t('notifIndivRetryError')} ${err}`);
     } finally {
@@ -283,7 +289,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
   const handleIndividualDelete = async (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
-    
+
     let externalId = video.postgresRecordId || video.id;
     if (video.videoUrl) {
       const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
@@ -292,22 +298,22 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
     setDeletingVideoIds(prev => new Set(prev).add(video.id));
     onAddLog('SignalCatcher', 'info', `Excluindo vídeo e arquivo ${externalId}...`);
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/content/${externalId}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content/${externalId}`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      
-      onAddLog('SignalCatcher', 'success', `Vídeo ${externalId} excluído com sucesso!`);
-      
-      setCaptures(prev => prev.map(v => 
-        v.id === video.id 
-          ? { ...v, status: 'DELETED' } 
+
+      onAddLog('SignalCatcher', 'info', t('deletionQueued'));
+
+      setCaptures(prev => prev.map(v =>
+        v.id === video.id
+            ? {...v, deletionRequested: true}
           : v
       ));
-      
+
     } catch (err) {
       onAddLog('SignalCatcher', 'error', `Falha ao excluir vídeo: ${err}`);
     } finally {
@@ -327,7 +333,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
   const confirmDiarization = async () => {
     if (!diarizationModalVideo) return;
-    
+
     let externalId = diarizationModalVideo.postgresRecordId || diarizationModalVideo.id;
     if (diarizationModalVideo.videoUrl) {
       const match = diarizationModalVideo.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
@@ -336,9 +342,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
     onAddLog('SignalCatcher', 'info', `Iniciando diarização para o vídeo ${externalId}...`);
     setIsDiarizing(true);
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/diarization/youtube/${externalId}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/diarization/youtube/${externalId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language: diarizationLanguage || 'en' }),
@@ -348,7 +354,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      
+
       onAddLog('SignalCatcher', 'success', `Diarização iniciada com sucesso (Task ID: ${data.task_id})`);
       setCaptures((prevCaptures) =>
         prevCaptures.map((c) =>
@@ -364,7 +370,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       }
       setDiarizationModalVideo(null);
 
-      
+
     } catch (err: any) {
       onAddLog('SignalCatcher', 'error', `Falha ao iniciar diarização: ${err.message || err}`);
     } finally {
@@ -385,7 +391,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `Cancelando diarização para o vídeo ${externalId}...`);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/diarization/${externalId}/cancel`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/diarization/${externalId}/cancel`, {
         method: 'POST',
       });
       if (!response.ok) {
@@ -433,7 +439,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `${t('notifSendingSource')} ${newSourceUrl}`);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/monitored_channels`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/monitored_channels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newSourceUrl.split('@')[1] || 'Novo Canal', url: newSourceUrl })
@@ -445,7 +451,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
       const resData = await response.json();
       onAddLog('SignalCatcher', 'success', `${t('notifSuccessSource')} ${resData.id || 'OK'})`);
-      
+
       if (onOpenNotifications) {
         onOpenNotifications();
       }
@@ -468,7 +474,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `${t('notifSendingVideo')} ${manualUrl}`);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/content`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: manualUrl })
@@ -488,9 +494,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       }
 
       const resData = await response.json();
-      
+
       onAddLog('SignalCatcher', 'success', `${t('notifSuccessVideo')} ${resData.message || 'OK'})`);
-      
+
       if (onOpenNotifications) {
         onOpenNotifications();
       }
@@ -520,12 +526,12 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     onAddLog('SignalCatcher', 'info', `${t('notifSendingPlaylist')} ${manualUrl}`);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/playlist`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/playlist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          url: manualUrl, 
-          save_in_playlist_folder: saveInPlaylistFolder 
+        body: JSON.stringify({
+          url: manualUrl,
+          save_in_playlist_folder: saveInPlaylistFolder
         })
       });
 
@@ -534,9 +540,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       }
 
       const resData = await response.json();
-      
+
       onAddLog('SignalCatcher', 'success', `${t('notifSuccessPlaylist')} (${resData.message || 'OK'})`);
-      
+
       if (onOpenNotifications) {
         onOpenNotifications();
       }
@@ -556,14 +562,14 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
   const handleToggleSourceStatus = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/monitored_channels/${id}/status`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/monitored_channels/${id}/status`, {
         method: 'PATCH',
       });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      
+
       setSources(sources.map(s => {
         if (s.id === id) {
           const nextStatus = data.active ? 'active' : 'paused';
@@ -581,7 +587,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     setIsTriggeringMetadata(true);
     onAddLog('SignalCatcher', 'info', 'Iniciando extração de metadados em lote...');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/content/trigger-metadata-extraction`, { method: 'POST' });
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content/trigger-metadata-extraction`, {method: 'POST'});
       if (!response.ok) throw new Error('Falha ao acionar job de metadados');
       onAddLog('SignalCatcher', 'success', 'Job de extração de metadados enfileirado com sucesso.');
       onRefresh?.();
@@ -596,7 +602,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     setIsTriggeringDownload(true);
     onAddLog('SignalCatcher', 'info', 'Iniciando download de vídeos em lote...');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/youtube/content/trigger-downloads`, { method: 'POST' });
+      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content/trigger-downloads`, {method: 'POST'});
       if (!response.ok) throw new Error('Falha ao acionar job de downloads');
       onAddLog('SignalCatcher', 'success', 'Job de download de vídeos enfileirado com sucesso.');
       onRefresh?.();
@@ -613,25 +619,25 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 transition-all hover:border-zinc-700/80">
         <div className="flex items-center gap-3.5">
           <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-            <Radio className="w-6 h-6 animate-pulse" />
+            <Radio className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold tracking-tight text-zinc-100">{t('appTitle')}</h2>
-              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+              <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
                 {t('dbConnected')}
               </span>
             </div>
-            <p className="text-xs text-zinc-400 font-mono mt-1">
+            <p className="text-sm text-zinc-400 mt-1">
               {t('appDescription')}
             </p>
           </div>
         </div>
       </div>
-      
+
       {/* Sub-Navigation Bar */}
-      <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
-        <div className="flex items-center gap-2 text-xs font-mono">
+      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+        <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1 [&>button]:shrink-0">
           <button
             onClick={() => setSubTab('captures')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
@@ -679,6 +685,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             <Activity className="w-3.5 h-3.5 text-fuchsia-400" />
             <span>{t('tabTracking' as any) || 'Tracking'}</span>
           </button>
+          <button onClick={() => setSubTab('jobs')}
+                  className={`px-4 py-2 rounded-xl border ${subTab === 'jobs' ? 'bg-zinc-800 border-zinc-700 text-zinc-100' : 'border-zinc-800 text-zinc-400'}`}>
+            {t('operationsTitle')}
+          </button>
         </div>
 
         {/* Action Trigger Buttons */}
@@ -706,11 +716,12 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           </button>
         </div>
       </div>
-      
+
+      {subTab === 'jobs' && <OperationsPanel language={language === "pt" ? "pt" : "en"}/>}
       {/* CONSTANTES PARA O TRACKING */}
       {(() => {
         if (subTab !== 'tracking') return null;
-        
+
         interface PipelineStepDef {
           id: string;
           label: string;
@@ -741,13 +752,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           { id: 'ACCOUNT_TERMINATED', label: 'ACCOUNT TERMINATED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
           { id: 'VIDEO_REMOVED', label: 'VIDEO REMOVED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
         ];
-        
+
         const PIPELINE_OTHER: PipelineStepDef[] = [
           { id: 'ERROR', label: 'ERROR', icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20', action: 'retry' },
           { id: 'REPROCESSING', label: 'REPROCESSING', icon: RefreshCw, color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', action: 'retry', animate: true },
           { id: 'DELETED', label: 'DELETED', icon: Trash, color: 'text-zinc-600', bg: 'bg-zinc-600/10', border: 'border-zinc-600/20', action: 'none' },
         ];
-        
+
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-zinc-900/80 border border-zinc-800 rounded-2xl shadow-sm gap-4">
@@ -760,7 +771,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   <p className="text-xs text-zinc-400 font-mono mt-0.5">{t('trackingPipelineDesc' as any) || 'Visão geral do processamento do YouTube Catcher Engine'}</p>
                 </div>
               </div>
-              
+
               <button
                 onClick={handleGlobalRetry}
                 disabled={isRetryingGlobal}
@@ -774,16 +785,16 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             <div className="flex flex-col gap-6">
               {/* FLUXO PRINCIPAL */}
               <div className="bg-zinc-950/40 p-4 rounded-3xl border border-zinc-800/60">
-                <h4 className="text-[11px] font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                <h4 className="text-xs font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                   {t('trackingMainFlow' as any) || 'Fluxo Principal de Captura'}
                 </h4>
-                
+
                 <div className="flex items-center justify-between w-full gap-2 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900/50">
                   {PIPELINE_MAIN_FLOW.map((step, idx) => {
                     const count = statusCounts[step.id] || 0;
                     const hasNext = idx < PIPELINE_MAIN_FLOW.length - 1;
-                    
+
                     return (
                       <React.Fragment key={step.id}>
                         <div className="flex-1 min-w-[155px] bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-zinc-700 transition-all shadow-sm shrink-0 relative">
@@ -791,43 +802,43 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                             <div className={`p-2.5 rounded-xl border ${step.bg} ${step.border} ${step.color}`}>
                               <step.icon className={`w-4 h-4 ${step.animate ? 'animate-spin' : ''}`} />
                             </div>
-                            
+
                             {step.action === 'metadata' && (
-                              <button 
-                                onClick={handleTriggerMetadata} 
+                              <button
+                                onClick={handleTriggerMetadata}
                                 disabled={isTriggeringMetadata || count === 0}
-                                className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-amber-500/20 text-amber-400 rounded-md border border-amber-500/30 hover:bg-amber-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-amber-500/20 text-amber-400 rounded-md border border-amber-500/30 hover:bg-amber-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {isTriggeringMetadata ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                                 {t('btnExtract' as any) || 'Extrair'}
                               </button>
                             )}
                             {step.action === 'download' && (
-                              <button 
-                                onClick={handleTriggerDownload} 
+                              <button
+                                onClick={handleTriggerDownload}
                                 disabled={isTriggeringDownload || count === 0}
-                                className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-blue-500/20 text-blue-400 rounded-md border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-blue-500/20 text-blue-400 rounded-md border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {isTriggeringDownload ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                                 {t('btnDownload' as any) || 'Baixar'}
                               </button>
                             )}
                             {step.action === 'completed' && (
-                              <button 
+                              <button
                                 disabled
-                                className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-emerald-500/10 text-emerald-500/50 rounded-md border border-emerald-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
+                                className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-emerald-500/10 text-emerald-500/50 rounded-md border border-emerald-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
                               >
                                 {t('btnCompleted' as any) || 'Finalizado'}
                               </button>
                             )}
                           </div>
-                          
+
                           <div>
                             <div className="text-3xl font-black text-zinc-100 tracking-tight">{count}</div>
-                            <div className="text-[10px] font-bold text-zinc-400 mt-1 uppercase tracking-wider leading-tight h-8 flex items-center">{step.label}</div>
+                            <div className="text-xs font-bold text-zinc-400 mt-1 uppercase tracking-wider leading-tight h-8 flex items-center">{step.label}</div>
                           </div>
                         </div>
-                        
+
                         {hasNext && (
                           <div className="flex shrink-0 text-zinc-700 mx-1">
                             <ChevronRight className="w-5 h-5" />
@@ -841,7 +852,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
               {/* CONTROLE E MANUTENÇÃO */}
               <div className="bg-zinc-950/40 p-4 rounded-3xl border border-zinc-800/60">
-                <h4 className="text-[11px] font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                <h4 className="text-xs font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
                   {t('trackingMaintenance' as any) || 'Manutenção e Ciclo de Vida'}
                 </h4>
@@ -855,28 +866,28 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                             <step.icon className={`w-5 h-5 ${step.animate ? 'animate-spin' : ''}`} />
                           </div>
                           {step.action === 'retry' && (
-                            <button 
-                              onClick={handleGlobalRetry} 
+                            <button
+                              onClick={handleGlobalRetry}
                               disabled={isRetryingGlobal || count === 0}
-                              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isRetryingGlobal ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                               {t('btnExecute' as any) || 'Executar'}
                             </button>
                           )}
                           {step.action === 'none' && (
-                            <button 
+                            <button
                               disabled
-                              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-zinc-500/10 text-zinc-500/50 rounded-md border border-zinc-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
+                              className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-zinc-500/10 text-zinc-500/50 rounded-md border border-zinc-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
                             >
                               {t('btnInactive' as any) || 'Inativo'}
                             </button>
                           )}
                         </div>
-                        
+
                         <div>
                           <div className="text-2xl font-black text-zinc-100 tracking-tight">{count}</div>
-                          <div className="text-[10px] font-bold text-zinc-400 mt-1 uppercase tracking-wider h-6 flex items-center">{step.label}</div>
+                          <div className="text-xs font-bold text-zinc-400 mt-1 uppercase tracking-wider h-6 flex items-center">{step.label}</div>
                         </div>
                       </div>
                     );
@@ -886,7 +897,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
               {/* EXCEÇÕES E ESTADOS TERMINAIS */}
               <div className="bg-zinc-950/40 p-4 rounded-3xl border border-zinc-800/60">
-                <h4 className="text-[11px] font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                <h4 className="text-xs font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-rose-500"></div>
                   {t('trackingExceptions' as any) || 'Exceções e Estados Terminais'}
                 </h4>
@@ -900,20 +911,20 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                             <step.icon className={`w-5 h-5 ${step.animate ? 'animate-spin' : ''}`} />
                           </div>
                           {step.action === 'retry' && (
-                            <button 
-                              onClick={handleGlobalRetry} 
+                            <button
+                              onClick={handleGlobalRetry}
                               disabled={isRetryingGlobal || count === 0}
-                              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isRetryingGlobal ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                               {t('btnExecute' as any) || 'Executar'}
                             </button>
                           )}
                         </div>
-                        
+
                         <div>
                           <div className="text-2xl font-black text-zinc-100 tracking-tight">{count}</div>
-                          <div className="text-[10px] font-bold text-zinc-400 mt-1 uppercase tracking-wider h-6 flex items-center">{step.label}</div>
+                          <div className="text-xs font-bold text-zinc-400 mt-1 uppercase tracking-wider h-6 flex items-center">{step.label}</div>
                         </div>
                       </div>
                     );
@@ -1006,7 +1017,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
               {captures.map((video) => (
-              <div 
+              <div
                 key={video.id}
                 className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-lg cursor-pointer hover:-translate-y-1 relative"
                 onClick={() => setSelectedVideo(video)}
@@ -1031,15 +1042,15 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
-                    
+
                     {/* Duration Badge */}
-                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-zinc-950/90 text-white font-mono text-[10px] border border-zinc-700">
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700">
                       {formatDuration(video.duration)}
                     </span>
 
                     {/* Diarization Badge */}
                     {(video.isDiarized || video.diarizationStatus) && (
-                      <div className={`absolute bottom-2 left-2 flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm ${
+                      <div className={`absolute bottom-2 left-2 flex items-center gap-1 text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm ${
                         video.isDiarized || video.diarizationStatus === 'COMPLETED'
                           ? 'bg-purple-950/90 text-purple-300 border-purple-500/40'
                           : video.diarizationStatus === 'ERROR'
@@ -1068,13 +1079,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     {/* Step Badge */}
 
                     {video.status && (
-                      <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${getStatusColor(video.status)} text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
-                        <span>{video.status.replace(/_/g, ' ')}</span>
+                      <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${video.deletionRequested ? 'text-amber-400' : getStatusColor(video.status)} text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
+                        <span>{video.deletionRequested ? t('deletionPending') : video.status.replace(/_/g, ' ')}</span>
                       </div>
                     )}
 
                     {/* PostgreSQL Record ID Badge */}
-                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-indigo-500/10 text-indigo-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-indigo-500/20 backdrop-blur-md">
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-indigo-500/10 text-indigo-300 text-xs font-mono px-2 py-0.5 rounded-full border border-indigo-500/20 backdrop-blur-md">
                       <Database className="w-3 h-3 text-indigo-400" />
                       <span>{video.postgresRecordId}</span>
                     </div>
@@ -1094,7 +1105,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                         </p>
                       ) : (
                         <div className="h-full bg-zinc-950/30 rounded-xl border border-zinc-800/30 border-dashed flex items-center justify-center">
-                          <span className="text-[10px] text-zinc-600 font-mono">{t('noDescription')}</span>
+                          <span className="text-xs text-zinc-600 font-mono">{t('noDescription')}</span>
                         </div>
                       )}
                     </div>
@@ -1102,17 +1113,17 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     {/* Tags */}
                     <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 h-[22px]">
                       {video.tags.slice(0, 3).map((tItem) => (
-                        <span 
-                          key={tItem} 
-                          className="text-[10px] shrink truncate max-w-[90px] font-mono px-2.5 py-0.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800"
+                        <span
+                          key={tItem}
+                          className="text-xs shrink truncate max-w-[90px] font-mono px-2.5 py-0.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800"
                           title={tItem}
                         >
                           #{tItem}
                         </span>
                       ))}
                       {video.tags.length > 3 && (
-                        <span 
-                          className="text-[10px] shrink-0 font-mono px-2 py-0.5 rounded-full bg-zinc-800/50 text-zinc-400 border border-zinc-700/50" 
+                        <span
+                          className="text-xs shrink-0 font-mono px-2 py-0.5 rounded-full bg-zinc-800/50 text-zinc-400 border border-zinc-700/50"
                           title={video.tags.slice(3).join(', ')}
                         >
                           +{video.tags.length - 3}
@@ -1125,11 +1136,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 {/* Card Footer: Buttons */}
                 <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 overflow-hidden">
-                    {['ERROR', 'DELETED'].includes(video.status) && (
+                    {video.status === 'ERROR' && !video.deletionRequested && (
                       <button
                         onClick={(e) => handleIndividualRetry(e, video)}
                         disabled={retryingVideoIds.has(video.id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-[11px] transition-all disabled:opacity-50 shadow-sm bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 hover:shadow-rose-500/10`}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-xs transition-all disabled:opacity-50 shadow-sm bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 hover:shadow-rose-500/10`}
                         title={t('titleReprocessVideo')}
                       >
                         <RefreshCw className={`w-3 h-3 ${retryingVideoIds.has(video.id) ? 'animate-spin' : ''}`} />
@@ -1137,7 +1148,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       </button>
                     )}
 
-                    {video.status === 'COMPLETED' && (() => {
+                    {video.status === 'COMPLETED' && !video.deletionRequested && (() => {
                       const isPending = ['PENDING', 'STARTED', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'IN_PROGRESS', 'PROCESSING'].includes(video.diarizationStatus || '') || (isDiarizing && diarizationModalVideo?.id === video.id);
                       const isCompleted = video.isDiarized || video.diarizationStatus === 'COMPLETED';
                       const isError = video.diarizationStatus === 'ERROR';
@@ -1196,7 +1207,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                           disabled={btnDisabled}
                           onMouseEnter={() => setHoveredDiarBtnId(video.id)}
                           onMouseLeave={() => setHoveredDiarBtnId(null)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-[11px] border transition-all shadow-sm ${btnStyle}`}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-xs border transition-all shadow-sm ${btnStyle}`}
                           title={btnTitle}
                         >
                           {btnIcon}
@@ -1246,7 +1257,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               {onLimitChange && limit && (
                 <div className="ml-4 flex items-center gap-2">
                   <label className="text-xs text-zinc-400 font-mono">Vídeos por página:</label>
-                  <select 
+                  <select
                     value={limit}
                     onChange={(e) => {
                       onLimitChange(Number(e.target.value));
@@ -1279,7 +1290,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               />
             </div>
           </div>
-          
+
           {savedChannels.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/20 rounded-2xl border border-zinc-800/50 border-dashed">
               <Youtube className="w-12 h-12 text-zinc-700 mb-4" />
@@ -1290,7 +1301,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 text-[11px] uppercase">
+                    <tr className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 text-xs uppercase">
                       <th className="p-3">{t('tableChannelName')}</th>
                       <th className="p-3">External ID</th>
                       <th className="p-3">{t('vidsSaved')}</th>
@@ -1304,16 +1315,16 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                             <img src={channel.avatar} alt="" className="w-9 h-9 rounded-full border border-zinc-700" />
                             <div className="flex flex-col gap-0.5">
                               <span className="font-semibold text-zinc-200 font-sans">{channel.name}</span>
-                              <a href={channel.channelUrl || channel.url} target="_blank" rel="noreferrer" className="text-[10px] text-zinc-500 hover:text-zinc-300 hover:underline truncate max-w-[300px]" title={channel.channelUrl || channel.url}>
+                              <a href={channel.channelUrl || channel.url} target="_blank" rel="noreferrer" className="text-xs text-zinc-500 hover:text-zinc-300 hover:underline truncate max-w-[300px]" title={channel.channelUrl || channel.url}>
                                 {channel.channelUrl || channel.url}
                               </a>
                             </div>
                           </div>
                         </td>
                         <td className="p-3">
-                          <span className="text-[11px] text-red-400 font-bold">{channel.channelId}</span>
+                          <span className="text-xs text-red-400 font-bold">{channel.channelId}</span>
                         </td>
-                        <td className="p-3 text-zinc-400 text-[11px] font-mono">
+                        <td className="p-3 text-zinc-400 text-xs font-mono">
                           {channel.totalCaptured}
                         </td>
                       </tr>
@@ -1340,7 +1351,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-[11px] uppercase">
+                  <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs uppercase">
                     <th className="p-3">{t('tableChannelSource')}</th>
                     <th className="p-3">{t('tableChannelName')}</th>
                     <th className="p-3">{t('tableLastCapture')}</th>
@@ -1354,7 +1365,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       <td className="p-3 flex items-center gap-2.5">
                         <img src={source.avatar} alt="" className="w-7 h-7 rounded-full border border-slate-700" />
                         <div>
-                          <a href={source.url} target="_blank" rel="noreferrer" className="text-[10px] text-cyan-400 hover:underline">
+                          <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-cyan-400 hover:underline">
                             {source.channelId}
                           </a>
                         </div>
@@ -1362,13 +1373,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       <td className="p-3 font-semibold text-slate-200 font-sans">
                         {source.name}
                       </td>
-                      <td className="p-3 text-slate-400 text-[11px]">
+                      <td className="p-3 text-slate-400 text-xs">
                         {source.lastCaptured.replace('T', ' ').slice(0, 16)}
                       </td>
                       <td className="p-3">
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                          source.status === 'active' 
-                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' 
+                        <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                          source.status === 'active'
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                             : 'bg-amber-950 text-amber-400 border border-amber-800'
                         }`}>
                           {source.status}
@@ -1395,11 +1406,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
       {/* INGESTION & SOURCE CREATION MODAL */}
       {isIngestionModalOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
           onClick={() => setIsIngestionModalOpen(false)}
         >
-          <div 
+          <div
             className="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1411,7 +1422,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-zinc-100">{t('modalIngestionTitle')}</h3>
-                  <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{t('modalIngestionSub')}</p>
+                  <p className="text-xs text-zinc-400 font-mono mt-0.5">{t('modalIngestionSub')}</p>
                 </div>
               </div>
               <button
@@ -1423,7 +1434,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             </div>
 
             {/* Modal Tabs Selector (3 API Routes: /video, /playlist, /canal or /channel) */}
-            <div className="grid grid-cols-3 p-2 gap-1.5 bg-zinc-950/80 border-b border-zinc-800 text-[11px] font-mono">
+            <div className="grid grid-cols-3 p-2 gap-1.5 bg-zinc-950/80 border-b border-zinc-800 text-xs font-mono">
               <button
                 type="button"
                 onClick={() => setModalMode('content')}
@@ -1470,11 +1481,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               {modalMode === 'content' && (
                 <form onSubmit={handleIngestContent} className="space-y-4">
                   <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-200 text-xs">
-                    <p className="text-[11px] text-zinc-300 font-sans leading-relaxed">{t('descVideoRoute')}</p>
+                    <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descVideoRoute')}</p>
                   </div>
 
                   <div>
-                    <label className="block text-zinc-400 text-[11px] uppercase tracking-wider mb-1">
+                    <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
                       {t('fieldUrlVideo')} *
                     </label>
                     <input
@@ -1520,11 +1531,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               {modalMode === 'playlist' && (
                 <form onSubmit={handleIngestPlaylist} className="space-y-4">
                   <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-200 text-xs">
-                    <p className="text-[11px] text-zinc-300 font-sans leading-relaxed">{t('descPlaylistRoute')}</p>
+                    <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descPlaylistRoute')}</p>
                   </div>
 
                   <div>
-                    <label className="block text-zinc-400 text-[11px] uppercase tracking-wider mb-1">
+                    <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
                       {t('fieldUrlPlaylist')} *
                     </label>
                     <input
@@ -1542,7 +1553,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       <span className="block text-xs font-bold text-zinc-200 font-sans">
                         {t('fieldSaveInPlaylistFolder')}
                       </span>
-                      <span className="block text-[10px] text-zinc-500 font-sans">
+                      <span className="block text-xs text-zinc-500 font-sans">
                         {t('fieldSaveInPlaylistFolderDesc')}
                       </span>
                     </div>
@@ -1594,11 +1605,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               {modalMode === 'sources' && (
                 <form onSubmit={handleRegisterSource} className="space-y-4">
                   <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs">
-                    <p className="text-[11px] text-zinc-300 font-sans leading-relaxed">{t('descSourcesRoute')}</p>
+                    <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descSourcesRoute')}</p>
                   </div>
 
                   <div>
-                    <label className="block text-zinc-400 text-[11px] uppercase tracking-wider mb-1">
+                    <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
                       {t('fieldUrlCanal')} *
                     </label>
                     <input
@@ -1647,7 +1658,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       {/* Video Details Modal */}
       {selectedVideo && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedVideo(null)}>
-          <div 
+          <div
             className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1676,22 +1687,22 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       <Youtube className="w-16 h-16 text-zinc-700 opacity-50" />
                     </div>
                   )}
-                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-[10px] border border-zinc-700/50">{formatDuration(selectedVideo.duration)}</span>
+                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700/50">{formatDuration(selectedVideo.duration)}</span>
                 </div>
                 <div className="flex flex-col gap-3">
                   <h3 className="text-lg font-bold text-zinc-100 leading-tight">{selectedVideo.title}</h3>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="text-sm font-semibold text-zinc-400 flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-[10px] uppercase font-bold border border-indigo-500/30">
+                      <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-xs uppercase font-bold border border-indigo-500/30">
                         {selectedVideo.sourceName.charAt(0)}
                       </span>
                       {selectedVideo.sourceName}
                     </span>
-                    <span className={`px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 ${getStatusColor(selectedVideo.status)} text-[10px] uppercase font-mono font-bold tracking-wider shadow-sm`}>
-                      {selectedVideo.status.replace(/_/g, ' ')}
+                    <span className={`px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 ${selectedVideo.deletionRequested ? 'text-amber-400' : getStatusColor(selectedVideo.status)} text-xs uppercase font-mono font-bold tracking-wider shadow-sm`}>
+                      {selectedVideo.deletionRequested ? t('deletionPending') : selectedVideo.status.replace(/_/g, ' ')}
                     </span>
                     {(selectedVideo.isDiarized || selectedVideo.diarizationStatus) && (
-                      <span className={`px-2.5 py-1 rounded-md border text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${
+                      <span className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${
                         selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED'
                           ? 'bg-purple-950/90 border-purple-500/40 text-purple-300'
                           : selectedVideo.diarizationStatus === 'ERROR'
@@ -1717,7 +1728,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       </span>
                     )}
                     {selectedVideo.publishedAt && (
-                      <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5 ml-2 bg-zinc-900/50 px-2 py-1 rounded-md border border-zinc-800/50">
+                      <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5 ml-2 bg-zinc-900/50 px-2 py-1 rounded-md border border-zinc-800/50">
                         <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
                         {t('publishedAt')}: {new Date(selectedVideo.publishedAt).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US')}
                       </span>
@@ -1725,9 +1736,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   </div>
                 </div>
               </div>
-  
+
               <div className="flex flex-col gap-2.5">
-                <h4 className="text-[11px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+                <h4 className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
                   <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
                   {t('fullDescription')}
                 </h4>
@@ -1737,7 +1748,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               </div>
 
               <div className="flex flex-col gap-2.5">
-                <h4 className="text-[11px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+                <h4 className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
                   <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
                   {t('tagsLabel')} ({selectedVideo.tags.length})
                 </h4>
@@ -1755,7 +1766,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               {/* Timestamps */}
               <div className="flex flex-col sm:flex-row gap-4 bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50">
                 <div className="flex flex-col gap-1 w-full">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
                     <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
                     {t('createdAt')}
                   </span>
@@ -1776,14 +1787,14 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     setSelectedVideo(null);
                     setVideoToDelete(selectedVideo);
                   }}
-                  disabled={deletingVideoIds.has(selectedVideo.id)}
+                  disabled={deletingVideoIds.has(selectedVideo.id) || selectedVideo.deletionRequested}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 text-xs font-bold transition-all disabled:opacity-50"
                 >
                   <Trash className={`w-4 h-4 ${deletingVideoIds.has(selectedVideo.id) ? 'animate-pulse' : ''}`} />
-                  <span>Excluir</span>
+                  <span>{selectedVideo.deletionRequested ? t('deletionPending') : t('btnConfirmDelete')}</span>
                 </button>
-                {selectedVideo.status === 'COMPLETED' && (
-                  <button 
+                {selectedVideo.status === 'COMPLETED' && !selectedVideo.deletionRequested && (
+                  <button
                       onClick={(e) => handleDiarizationClick(e, selectedVideo)}
                       className="px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold shadow-sm shadow-purple-500/10 transition-colors flex items-center gap-1.5 border border-purple-500/20"
                     >
@@ -1831,7 +1842,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="p-6">
               <p className="text-sm text-zinc-400 mb-4">
                 {t('descConfirmDelete')}
@@ -1885,12 +1896,12 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="p-6">
               <p className="text-sm text-zinc-400 mb-4">
                 {t('diarizationModalSubtitle')}
               </p>
-              
+
               <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 mb-4">
                 <p className="text-sm text-zinc-200 font-bold line-clamp-1">{diarizationModalVideo.title}</p>
                 <p className="text-xs text-zinc-500 mt-1">{diarizationModalVideo.sourceName}</p>
@@ -1905,9 +1916,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   value={diarizationLanguage}
                   onChange={(e) => setDiarizationLanguage(e.target.value)}
                   placeholder="en, pt, es, etc."
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                 />
-                <p className="text-[10px] text-zinc-500 mt-1">
+                <p className="text-xs text-zinc-500 mt-1">
                   {t('diarizationModalLangDesc')}
                 </p>
               </div>

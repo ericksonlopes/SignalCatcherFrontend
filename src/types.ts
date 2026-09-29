@@ -49,6 +49,10 @@ export interface CapturedVideo {
   description?: string;
   sentimentScore?: number; // -1 to 1
   language?: string;
+  deletionRequested?: boolean;
+  attemptCount?: number;
+  nextRetryAt?: string | null;
+  errorInfo?: string | null;
   isDiarized?: boolean;
   diarizationStatus?: string | null;
 }

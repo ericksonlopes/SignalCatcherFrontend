@@ -1,1 +1,51 @@
 @import "tailwindcss";
+
+
+/* Semantic palette shared by the existing Tailwind components. */
+[data-theme="light"] {
+  color-scheme: light;
+  background-color: #f1f5f9;
+  --color-zinc-950: #ffffff;
+  --color-zinc-900: #f8fafc;
+  --color-zinc-800: #e2e8f0;
+  --color-zinc-700: #cbd5e1;
+  --color-zinc-600: #64748b;
+  --color-zinc-500: #64748b;
+  --color-zinc-400: #475569;
+  --color-zinc-300: #334155;
+  --color-zinc-200: #1e293b;
+  --color-zinc-100: #0f172a;
+}
+[data-theme="cyberpunk"], [data-theme="oled"] { color-scheme: dark; }
+[data-theme="oled"] { --color-zinc-950: #000000; --color-zinc-900: #080808; }
+[data-theme="light"] [class*="bg-[#09090b]"],
+[data-theme="light"] [class*="bg-[#0a0a0a]"],
+[data-theme="light"] [class*="bg-[#18181b]"] { background-color: var(--color-zinc-950); }
+[data-theme="oled"] [class*="bg-[#09090b]"] { background-color: #000; }
+[data-theme="light"] [class*="text-emerald-400"] { color: #047857; }
+[data-theme="light"] [class*="text-indigo-400"] { color: #4338ca; }
+[data-theme="light"] [class*="text-blue-400"] { color: #1d4ed8; }
+[data-theme="light"] [class*="text-cyan-400"] { color: #0e7490; }
+[data-theme="light"] [class*="text-amber-400"] { color: #92400e; }
+[data-theme="light"] [class*="text-rose-400"],
+[data-theme="light"] [class*="text-red-400"] { color: #be123c; }
+[data-theme="light"] [class*="text-purple-400"],
+[data-theme="light"] [class*="text-fuchsia-400"] { color: #7e22ce; }
+button { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--color-indigo-500);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+[data-theme="light"] [class*="hover:text-white"]:hover { color: #0f172a; }
+[data-theme="light"] [class*="from-zinc-100"][class*="text-transparent"] {
+  background-image: linear-gradient(to right, #0f172a, #4338ca, #0e7490);
+}

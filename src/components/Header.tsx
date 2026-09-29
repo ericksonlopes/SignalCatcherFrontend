@@ -1,23 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Activity, 
-  Terminal, 
-  Server, 
-  Search, 
-  Bell, 
-  Sun, 
-  Moon, 
-  Zap,
-  Settings,
-  Check,
-  X,
-  Sliders,
-  RefreshCw,
-  Database,
-  Globe
-} from 'lucide-react';
-import { ThemeMode, LanguageMode } from '../types';
-import { getTranslation } from '../locales';
+import React, {useEffect, useRef, useState} from 'react';
+import {Bell, Check, Globe, Moon, RefreshCw, Search, Server, Settings, Sliders, Sun, X, Zap} from 'lucide-react';
+import {LanguageMode, ThemeMode} from '../types';
+import {getTranslation} from '../locales';
+import {getAdminKey, setAdminKey} from '../api';
 
 interface HeaderProps {
   theme: ThemeMode;
@@ -49,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   setIsSimulatingLive
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [adminKey, updateAdminKey] = useState<string>(() => getAdminKey());
   const [currentLang, setCurrentLang] = useState<LanguageMode>(language);
   const settingsRef = useRef<HTMLDivElement>(null);
   const { t } = getTranslation(language);
@@ -85,10 +71,10 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-3 min-w-max">
         <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-cyan-600 to-emerald-500 p-0.5 shadow-md shadow-indigo-500/20">
           <div className="w-full h-full bg-zinc-950 rounded-[10px] flex items-center justify-center">
-            <Zap className="w-5 h-5 text-indigo-400 animate-pulse" />
+            <Zap className="w-5 h-5 text-indigo-400 " />
           </div>
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className=" absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
           </span>
         </div>
@@ -98,13 +84,13 @@ export const Header: React.FC<HeaderProps> = ({
             <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-zinc-100 via-indigo-200 to-cyan-300 bg-clip-text text-transparent">
               SignalCatcher
             </h1>
-            <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              Bento v2.4
+            <span className="text-xs font-semibold tracking-wide px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              {t('homelabDashboard')}
             </span>
           </div>
-          <p className="text-xs text-zinc-400 font-mono flex items-center gap-1.5">
-            <Server className="w-3 h-3 text-emerald-400" />
-            <span>Python FastAPI Hub</span>
+          <p className="text-sm text-zinc-400 flex items-center gap-1.5">
+            <Server className={`w-3.5 h-3.5 ${isBackendConnected ? 'text-emerald-400' : 'text-rose-400'}`} />
+            <span role="status">{t(isBackendConnected ? 'apiConnected' : 'apiDisconnected')}{isBackendConnected && latency > 0 ? ` · ${Math.round(latency)} ms` : ''}</span>
           </p>
         </div>
       </div>
@@ -119,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Search className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
             <span>{t('searchHeaderPlaceholder')}</span>
           </span>
-          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-800 text-zinc-300 rounded-md border border-zinc-700">
+          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-mono bg-zinc-800 text-zinc-300 rounded-md border border-zinc-700">
             Ctrl K
           </kbd>
         </button>
@@ -135,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Bell className="w-4 h-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold font-mono px-1 rounded-full min-w-4 h-4 flex items-center justify-center animate-bounce">
+            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-xs font-bold font-mono px-1 rounded-full min-w-4 h-4 flex items-center justify-center ">
               {unreadCount}
             </span>
           )}
@@ -144,6 +130,8 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Settings Button & Dropdown Popover */}
         <div className="relative" ref={settingsRef}>
           <button
+            aria-expanded={isSettingsOpen}
+            aria-label={t('settingsBtn')}
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all text-xs font-medium ${
               isSettingsOpen 
@@ -174,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Theme Settings Section */}
               <div className="space-y-2 mb-4">
-                <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block mb-1">
+                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 block mb-1">
                   {t('themeLabel')}
                 </label>
                 
@@ -237,7 +225,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Language Settings Section */}
               <div className="space-y-2 mb-4 pt-3 border-t border-zinc-800">
-                <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 flex items-center justify-between mb-1">
+                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 flex items-center justify-between mb-1">
                   <span>{t('languageLabel')}</span>
                   <Globe className="w-3.5 h-3.5 text-indigo-400" />
                 </label>
@@ -271,9 +259,26 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
 
+                <div className="space-y-2 mb-4 pt-3 border-t border-zinc-800">
+                    <label htmlFor="admin-api-key" className="text-xs text-zinc-300">{t('adminKeyLabel')}</label>
+                    <input id="admin-api-key" type="password" autoComplete="off" value={adminKey}
+                           onChange={event => {
+                               updateAdminKey(event.target.value);
+                               setAdminKey(event.target.value);
+                           }}
+                           className="w-full p-2 rounded-lg bg-zinc-950 border border-zinc-700 text-xs"
+                           placeholder={t('adminKeyPlaceholder')}/>
+                    <p className="text-xs text-zinc-400">{t('adminKeyHelp')}</p>
+                    <button onClick={() => {
+                        updateAdminKey('');
+                        setAdminKey('');
+                    }}
+                            className="text-xs text-zinc-400 hover:text-zinc-100">{t('adminKeyClear')}</button>
+                </div>
+
               {/* Additional Options */}
               <div className="pt-3 border-t border-zinc-800 space-y-2">
-                <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block">
+                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 block">
                   {t('executionPrefLabel')}
                 </label>
 

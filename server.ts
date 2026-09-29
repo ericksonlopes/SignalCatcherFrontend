@@ -1,12 +1,26 @@
 import express from "express";
+import {timingSafeEqual} from "node:crypto";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+import {createServer as createViteServer} from "vite";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+  // Match the backend's administrative access contract; keep the key server-side.
+  app.use((req, res, next) => {
+    const administrative = req.path === '/metrics' || (req.path.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method));
+    if (!administrative) return next();
+    const expected = process.env.ADMIN_API_KEY;
+    if (!expected) return res.status(503).json({detail: 'Administrative access is not configured.'});
+    const supplied = Buffer.from(req.header('X-API-Key') || '');
+    const expectedBytes = Buffer.from(expected);
+    if (supplied.length !== expectedBytes.length || !timingSafeEqual(supplied, expectedBytes)) {
+      return res.status(401).json({detail: 'Invalid administrative API key.'});
+    }
+    next();
+  });
 
   // In-memory data store for YouTube sources and content
   const youtubeSources: Array<{
@@ -42,8 +56,30 @@ async function startServer() {
     sentimentScore: number;
     is_diarized?: boolean;
     diarization_status?: string | null;
+    deletion_requested?: boolean;
   }> = [];
 
+
+  app.get('/status', (_req, res) => res.json({status: 'online'}));
+  app.get('/ready', (_req, res) => res.json({status: 'ready', checks: {database: true, worker: true}}));
+  app.get('/metrics', (_req, res) => res.json({
+    content_counts: {}, oldest_queued_age_seconds: 0, expired_reservations: 0,
+    deletions_pending: youtubeContents.filter(item => item.deletion_requested).length,
+    retries_exhausted: 0, deletions_exhausted: 0, jobs: [],
+  }));
+  const mockJobs = new Set(['youtube_monitor_channels', 'youtube_extract_and_download',
+    'youtube_extract_metadata', 'youtube_download_videos', 'youtube_process_errors',
+    'youtube_promote_scheduled', 'youtube_delete_contents']);
+  app.post('/api/youtube/scheduler/jobs/:jobId/run', (req, res) => {
+    if (!mockJobs.has(req.params.jobId)) return res.status(404).json({detail: 'Job not found.'});
+    return res.status(202).json({message: 'Mock request queued.', job_id: req.params.jobId});
+  });
+  app.delete('/api/youtube/content/:externalId', (req, res) => {
+    const item = youtubeContents.find(video => video.id === req.params.externalId || video.postgresRecordId === req.params.externalId);
+    if (!item) return res.status(404).json({detail: 'Content not found.'});
+    item.deletion_requested = true;
+    return res.status(202).json({message: 'Mock deletion queued.', deletion_requested: true});
+  });
 
   // API Routes
 
@@ -234,10 +270,22 @@ async function startServer() {
     if (channelQuery) {
       items = items.filter(i => (i.sourceName || "").toLowerCase().includes(channelQuery));
     }
-    return res.json({
-      success: true,
-      data: items
-    });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const step = String(req.query.step || '');
+    const search = String(req.query.search || '').toLowerCase();
+    if (step) items = items.filter(item => item.status === step);
+    if (search) items = items.filter(item => item.title.toLowerCase().includes(search));
+    const total = items.length;
+    const pageItems = items.slice((page - 1) * limit, page * limit).map(item => ({
+      id: item.id, title: item.title, url: item.videoUrl, channel_name: item.sourceName,
+      step: item.status, thumbnail: item.thumbnail, duration: 0, published_at: item.publishedAt,
+      tags: item.tags, is_diarized: item.is_diarized ?? false,
+      diarization_status: item.diarization_status ?? null,
+      deletion_requested: item.deletion_requested ?? false,
+      attempt_count: 0, next_retry_at: null, error_info: null,
+    }));
+    return res.json({items: pageItems, data: items, total, page, limit, total_pages: Math.ceil(total / limit)});
   });
 
   /**
