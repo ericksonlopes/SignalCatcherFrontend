@@ -1,3 +1,5 @@
+import {useInfiniteVideos} from './hooks/useInfiniteVideos';
+import {readWorkspace, saveWorkspace} from './navigationStorage';
 import {API_BASE_URL, apiFetch} from './api';
 import React, {useEffect, useRef, useState} from 'react';
 import {BarChart3, Home, Mic, Radio, Sparkles, Terminal, TrendingDown} from 'lucide-react';
@@ -31,7 +33,6 @@ import {
   INITIAL_DEVICES,
   INITIAL_FOLLOWER_HISTORY,
   INITIAL_JOBS,
-  INITIAL_LOGS
 } from './data/initialData';
 
 function SignalCatcherHub() {
@@ -41,13 +42,9 @@ function SignalCatcherHub() {
     document.title = "SignalCatcher";
   }, []);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [limit, setLimit] = useState(20);
   const [stepFilter, setStepFilter] = useState('COMPLETED');
   const [channelFilter, setChannelFilter] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [isFetchingVideos, setIsFetchingVideos] = useState(false);
   const [isFetchingChannels, setIsFetchingChannels] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,75 +57,18 @@ function SignalCatcherHub() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-      setCurrentPage(1); // Reset page on new search
     }, 500);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
 
 
-  const initialVideosFetched = useRef(false);
   const initialChannelsFetched = useRef(false);
 
-  useEffect(() => {
-    if (!initialVideosFetched.current) {
-      setIsFetchingVideos(true);
-    }
-    const stepQuery = stepFilter ? `&step=${stepFilter}` : '';
-    const searchQueryParam = debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : '';
-    const channelQueryParam = channelFilter ? `&channel=${encodeURIComponent(channelFilter)}` : '';
-    apiFetch(`${API_BASE_URL}/api/youtube/content?page=${currentPage}&limit=${limit}${stepQuery}${searchQueryParam}${channelQueryParam}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.items) {
-          const fetchedCaptures: CapturedVideo[] = data.items.map((item: any) => ({
-            id: item.id || `vid-${Math.random()}`,
-            sourceId: 'api',
-            sourceName: item.channel_name || 'YouTube API',
-            sourceAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-            title: item.title,
-            videoUrl: item.url,
-            thumbnail: item.thumbnail || '',
-            createdAt: item.created_at || item.createdAt || new Date().toISOString(),
-            publishedAt: item.published_at || item.publishedAt || new Date().toISOString(),
-            duration: item.duration || '0:00',
-            views: 0,
-            likes: 0,
-            commentsCount: 0,
-            status: item.step || 'PENDING_DOWNLOAD',
-            postgresRecordId: item.id || '',
-            tags: item.tags || [],
-            summary: '',
-            description: item.description || '',
-            sentimentScore: 0,
-            language: item.language,
-            deletionRequested: item.deletion_requested ?? false,
-            attemptCount: item.attempt_count ?? 0,
-            nextRetryAt: item.next_retry_at ?? null,
-            errorInfo: item.error_info ?? null,
-            isDiarized: item.is_diarized ?? item.isDiarized ?? false,
-            diarizationStatus: item.diarization_status || item.diarizationStatus || null
-          }));
-
-          setCaptures(fetchedCaptures);
-          if (data.total_pages) {
-            setTotalPages(data.total_pages);
-          }
-          if (data.status_counts) {
-            setStatusCounts(data.status_counts);
-          }
-          if (data.total_status_count !== undefined) {
-            setTotalStatusCount(data.total_status_count);
-          }
-        }
-      })
-      .catch(err => console.error("Failed to fetch API data", err))
-      .finally(() => {
-        setIsFetchingVideos(false);
-        initialVideosFetched.current = true;
-      });
-  }, [currentPage, refreshTrigger, limit, stepFilter, debouncedSearchQuery, channelFilter]);
-
+  const {captures, setCaptures, isInitialLoading: isFetchingVideos, isLoadingMore,
+    hasMore, error: videoLoadError, loadMore} = useInfiniteVideos(
+      stepFilter, debouncedSearchQuery, channelFilter, refreshTrigger,
+    );
 
   useEffect(() => {
     if (!initialChannelsFetched.current) {
@@ -225,21 +165,20 @@ function SignalCatcherHub() {
   const [isSimulatingLive, setIsSimulatingLive] = useState<boolean>(true);
 
   // App Tabs State
-  const [tabs, setTabs] = useState<AppTab[]>([
-    { id: 'tab-1', appId: 'signalcatcher', title: 'SignalCatcher Ingestor', icon: 'radio', isPinned: true }
-  ]);
+  const [initialWorkspace] = useState(readWorkspace);
+  const [tabs, setTabs] = useState<AppTab[]>(initialWorkspace.tabs);
+  const [activeTabId, setActiveTabId] = useState<string>(initialWorkspace.activeTabId);
 
-  const [activeTabId, setActiveTabId] = useState<string>('tab-1');
+  useEffect(() => {saveWorkspace(tabs, activeTabId);}, [tabs, activeTabId]);
 
   // Datasets State
   const [sources, setSources] = useState<ContentSource[]>([]);
   const [savedChannels, setSavedChannels] = useState<ContentSource[]>([]);
-  const [captures, setCaptures] = useState<CapturedVideo[]>([]);
   const [jobs, setJobs] = useState<ScheduledJob[]>(INITIAL_JOBS);
   const [devices, setDevices] = useState<SmartDevice[]>(INITIAL_DEVICES);
   const [followerHistory, setFollowerHistory] = useState<FollowerStats[]>(INITIAL_FOLLOWER_HISTORY);
   const [creators, setCreators] = useState<CreatorMetric[]>(INITIAL_CREATORS);
-  const [logs, setLogs] = useState<SystemLog[]>(INITIAL_LOGS);
+  const [logs, setLogs] = useState<SystemLog[]>([]);
 
   // Modal & Drawer Toggles
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
@@ -252,17 +191,17 @@ function SignalCatcherHub() {
   // Add system log helper
   const addLog = (sourceApp: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => {
     const newLog: SystemLog = {
-      id: `log-${Date.now()}`,
+      id: crypto.randomUUID(),
       timestamp: new Date().toTimeString().slice(0, 8),
       sourceApp,
       level,
       message
     };
-    setLogs((prev) => [newLog, ...prev]);
-    setUnreadLogsCount((prev) => prev + 1);
+    setLogs((prev) => [newLog, ...prev].slice(0, 200));
+    if (!isNotificationsOpen) setUnreadLogsCount((prev) => Math.min(200, prev + 1));
 
     // Trigger reactive Toast notification
-    toast[level](message, sourceApp, {
+    if (!isNotificationsOpen) toast[level](message, sourceApp, {
       action: {
         label: language === 'pt' ? 'Ver Logs' : 'View Logs',
         onClick: () => {
@@ -446,11 +385,10 @@ function SignalCatcherHub() {
               setJobs={setJobs}
               onTriggerJob={handleTriggerJob}
               onAddLog={addLog}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              limit={limit}
-              onLimitChange={setLimit}
+              hasMoreVideos={hasMore}
+              isLoadingMoreVideos={isLoadingMore}
+              videoLoadError={videoLoadError}
+              onLoadMoreVideos={loadMore}
               stepFilter={stepFilter}
               onStepFilterChange={setStepFilter}
               channelFilter={channelFilter}
@@ -516,7 +454,8 @@ function SignalCatcherHub() {
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         logs={logs}
-        onClearLogs={() => setLogs([])}
+        language={language}
+        onClearLogs={() => {setLogs([]); setUnreadLogsCount(0);}}
       />
 
       <CustomAppBuilderModal
@@ -526,7 +465,7 @@ function SignalCatcherHub() {
       />
 
       {/* Global Reactive Toast Notifications */}
-      <ToastContainer />
+      <ToastContainer language={language} hidden={isNotificationsOpen} />
     </div>
   );
 }

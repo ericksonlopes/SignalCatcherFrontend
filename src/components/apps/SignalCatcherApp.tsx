@@ -1,5 +1,8 @@
+import {buildChannelOptions, channelIdentity} from '../../channelOptions';
+import {MonitoredChannels} from './MonitoredChannels';
+import {CaptureSection, readCaptureSection, saveCaptureSection} from '../../navigationStorage';
 import {API_BASE_URL, apiFetch} from '../../api';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   Activity,
   AlertCircle,
@@ -32,7 +35,7 @@ import {
 
 import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
 import {getTranslation} from '../../locales';
-import {OperationsPanel} from './OperationsPanel';
+import {TrackingTelemetry} from './TrackingTelemetry';
 
 
 const formatDuration = (duration: number | string | undefined | null): string => {
@@ -73,11 +76,10 @@ interface SignalCatcherAppProps {
   setJobs: React.Dispatch<React.SetStateAction<ScheduledJob[]>>;
   onTriggerJob: (jobId: string) => void;
   onAddLog: (sourceApp: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
-  currentPage?: number;
-  totalPages?: number;
-  onPageChange?: (page: number) => void;
-  limit?: number;
-  onLimitChange?: (limit: number) => void;
+  hasMoreVideos?: boolean;
+  isLoadingMoreVideos?: boolean;
+  videoLoadError?: boolean;
+  onLoadMoreVideos?: () => void;
   stepFilter?: string;
   onStepFilterChange?: (step: string) => void;
   channelFilter?: string;
@@ -130,11 +132,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   setJobs,
   onTriggerJob,
   onAddLog,
-  currentPage = 1,
-  totalPages = 1,
-  onPageChange,
-  limit,
-  onLimitChange,
+  hasMoreVideos = false,
+  isLoadingMoreVideos = false,
+  videoLoadError = false,
+  onLoadMoreVideos,
   stepFilter = '',
   onStepFilterChange,
   channelFilter = '',
@@ -151,11 +152,22 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   totalMonitoredCount = 0
 }) => {
   const { t } = getTranslation(language);
-  const [subTab, setSubTab] = useState<'captures' | 'saved_channels' | 'sources' | 'jobs' | 'tracking'>('captures');
+  const [subTab, setSubTab] = useState<CaptureSection>(readCaptureSection);
+  useEffect(() => {saveCaptureSection(subTab);}, [subTab]);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const loadMoreSentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (subTab !== 'captures' || !hasMoreVideos || isLoadingData || isLoadingMoreVideos || videoLoadError || !onLoadMoreVideos) return;
+    const target = loadMoreSentinel.current;
+    if (!target || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) onLoadMoreVideos();
+    }, {rootMargin: '300px 0px'});
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [subTab, hasMoreVideos, isLoadingData, isLoadingMoreVideos, videoLoadError, onLoadMoreVideos, captures.length]);
 
-  const [isTriggeringMetadata, setIsTriggeringMetadata] = useState(false);
-  const [isTriggeringDownload, setIsTriggeringDownload] = useState(false);
+
 
   const query = onSearchQueryChange ? searchQuery : localSearchQuery;
   const handleSearchChange = (val: string) => {
@@ -173,41 +185,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [saveInPlaylistFolder, setSaveInPlaylistFolder] = useState(false);
   const [isProcessingManual, setIsProcessingManual] = useState(false);
 
-  // Map channel external_id -> display title/name for select filter and display
-  const channelOptions = useMemo(() => {
-    const map = new Map<string, string>(); // external_id -> display_name
-
-    // 1. Saved channels
-    (savedChannels || []).forEach((c) => {
-      if (c.channelId) {
-        map.set(c.channelId, c.name || c.channelId);
-      }
-    });
-
-    // 2. Monitored sources
-    (sources || []).forEach((s) => {
-      if (s.channelId) {
-        if (!map.has(s.channelId) || map.get(s.channelId) === s.channelId) {
-          map.set(s.channelId, s.name || s.channelId);
-        }
-      }
-    });
-
-    // 3. Captures (for any external_id not in saved/monitored channels)
-    (captures || []).forEach((c) => {
-      if (c.sourceName && !map.has(c.sourceName)) {
-        map.set(c.sourceName, c.sourceName);
-      }
-    });
-
-    return Array.from(map.entries()).sort((a, b) =>
-      a[1].localeCompare(b[1], undefined, { sensitivity: 'base' })
-    );
-  }, [savedChannels, sources, captures]);
-
-  const channelMap = useMemo(() => {
-    return new Map(channelOptions);
-  }, [channelOptions]);
+  const channelOptions = useMemo(
+    () => buildChannelOptions(savedChannels || [], sources || [], captures || []),
+    [savedChannels, sources, captures],
+  );
+  const channelMap = useMemo(() => new Map(
+    channelOptions.map(([value, label]) => [channelIdentity(value), label]),
+  ), [channelOptions]);
 
   // New source form state
   const [newSourceName, setNewSourceName] = useState('');
@@ -424,11 +408,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }
   };
 
-  // Filtered captures (sources only, captures are pre-filtered by backend)
-  const filteredSources = sources.filter((s) => {
-    const q = query.toLowerCase();
-    return s.name.toLowerCase().includes(q) || s.channelId.toLowerCase().includes(q);
-  });
+
 
   // Handler for POST /api/youtube/sources
   const handleRegisterSource = async (e: React.FormEvent) => {
@@ -583,36 +563,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }
   };
 
-  const handleTriggerMetadata = async () => {
-    setIsTriggeringMetadata(true);
-    onAddLog('SignalCatcher', 'info', 'Iniciando extração de metadados em lote...');
-    try {
-      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content/trigger-metadata-extraction`, {method: 'POST'});
-      if (!response.ok) throw new Error('Falha ao acionar job de metadados');
-      onAddLog('SignalCatcher', 'success', 'Job de extração de metadados enfileirado com sucesso.');
-      onRefresh?.();
-    } catch (err) {
-      onAddLog('SignalCatcher', 'error', `Erro ao acionar job de metadados: ${err}`);
-    } finally {
-      setIsTriggeringMetadata(false);
-    }
-  };
-
-  const handleTriggerDownload = async () => {
-    setIsTriggeringDownload(true);
-    onAddLog('SignalCatcher', 'info', 'Iniciando download de vídeos em lote...');
-    try {
-      const response = await apiFetch(`${API_BASE_URL}/api/youtube/content/trigger-downloads`, {method: 'POST'});
-      if (!response.ok) throw new Error('Falha ao acionar job de downloads');
-      onAddLog('SignalCatcher', 'success', 'Job de download de vídeos enfileirado com sucesso.');
-      onRefresh?.();
-    } catch (err) {
-      onAddLog('SignalCatcher', 'error', `Erro ao acionar job de downloads: ${err}`);
-    } finally {
-      setIsTriggeringDownload(false);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full bg-[#09090b] text-zinc-100 font-sans p-2 sm:p-4 space-y-4 overflow-y-auto animate-in fade-in duration-500">
       {/* Top App Hero & Overview Bar - Bento Grid Card */}
@@ -637,7 +587,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
       {/* Sub-Navigation Bar */}
       <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
-        <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1 [&>button]:shrink-0">
+        <div className="flex items-center gap-2 text-xs overflow-x-auto pb-1 [&>button]:shrink-0">
           <button
             onClick={() => setSubTab('captures')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
@@ -685,10 +635,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             <Activity className="w-3.5 h-3.5 text-fuchsia-400" />
             <span>{t('tabTracking' as any) || 'Tracking'}</span>
           </button>
-          <button onClick={() => setSubTab('jobs')}
-                  className={`px-4 py-2 rounded-xl border ${subTab === 'jobs' ? 'bg-zinc-800 border-zinc-700 text-zinc-100' : 'border-zinc-800 text-zinc-400'}`}>
-            {t('operationsTitle')}
-          </button>
         </div>
 
         {/* Action Trigger Buttons */}
@@ -717,7 +663,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         </div>
       </div>
 
-      {subTab === 'jobs' && <OperationsPanel language={language === "pt" ? "pt" : "en"}/>}
       {/* CONSTANTES PARA O TRACKING */}
       {(() => {
         if (subTab !== 'tracking') return null;
@@ -729,19 +674,18 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           color: string;
           bg: string;
           border: string;
-          action?: string;
           animate?: boolean;
         }
 
         const PIPELINE_MAIN_FLOW: PipelineStepDef[] = [
-          { id: 'STARTED', label: 'STARTED', icon: PlayCircle, color: 'text-zinc-400', bg: 'bg-zinc-400/10', border: 'border-zinc-400/20', action: 'metadata' },
-          { id: 'PENDING_METADATA_EXTRACTION', label: 'PENDING METADATA EXTRACTION', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20', action: 'metadata' },
-          { id: 'EXTRACTING_METADATA', label: 'EXTRACTING METADATA', icon: Loader2, color: 'text-amber-300', bg: 'bg-amber-300/10', border: 'border-amber-300/20', action: 'metadata', animate: true },
-          { id: 'METADATA_EXTRACTED', label: 'METADATA EXTRACTED', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', action: 'download' },
-          { id: 'PENDING_DOWNLOAD', label: 'PENDING DOWNLOAD', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20', action: 'download' },
-          { id: 'DOWNLOADING', label: 'DOWNLOADING', icon: Loader2, color: 'text-blue-300', bg: 'bg-blue-300/10', border: 'border-blue-300/20', action: 'download', animate: true },
-          { id: 'DOWNLOADED', label: 'DOWNLOADED', icon: CheckCircle2, color: 'text-indigo-400', bg: 'bg-indigo-400/10', border: 'border-indigo-400/20', action: 'download' },
-          { id: 'COMPLETED', label: 'COMPLETED', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', action: 'completed' },
+          { id: 'STARTED', label: 'STARTED', icon: PlayCircle, color: 'text-zinc-400', bg: 'bg-zinc-400/10', border: 'border-zinc-400/20' },
+          { id: 'PENDING_METADATA_EXTRACTION', label: 'PENDING METADATA EXTRACTION', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
+          { id: 'EXTRACTING_METADATA', label: 'EXTRACTING METADATA', icon: Loader2, color: 'text-amber-300', bg: 'bg-amber-300/10', border: 'border-amber-300/20', animate: true },
+          { id: 'METADATA_EXTRACTED', label: 'METADATA EXTRACTED', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' },
+          { id: 'PENDING_DOWNLOAD', label: 'PENDING DOWNLOAD', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
+          { id: 'DOWNLOADING', label: 'DOWNLOADING', icon: Loader2, color: 'text-blue-300', bg: 'bg-blue-300/10', border: 'border-blue-300/20', animate: true },
+          { id: 'DOWNLOADED', label: 'DOWNLOADED', icon: CheckCircle2, color: 'text-indigo-400', bg: 'bg-indigo-400/10', border: 'border-indigo-400/20' },
+          { id: 'COMPLETED', label: 'COMPLETED', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
         ];
 
         const PIPELINE_EXCEPTIONS: PipelineStepDef[] = [
@@ -754,9 +698,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         ];
 
         const PIPELINE_OTHER: PipelineStepDef[] = [
-          { id: 'ERROR', label: 'ERROR', icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20', action: 'retry' },
-          { id: 'REPROCESSING', label: 'REPROCESSING', icon: RefreshCw, color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', action: 'retry', animate: true },
-          { id: 'DELETED', label: 'DELETED', icon: Trash, color: 'text-zinc-600', bg: 'bg-zinc-600/10', border: 'border-zinc-600/20', action: 'none' },
+          { id: 'ERROR', label: 'ERROR', icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
+          { id: 'REPROCESSING', label: 'REPROCESSING', icon: RefreshCw, color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', animate: true },
+          { id: 'DELETED', label: 'DELETED', icon: Trash, color: 'text-zinc-600', bg: 'bg-zinc-600/10', border: 'border-zinc-600/20' },
         ];
 
         return (
@@ -771,15 +715,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   <p className="text-xs text-zinc-400 font-mono mt-0.5">{t('trackingPipelineDesc' as any) || 'Visão geral do processamento do YouTube Catcher Engine'}</p>
                 </div>
               </div>
-
-              <button
-                onClick={handleGlobalRetry}
-                disabled={isRetryingGlobal}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 font-medium text-xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRetryingGlobal ? 'animate-spin' : ''}`} />
-                <span>Reprocessar Todas as Falhas</span>
-              </button>
             </div>
 
             <div className="flex flex-col gap-6">
@@ -797,45 +732,16 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
                     return (
                       <React.Fragment key={step.id}>
-                        <div className="flex-1 min-w-[155px] bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-zinc-700 transition-all shadow-sm shrink-0 relative">
+                        <div className="flex-1 min-w-[176px] bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-zinc-700 transition-all shadow-sm shrink-0 relative">
                           <div className="flex items-start justify-between">
                             <div className={`p-2.5 rounded-xl border ${step.bg} ${step.border} ${step.color}`}>
                               <step.icon className={`w-4 h-4 ${step.animate ? 'animate-spin' : ''}`} />
                             </div>
-
-                            {step.action === 'metadata' && (
-                              <button
-                                onClick={handleTriggerMetadata}
-                                disabled={isTriggeringMetadata || count === 0}
-                                className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-amber-500/20 text-amber-400 rounded-md border border-amber-500/30 hover:bg-amber-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isTriggeringMetadata ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                                {t('btnExtract' as any) || 'Extrair'}
-                              </button>
-                            )}
-                            {step.action === 'download' && (
-                              <button
-                                onClick={handleTriggerDownload}
-                                disabled={isTriggeringDownload || count === 0}
-                                className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-blue-500/20 text-blue-400 rounded-md border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isTriggeringDownload ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                                {t('btnDownload' as any) || 'Baixar'}
-                              </button>
-                            )}
-                            {step.action === 'completed' && (
-                              <button
-                                disabled
-                                className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-emerald-500/10 text-emerald-500/50 rounded-md border border-emerald-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
-                              >
-                                {t('btnCompleted' as any) || 'Finalizado'}
-                              </button>
-                            )}
                           </div>
 
                           <div>
-                            <div className="text-3xl font-black text-zinc-100 tracking-tight">{count}</div>
-                            <div className="text-xs font-bold text-zinc-400 mt-1 uppercase tracking-wider leading-tight h-8 flex items-center">{step.label}</div>
+                            <div className="text-2xl font-bold text-zinc-100 tracking-tight tabular-nums">{count}</div>
+                            <div className="text-[11px] font-medium text-zinc-400 mt-1 uppercase tracking-normal leading-snug min-h-8 flex items-center break-words">{step.label}</div>
                           </div>
                         </div>
 
@@ -865,24 +771,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                           <div className={`p-2.5 rounded-xl border ${step.bg} ${step.border} ${step.color}`}>
                             <step.icon className={`w-5 h-5 ${step.animate ? 'animate-spin' : ''}`} />
                           </div>
-                          {step.action === 'retry' && (
-                            <button
-                              onClick={handleGlobalRetry}
-                              disabled={isRetryingGlobal || count === 0}
-                              className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {isRetryingGlobal ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                              {t('btnExecute' as any) || 'Executar'}
-                            </button>
-                          )}
-                          {step.action === 'none' && (
-                            <button
-                              disabled
-                              className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-zinc-500/10 text-zinc-500/50 rounded-md border border-zinc-500/20 transition-colors flex items-center gap-1 cursor-not-allowed"
-                            >
-                              {t('btnInactive' as any) || 'Inativo'}
-                            </button>
-                          )}
                         </div>
 
                         <div>
@@ -910,16 +798,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                           <div className={`p-2.5 rounded-xl border ${step.bg} ${step.border} ${step.color}`}>
                             <step.icon className={`w-5 h-5 ${step.animate ? 'animate-spin' : ''}`} />
                           </div>
-                          {step.action === 'retry' && (
-                            <button
-                              onClick={handleGlobalRetry}
-                              disabled={isRetryingGlobal || count === 0}
-                              className="text-xs uppercase font-bold tracking-wider px-2 py-1.5 bg-rose-500/20 text-rose-400 rounded-md border border-rose-500/30 hover:bg-rose-500/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {isRetryingGlobal ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                              {t('btnExecute' as any) || 'Executar'}
-                            </button>
-                          )}
                         </div>
 
                         <div>
@@ -932,6 +810,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 </div>
               </div>
             </div>
+            <TrackingTelemetry language={language === "pt" ? "pt" : "en"} onAddLog={onAddLog} />
           </div>
         );
       })()}
@@ -956,7 +835,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 value={stepFilter}
                 onChange={(e) => {
                   onStepFilterChange(e.target.value);
-                  if (onPageChange) onPageChange(1); // Reset page on filter change
                 }}
                 className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
               >
@@ -986,7 +864,6 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 value={channelFilter}
                 onChange={(e) => {
                   onChannelFilterChange(e.target.value);
-                  if (onPageChange) onPageChange(1); // Reset page on filter change
                 }}
                 className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
               >
@@ -1025,7 +902,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <div className="flex flex-col flex-1">
                   {/* Card Header: Channel Info */}
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-semibold text-zinc-200">{channelMap.get(video.sourceName) || video.sourceName}</span>
+                    <span className="text-xs font-semibold text-zinc-200">{channelMap.get(channelIdentity(video.sourceName)) || video.sourceName}</span>
                   </div>
 
                   {/* Thumbnail & Badges */}
@@ -1232,48 +1109,14 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           </div>
           )}
 
-          {/* Pagination Controls */}
-          {totalPages > 0 && onPageChange && (
-            <div className="flex items-center justify-center gap-4 mt-8 mb-4">
-              <button
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <span className="text-sm font-mono text-zinc-300">
-                Página {currentPage} de {totalPages}
-              </span>
-              <button
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-
-              {/* Items per page selector */}
-              {onLimitChange && limit && (
-                <div className="ml-4 flex items-center gap-2">
-                  <label className="text-xs text-zinc-400 font-mono">Vídeos por página:</label>
-                  <select
-                    value={limit}
-                    onChange={(e) => {
-                      onLimitChange(Number(e.target.value));
-                      onPageChange(1);
-                    }}
-                    className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs rounded-lg px-2 py-1 outline-none focus:border-indigo-500 font-mono"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
+          <div ref={loadMoreSentinel} className="flex flex-col items-center justify-center gap-2 py-5 text-xs text-zinc-400" aria-live="polite">
+            {videoLoadError ? <>
+              <p role="alert">{t('videosLoadError')}</p>
+              <button onClick={onLoadMoreVideos} className="rounded-lg border border-zinc-700 px-3 py-2 text-indigo-400">{t('videosRetry')}</button>
+            </> : isLoadingMoreVideos ? <span className="inline-flex items-center gap-2"><Loader2 className="size-4 animate-spin" />{t('videosLoadingMore')}</span> : hasMoreVideos && !isLoadingData ?
+              <button onClick={onLoadMoreVideos} className="rounded-lg border border-zinc-800 px-3 py-2 hover:text-zinc-100">{t('videosLoadMore')}</button> : captures.length > 0 && !isLoadingData ?
+              <p>{t('videosEnd')} · {captures.length}</p> : null}
+          </div>
         </div>
       )}
 
@@ -1337,72 +1180,12 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         </div>
       )}
 
-      {/* SUB-TAB 2: SOURCES MANAGER */}
-      {subTab === 'sources' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-slate-200 font-mono">
-              {t('monitoredSources')} ({sources.length})
-            </h3>
-          </div>
-
-          {/* Sources List Table */}
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl font-mono text-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs uppercase">
-                    <th className="p-3">{t('tableChannelSource')}</th>
-                    <th className="p-3">{t('tableChannelName')}</th>
-                    <th className="p-3">{t('tableLastCapture')}</th>
-                    <th className="p-3">{t('tableStatus')}</th>
-                    <th className="p-3 text-right">{t('tableAction')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {filteredSources.map((source) => (
-                    <tr key={source.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="p-3 flex items-center gap-2.5">
-                        <img src={source.avatar} alt="" className="w-7 h-7 rounded-full border border-slate-700" />
-                        <div>
-                          <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-cyan-400 hover:underline">
-                            {source.channelId}
-                          </a>
-                        </div>
-                      </td>
-                      <td className="p-3 font-semibold text-slate-200 font-sans">
-                        {source.name}
-                      </td>
-                      <td className="p-3 text-slate-400 text-xs">
-                        {source.lastCaptured.replace('T', ' ').slice(0, 16)}
-                      </td>
-                      <td className="p-3">
-                        <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
-                          source.status === 'active'
-                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                            : 'bg-amber-950 text-amber-400 border border-amber-800'
-                        }`}>
-                          {source.status}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleToggleSourceStatus(source.id)}
-                          className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 transition-colors"
-                          title="Alternar Ativo/Pausado"
-                        >
-                          {source.status === 'active' ? <PauseCircle className="w-4 h-4 text-amber-400" /> : <PlayCircle className="w-4 h-4 text-emerald-400" />}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {subTab === 'sources' && <MonitoredChannels
+        sources={sources}
+        language={language === 'pt' ? 'pt' : 'en'}
+        onToggle={handleToggleSourceStatus}
+        onAdd={() => {setModalMode('sources'); setIsIngestionModalOpen(true);}}
+      />}
 
       {/* INGESTION & SOURCE CREATION MODAL */}
       {isIngestionModalOpen && (

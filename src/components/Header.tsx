@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
               {t('homelabDashboard')}
             </span>
           </div>
-          <p className="text-sm text-zinc-400 flex items-center gap-1.5">
+          <p className="text-xs text-zinc-400 flex items-center gap-1.5">
             <Server className={`w-3.5 h-3.5 ${isBackendConnected ? 'text-emerald-400' : 'text-rose-400'}`} />
             <span role="status">{t(isBackendConnected ? 'apiConnected' : 'apiDisconnected')}{isBackendConnected && latency > 0 ? ` · ${Math.round(latency)} ms` : ''}</span>
           </p>
@@ -118,6 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={onToggleNotifications}
           className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-indigo-400 transition-colors"
           title={t('notificationsTitle')}
+          aria-label={t('notificationsTitle')}
         >
           <Bell className="w-4 h-4" />
           {unreadCount > 0 && (

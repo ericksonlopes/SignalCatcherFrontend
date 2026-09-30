@@ -27,8 +27,8 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | null>(null);
 
-const MAX_TOASTS = 6;
-const DEFAULT_DURATION = 4500;
+const MAX_TOASTS = 3;
+const DEFAULT_DURATION = 5000;
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -47,7 +47,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const newToast: ToastNotification = {
         ...item,
         id,
-        duration: item.duration ?? DEFAULT_DURATION,
+        duration: item.duration ?? (item.type === 'error' ? 9000 : DEFAULT_DURATION),
         createdAt: item.createdAt || Date.now(),
       };
 

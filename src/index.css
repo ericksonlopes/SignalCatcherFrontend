@@ -49,3 +49,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 [data-theme="light"] [class*="from-zinc-100"][class*="text-transparent"] {
   background-image: linear-gradient(to right, #0f172a, #4338ca, #0e7490);
 }
+
+/* Keep dense controls predictable and avoid browser serif fallbacks. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }

@@ -12,9 +12,14 @@ that same administrative key. It is kept in `sessionStorage` for the current bro
 and sent through `X-API-Key` for administrative writes and metrics. Never put the key in
 `VITE_*` variables, which are embedded into the public browser bundle.
 
-The **Operations** tab reports real worker readiness, pending requests, completed job
-runs, failures, queue age and processing/deletion retries that exhausted their limits.
-Its Run buttons queue work in PostgreSQL; they do not imply that a job has completed.
+The **Tracking** tab combines pipeline stage counts with real worker readiness, pending
+requests, completed job runs, failures, queue age and exhausted processing/deletion retries.
+Manual job controls appear once in the jobs table below the pipeline. Its Run buttons
+queue work in PostgreSQL; they do not imply that a job has completed.
+
+Ingested videos load in batches of 20 as you scroll. Search and filter changes restart
+the list; background refreshes preserve the loaded window. A Load more button is
+available alongside automatic scrolling, and failed requests can be retried.
 
 Deletion is asynchronous: the UI shows **Deletion pending** until the worker confirms
 file removal and persists `DELETED`. Active processing returns a conflict instead of
