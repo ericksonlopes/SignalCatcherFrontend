@@ -17,7 +17,7 @@ requests, completed job runs, failures, queue age and exhausted processing/delet
 Manual job controls appear once in the jobs table below the pipeline. Its Run buttons
 queue work in PostgreSQL; they do not imply that a job has completed.
 
-Ingested videos load in batches of 20 as you scroll. Search and filter changes restart
+Ingested videos load in batches of 24 as you scroll. Search and filter changes restart
 the list; background refreshes preserve the loaded window. A Load more button is
 available alongside automatic scrolling, and failed requests can be retried.
 

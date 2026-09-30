@@ -1,4 +1,10 @@
 export const pt = {
+    savedChannelsDescription: "Canais identificados nos vídeos ingeridos e suas contagens de vídeos salvos.",
+    savedChannelsSort: "Ordenar canais",
+    savedChannelsSortName: "Nome do canal",
+    savedChannelsSortVideos: "Mais vídeos salvos",
+    savedChannelsEmpty: "Nenhum canal salvo.",
+
     videosLoadError: "Não foi possível carregar os vídeos.",
     videosRetry: "Tentar novamente",
     videosLoadingMore: "Carregando mais vídeos…",

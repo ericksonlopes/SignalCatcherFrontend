@@ -1,3 +1,4 @@
+import {SavedChannels} from './SavedChannels';
 import {buildChannelOptions, channelIdentity} from '../../channelOptions';
 import {MonitoredChannels} from './MonitoredChannels';
 import {CaptureSection, readCaptureSection, saveCaptureSection} from '../../navigationStorage';
@@ -1120,65 +1121,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         </div>
       )}
 
-      {/* SUB-TAB 1.5: SAVED CHANNELS */}
-      {subTab === 'saved_channels' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-900/80 p-3.5 rounded-2xl border border-zinc-800 shadow-sm">
-            <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
-              <input
-                type="text"
-                placeholder={t('filterPlaceholder')}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-red-500/50 font-mono"
-              />
-            </div>
-          </div>
-
-          {savedChannels.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/20 rounded-2xl border border-zinc-800/50 border-dashed">
-              <Youtube className="w-12 h-12 text-zinc-700 mb-4" />
-              <p className="text-zinc-500 font-mono text-sm">Nenhum canal salvo.</p>
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-xl font-mono text-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 text-xs uppercase">
-                      <th className="p-3">{t('tableChannelName')}</th>
-                      <th className="p-3">External ID</th>
-                      <th className="p-3">{t('vidsSaved')}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {savedChannels.map((channel) => (
-                      <tr key={channel.id} className="hover:bg-zinc-800/40 transition-colors">
-                        <td className="p-3">
-                          <div className="flex items-center gap-3">
-                            <img src={channel.avatar} alt="" className="w-9 h-9 rounded-full border border-zinc-700" />
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-semibold text-zinc-200 font-sans">{channel.name}</span>
-                              <a href={channel.channelUrl || channel.url} target="_blank" rel="noreferrer" className="text-xs text-zinc-500 hover:text-zinc-300 hover:underline truncate max-w-[300px]" title={channel.channelUrl || channel.url}>
-                                {channel.channelUrl || channel.url}
-                              </a>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <span className="text-xs text-red-400 font-bold">{channel.channelId}</span>
-                        </td>
-                        <td className="p-3 text-zinc-400 text-xs font-mono">
-                          {channel.totalCaptured}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {subTab === 'saved_channels' && <SavedChannels
+        channels={savedChannels || []}
+        language={language === 'pt' ? 'pt' : 'en'}
+      />}
 
       {subTab === 'sources' && <MonitoredChannels
         sources={sources}

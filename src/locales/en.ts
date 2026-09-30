@@ -1,6 +1,12 @@
 import {TranslationKeys} from './pt';
 
 export const en: Record<TranslationKeys, string> = {
+    savedChannelsDescription: "Channels identified in ingested videos and their saved video counts.",
+    savedChannelsSort: "Sort channels",
+    savedChannelsSortName: "Channel name",
+    savedChannelsSortVideos: "Most saved videos",
+    savedChannelsEmpty: "No saved channels.",
+
     videosLoadError: "Unable to load videos.",
     videosRetry: "Try again",
     videosLoadingMore: "Loading more videos…",

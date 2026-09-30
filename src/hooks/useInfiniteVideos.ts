@@ -11,7 +11,7 @@ interface VideoDTO {
 }
 interface VideoPage {items: VideoDTO[]; total_pages: number;}
 interface RequestContext {controller: AbortController; busy: boolean; pages: number; hasMore: boolean;}
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 24;
 
 function mapVideo(item: VideoDTO): CapturedVideo {
     return {
