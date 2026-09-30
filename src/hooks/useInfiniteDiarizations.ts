@@ -17,7 +17,7 @@ interface RequestContext {
   failedMode: RequestMode;
 }
 const PAGE_SIZE = 20;
-const fingerprint = (page: DiarizationPage) => JSON.stringify([page.total, page.items.map(item => [item.id, item.step, item.progress_percent])]);
+const fingerprint = (page: DiarizationPage) => JSON.stringify([page.total, page.items.map(item => [item.id, item.step, item.progress_percent, item.queue_priority])]);
 
 export function mergeDiarizations(previous: DiarizationVideo[], incoming: DiarizationVideo[]) {
   return Array.from(new Map([...previous, ...incoming].map(item => [item.id, item])).values());

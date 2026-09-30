@@ -210,6 +210,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const [diarizationModalVideo, setDiarizationModalVideo] = useState<CapturedVideo | null>(null);
   const [diarizationLanguage, setDiarizationLanguage] = useState<string>('en');
   const [isDiarizing, setIsDiarizing] = useState(false);
+  const [diarizationStartNow, setDiarizationStartNow] = useState(false);
   const [hoveredDiarBtnId, setHoveredDiarBtnId] = useState<string | null>(null);
   const [cancellingDiarIds, setCancellingDiarIds] = useState<Set<string>>(new Set());
 
@@ -314,6 +315,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     e.stopPropagation();
     setDiarizationModalVideo(video);
     setDiarizationLanguage(video.language || 'en');
+    setDiarizationStartNow(false);
   };
 
   const confirmDiarization = async () => {
@@ -332,7 +334,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       const response = await apiFetch(`${API_BASE_URL}/api/diarization/youtube/${externalId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: diarizationLanguage || 'en' }),
+        body: JSON.stringify({ language: diarizationLanguage || 'en', start_now: diarizationStartNow }),
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -1650,6 +1652,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <p className="text-xs text-zinc-500 mt-1">
                   {t('diarizationModalLangDesc')}
                 </p>
+                <label className="mt-3 flex items-start gap-3 rounded-lg border border-zinc-700 p-3 text-sm text-zinc-200">
+                  <input type="checkbox" checked={diarizationStartNow} onChange={event => setDiarizationStartNow(event.target.checked)} disabled={isDiarizing} className="mt-1 accent-purple-500" />
+                  <span>{t('diarizationStartNow')}<span className="mt-1 block text-xs leading-relaxed text-zinc-400">{t('diarizationStartNowHint')}</span></span>
+                </label>
               </div>
             </div>
 

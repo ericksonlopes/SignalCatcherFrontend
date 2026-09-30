@@ -16,6 +16,7 @@ export interface DiarizationVideo {
   duration: string;
   step: string;
   progress_percent?: number | null;
+  queue_priority?: number;
   entity_id?: string;
   entity_type?: string;
   result_json?: TranscriptResult | null;
@@ -55,6 +56,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
   const [refresh, setRefresh] = useState(0);
   const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState('');
+  const [startingId, setStartingId] = useState<string | null>(null);
   const openButtonRef = useRef<HTMLButtonElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -113,6 +115,24 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
     }
   }
   function clearFilters() { setSearchQuery(''); setDebouncedQuery(''); setStepFilter('COMPLETED'); }
+  async function startNow(video: DiarizationVideo) {
+    if (startingId) return;
+    setStartingId(video.id);
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/diarization/${video.id}/start-now`, { method: 'POST' });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+      }
+      setNotice(t('diarizationStartNowSuccess'));
+      onAddLog('Diarization', 'success', t('diarizationStartNowSuccess'));
+      setRefresh(value => value + 1);
+    } catch (error) {
+      setNotice(t('diarizationStartNowError') + ' ' + String(error));
+    } finally {
+      setStartingId(null);
+    }
+  }
   function closeViewer() { setSelectedVideo(null); requestAnimationFrame(() => openButtonRef.current?.focus()); }
   function badge(step: string) {
     const normalized = step.toUpperCase();
@@ -127,6 +147,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
       ? Math.max(0, Math.min(100, Math.floor(video.progress_percent))) : null;
     return <div className="min-w-0 space-y-2">
       <div className="flex flex-wrap items-center gap-2">{badge(video.step)}{percent !== null && <span className="text-xs tabular-nums text-zinc-300">{percent}%</span>}</div>
+      {video.step.toUpperCase() === 'PENDING' && (video.queue_priority ?? 0) > 0 && <p className="text-xs text-indigo-400">{t('diarizationNextInQueue')}</p>}
       {measurable && <div role="progressbar" aria-label={t('diarizationStageProgress') + ': ' + t(steps[video.step.toUpperCase()].label)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined} className="h-1.5 w-32 max-w-full overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full ' + (percent === null ? 'w-1/3 animate-pulse motion-reduce:animate-none ' : 'transition-[width] motion-reduce:transition-none ') + (video.step.toUpperCase() === 'TRANSCRIPTION' ? 'bg-amber-400' : video.step.toUpperCase() === 'ALIGNMENT' ? 'bg-blue-400' : 'bg-purple-400')} style={percent !== null ? { width: `${percent}%` } : undefined} /></div>}
       {measurable && percent === null && <p className="text-xs text-zinc-500">{t('diarizationProgressWaiting')}</p>}
     </div>;
@@ -160,7 +181,10 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
                     <div className="min-w-0 flex-1"><h2 className="line-clamp-2 break-words text-sm font-medium leading-5 text-zinc-200">{completed ? <button aria-current={selectedVideo?.id === video.id ? 'true' : undefined} onClick={event => { openButtonRef.current = event.currentTarget; setSelectedVideo(video); }} className="min-h-10 text-left hover:text-indigo-400">{video.title}</button> : video.title}</h2><p className="mt-1 truncate text-xs text-zinc-400">{video.channelName}</p></div>
                   </div>
                   {status(video)}
-                  {completed ? <button onClick={event => { openButtonRef.current = event.currentTarget; setSelectedVideo(video); }} className={button + ' justify-self-start'}><FileText className="h-4 w-4" />{t('diarizationOpen')}</button> : <button onClick={() => void reprocess(video)} disabled={reprocessingIds.has(video.id)} className={button + ' justify-self-start'}><RefreshCw className={'h-4 w-4 ' + (reprocessingIds.has(video.id) ? 'animate-spin' : '')} />{t(reprocessingIds.has(video.id) ? 'reprocessingDiarization' : 'btnReprocessDiarization')}</button>}
+                  {completed ? <button onClick={event => { openButtonRef.current = event.currentTarget; setSelectedVideo(video); }} className={button + ' justify-self-start'}><FileText className="h-4 w-4" />{t('diarizationOpen')}</button> : <div className="flex flex-wrap gap-2">
+                    {['PENDING', 'ERROR', 'CANCELLED'].includes(video.step.toUpperCase()) && <button onClick={() => void startNow(video)} disabled={startingId !== null || reprocessingIds.has(video.id)} title={t('diarizationStartNowHint')} className={button + ' border-indigo-500/40 text-indigo-300'}>{startingId === video.id && <Loader2 className="h-4 w-4 animate-spin" />}{t('diarizationStartNow')}</button>}
+                    <button onClick={() => void reprocess(video)} disabled={reprocessingIds.has(video.id) || startingId !== null} className={button}><RefreshCw className={'h-4 w-4 ' + (reprocessingIds.has(video.id) ? 'animate-spin' : '')} />{t(reprocessingIds.has(video.id) ? 'reprocessingDiarization' : 'btnReprocessDiarization')}</button>
+                  </div>}
                 </div>
               </article>;
             })}

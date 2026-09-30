@@ -296,6 +296,7 @@ async function startServer() {
     id: string;
     step: string;
     progress_percent?: number | null;
+    queue_priority?: number;
     created_at: string;
     entity_id: string;
     entity_type: string;
@@ -305,6 +306,38 @@ async function startServer() {
     duration: string;
     result_json: any;
   }> = [];
+
+  function prioritizeMockDiarization(id: string) {
+    const video = youtubeContents.find(v => v.id === id || v.postgresRecordId === id || `diar-${v.id}` === id);
+    let task = mockDiarizations.find(d => d.id === id || d.entity_id === id);
+    if (!task && video) {
+      task = { id: `diar-${video.id}`, step: 'PENDING', queue_priority: 0,
+        created_at: new Date().toISOString(), entity_id: video.postgresRecordId || video.id,
+        entity_type: 'YOUTUBE', title: video.title, channelName: video.sourceName,
+        thumbnail: video.thumbnail, duration: video.duration, result_json: null };
+      mockDiarizations.unshift(task);
+    }
+    if (!task) return undefined;
+    const active = ['STARTED', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'DIARIZED'];
+    for (const item of mockDiarizations) {
+      item.queue_priority = 0;
+      if (active.includes(item.step)) {
+        item.step = 'PENDING'; item.progress_percent = null;
+      }
+    }
+    for (const item of youtubeContents) {
+      if (active.includes(item.diarization_status || '')) item.diarization_status = 'PENDING';
+    }
+    task.step = 'PENDING'; task.queue_priority = 1; task.progress_percent = null; task.result_json = null;
+    if (video) { video.diarization_status = 'PENDING'; video.is_diarized = false; }
+    return task;
+  }
+
+  app.post('/api/diarization/:id/start-now', (req, res) => {
+    const task = prioritizeMockDiarization(req.params.id);
+    if (!task) return res.status(404).json({ detail: 'Diarization task not found' });
+    return res.json({ task_id: task.id, step: task.step, queue_priority: task.queue_priority });
+  });
 
   app.get(["/api/diarization/list", "/api/diarization"], (req, res) => {
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
@@ -391,9 +424,10 @@ async function startServer() {
       video.diarization_status = 'PENDING';
     }
 
+    const prioritized = req.body?.start_now ? prioritizeMockDiarization(id) : undefined;
     return res.json({
       success: true,
-      task_id: `task-diarize-${Date.now()}`,
+      task_id: prioritized?.id || `task-diarize-${Date.now()}`,
       message: `Diarização iniciada para o vídeo ${id} (Idioma: ${language || 'Auto'})`
     });
   });
