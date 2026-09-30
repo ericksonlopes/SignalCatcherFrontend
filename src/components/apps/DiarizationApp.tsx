@@ -42,6 +42,14 @@ const steps: Record<string, { label: TranslationKeys; color: string }> = {
   ERROR: { label: 'stepError', color: 'text-red-400 bg-red-500/10' },
 };
 const button = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40';
+const filterStorageKey = 'signalcatcher_diarization_filter';
+function savedStepFilter() {
+  try {
+    const saved = localStorage.getItem(filterStorageKey);
+    if (filters.some(filter => filter.value === saved)) return saved!;
+  } catch { /* Storage may be unavailable in restricted browsers. */ }
+  return 'COMPLETED';
+}
 function durationLabel(duration: string) {
   if (String(duration || '').includes(':')) return duration;
   return formatTime(Number(duration));
@@ -52,7 +60,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
   const [selectedVideo, setSelectedVideo] = useState<DiarizationVideo | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [stepFilter, setStepFilter] = useState('COMPLETED');
+  const [stepFilter, setStepFilter] = useState(savedStepFilter);
   const [refresh, setRefresh] = useState(0);
   const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState('');
@@ -63,6 +71,10 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
   const reportedError = useRef(false);
   const { videos, setVideos, isLoading, isFetching, isLoadingMore, hasMore, loadError, totalItems, loadMore, retry } =
     useInfiniteDiarizations(stepFilter, debouncedQuery, refresh);
+
+  useEffect(() => {
+    try { localStorage.setItem(filterStorageKey, stepFilter); } catch { /* Keep filtering when storage is unavailable. */ }
+  }, [stepFilter]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
@@ -167,7 +179,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
           </div>
         </header>
         <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" aria-busy={isLoading || isLoadingMore}>
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-zinc-400 lg:px-6"><span role="status">{videos.length} / {totalItems} {t('diarizationResults')} · {t('diarizationLatest')}</span><span className={selectedVideo ? 'hidden' : 'inline-flex items-center gap-1.5'}><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{t('diarizationAutoUpdate')}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-zinc-400 lg:px-6"><span role="status">{videos.length} / {totalItems} {t('diarizationResults')} · {t(stepFilter === 'ALL' ? 'diarizationProcessingFirst' : 'diarizationLatest')}</span><span className={selectedVideo ? 'hidden' : 'inline-flex items-center gap-1.5'}><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{t('diarizationAutoUpdate')}</span></div>
           {notice && <div role="status" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300"><p className="flex-1">{notice}</p><button aria-label={t('diarizationCancel')} onClick={() => setNotice('')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-zinc-800"><X className="h-4 w-4" /></button></div>}
           {loadError && <div role="alert" className="mx-4 mb-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400"><div className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{t('loadDiarizationsError')}</div><button onClick={retry} disabled={isFetching} className={button + ' mt-3'}>{t('diarizationRetry')}</button></div>}
           {isLoading ? <div role="status" className="flex items-center justify-center gap-2 p-12 text-sm text-zinc-400"><Loader2 className="h-5 w-5 animate-spin" />{t('diarizationLoading')}</div> : !videos.length && !loadError ? <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center"><FileText className="mb-4 h-10 w-10 text-zinc-500" /><h2 className="text-lg font-medium text-zinc-200">{t('noDiarizationsFound')}</h2><p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">{t('diarizationEmptyHint')}</p>{(searchQuery || stepFilter !== 'COMPLETED') && <button onClick={clearFilters} className={button + ' mt-5'}>{t('diarizationClearFilters')}</button>}</div> : <div className="w-full space-y-2 px-4 pb-4 lg:px-6">

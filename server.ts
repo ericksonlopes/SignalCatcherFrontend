@@ -388,6 +388,14 @@ async function startServer() {
       );
     }
 
+    const processingSteps = new Set(['STARTED', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'DIARIZED']);
+    items.sort((a, b) => {
+      if (!stepFilter || stepFilter === 'ALL') {
+        const activeOrder = Number(processingSteps.has(b.step.toUpperCase())) - Number(processingSteps.has(a.step.toUpperCase()));
+        if (activeOrder) return activeOrder;
+      }
+      return b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id);
+    });
     const total = items.length;
     const totalPages = Math.ceil(total / limit) || 1;
     const offset = (page - 1) * limit;

@@ -320,6 +320,7 @@ export const en: Record<TranslationKeys, string> = {
   diarizationExported: "Transcript exported.",
 
   diarizationLatest: "Newest first",
+  diarizationProcessingFirst: "Processing first",
   diarizationLoadingMore: "Loading more videos…",
   diarizationLoadMore: "Load more videos",
   diarizationEnd: "All results have been loaded.",

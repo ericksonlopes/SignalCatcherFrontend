@@ -318,6 +318,7 @@ export const pt = {
   diarizationExported: "Transcrição exportada.",
 
   diarizationLatest: "Mais recentes primeiro",
+  diarizationProcessingFirst: "Em processamento primeiro",
   diarizationLoadingMore: "Carregando mais vídeos…",
   diarizationLoadMore: "Carregar mais vídeos",
   diarizationEnd: "Todos os resultados foram carregados.",
