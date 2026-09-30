@@ -1,6 +1,7 @@
 import {useInfiniteVideos} from './hooks/useInfiniteVideos';
 import {readWorkspace, saveWorkspace} from './navigationStorage';
 import {API_BASE_URL, apiFetch} from './api';
+import {createLogId} from './logId';
 import React, {useEffect, useRef, useState} from 'react';
 import {BarChart3, Home, Mic, Radio, Sparkles, Terminal, TrendingDown} from 'lucide-react';
 import {Header} from './components/Header';
@@ -191,7 +192,7 @@ function SignalCatcherHub() {
   // Add system log helper
   const addLog = (sourceApp: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => {
     const newLog: SystemLog = {
-      id: crypto.randomUUID(),
+      id: createLogId(),
       timestamp: new Date().toTimeString().slice(0, 8),
       sourceApp,
       level,

@@ -317,7 +317,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   };
 
   const confirmDiarization = async () => {
-    if (!diarizationModalVideo) return;
+    if (!diarizationModalVideo || isDiarizing) return;
 
     let externalId = diarizationModalVideo.postgresRecordId || diarizationModalVideo.id;
     if (diarizationModalVideo.videoUrl) {
@@ -325,10 +325,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       if (match) externalId = match[1];
     }
 
-    onAddLog('SignalCatcher', 'info', `Iniciando diarização para o vídeo ${externalId}...`);
     setIsDiarizing(true);
 
     try {
+      onAddLog('SignalCatcher', 'info', `Iniciando diarização para o vídeo ${externalId}...`);
       const response = await apiFetch(`${API_BASE_URL}/api/diarization/youtube/${externalId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
