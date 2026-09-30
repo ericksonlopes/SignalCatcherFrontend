@@ -60,7 +60,7 @@ export function useInfiniteDiarizations(step: string, search: string, refreshTri
         firstPage = await fetchPage(1, current.controller.signal);
         // Most polls only fetch the newest page. Refresh the loaded window when its
         // head changes, so offset pagination stays aligned without losing older rows.
-        if (fingerprint(firstPage) === current.head && !['ALL', 'PROCESSING', 'ALIGNMENT', 'DIARIZATION'].includes(step)) return;
+        if (fingerprint(firstPage) === current.head && !['ALL', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION'].includes(step)) return;
       }
       const start = mode === 'more' ? current.pages + 1 : 1;
       const end = mode === 'more' ? start : Math.max(1, current.pages);

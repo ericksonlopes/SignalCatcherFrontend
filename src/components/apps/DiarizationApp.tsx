@@ -122,12 +122,13 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
   }
 
   function status(video: DiarizationVideo) {
-    const measurable = ['ALIGNMENT', 'DIARIZATION'].includes(video.step.toUpperCase());
+    const measurable = ['TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION'].includes(video.step.toUpperCase());
     const percent = measurable && typeof video.progress_percent === 'number' && Number.isFinite(video.progress_percent)
       ? Math.max(0, Math.min(100, Math.floor(video.progress_percent))) : null;
     return <div className="min-w-0 space-y-2">
       <div className="flex flex-wrap items-center gap-2">{badge(video.step)}{percent !== null && <span className="text-xs tabular-nums text-zinc-300">{percent}%</span>}</div>
-      {percent !== null && <div role="progressbar" aria-label={t('diarizationStageProgress') + ': ' + t(steps[video.step.toUpperCase()].label)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 w-32 max-w-full overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full transition-[width] motion-reduce:transition-none ' + (video.step.toUpperCase() === 'ALIGNMENT' ? 'bg-blue-400' : 'bg-purple-400')} style={{ width: `${percent}%` }} /></div>}
+      {measurable && <div role="progressbar" aria-label={t('diarizationStageProgress') + ': ' + t(steps[video.step.toUpperCase()].label)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined} className="h-1.5 w-32 max-w-full overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full ' + (percent === null ? 'w-1/3 animate-pulse motion-reduce:animate-none ' : 'transition-[width] motion-reduce:transition-none ') + (video.step.toUpperCase() === 'TRANSCRIPTION' ? 'bg-amber-400' : video.step.toUpperCase() === 'ALIGNMENT' ? 'bg-blue-400' : 'bg-purple-400')} style={percent !== null ? { width: `${percent}%` } : undefined} /></div>}
+      {measurable && percent === null && <p className="text-xs text-zinc-500">{t('diarizationProgressWaiting')}</p>}
     </div>;
   }
 

@@ -269,6 +269,7 @@ export const en: Record<TranslationKeys, string> = {
   stepDiarization: "Diarizing",
   stepDiarized: "Diarized",
   diarizationStageProgress: "Stage progress",
+  diarizationProgressWaiting: "Waiting for progress update",
   stepCompleted: "Completed",
   stepError: "Error",
   stepAll: "All",

@@ -267,6 +267,7 @@ export const pt = {
   stepDiarization: "Separando Vozes",
   stepDiarized: "Diarizado",
   diarizationStageProgress: "Progresso da etapa",
+  diarizationProgressWaiting: "Aguardando atualização do progresso",
   stepCompleted: "Concluído",
   stepError: "Erro",
   stepAll: "Todas",
