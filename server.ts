@@ -295,6 +295,7 @@ async function startServer() {
   const mockDiarizations: Array<{
     id: string;
     step: string;
+    progress_percent?: number | null;
     created_at: string;
     entity_id: string;
     entity_type: string;
@@ -319,6 +320,7 @@ async function startServer() {
         items.unshift({
           id: `diar-${v.id}`,
           step: v.diarization_status,
+          progress_percent: null,
           created_at: new Date().toISOString(),
           entity_id: v.postgresRecordId || v.id,
           entity_type: "YOUTUBE",
@@ -335,7 +337,7 @@ async function startServer() {
       if (stepFilter === "PENDING") {
         items = items.filter(d => (d.step || "").toUpperCase() === "PENDING");
       } else if (stepFilter === "PROCESSING") {
-        const processingSteps = ["STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION", "PROCESSING"];
+        const processingSteps = ["STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION", "DIARIZED", "PROCESSING"];
         items = items.filter(d => processingSteps.includes((d.step || "").toUpperCase()));
       } else if (stepFilter === "ERROR") {
         items = items.filter(d => (d.step || "").toUpperCase() === "ERROR");
@@ -406,6 +408,7 @@ async function startServer() {
     const diar = mockDiarizations.find(d => d.id === id || d.entity_id === id);
     if (diar) {
       diar.step = "PENDING";
+      diar.progress_percent = null;
       diar.result_json = null;
     }
 
@@ -446,6 +449,7 @@ async function startServer() {
 
     if (diar) {
       diar.step = "CANCELLED";
+      diar.progress_percent = null;
     }
     if (video) {
       video.is_diarized = false;

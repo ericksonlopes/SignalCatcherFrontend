@@ -69,6 +69,7 @@ export interface PaginatedResponse<T> {
 
 export interface DiarizationItem {
   id: string;
+  progress_percent?: number | null;
   step: 'STARTED' | 'PENDING' | 'TRANSCRIPTION' | 'ALIGNMENT' | 'DIARIZATION' | 'COMPLETED' | 'ERROR' | string;
   created_at?: string | null;
   entity_id?: string | null;

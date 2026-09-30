@@ -295,7 +295,7 @@ function SignalCatcherHub() {
   };
 
   return (
-    <div data-theme={theme} className={`min-h-screen flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
+    <div data-theme={theme} className={`${activeTab.appId === 'diarization' ? 'h-dvh overflow-hidden' : 'min-h-screen'} flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
       {/* Top Header */}
       <Header
         theme={theme}
@@ -316,9 +316,9 @@ function SignalCatcherHub() {
       />
 
       {/* Main Workspace with Side Rail + Bento Content Area */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden relative">
         {/* Bento Mini Side Rail */}
-        <aside aria-label={language === 'pt' ? 'Aplicações' : 'Applications'} className="flex md:flex-col items-center py-2 md:py-4 px-2 md:w-16 overflow-x-auto bg-[#09090b] border-b md:border-b-0 md:border-r border-zinc-800/80 gap-3 shrink-0">
+        <aside aria-label={language === 'pt' ? 'Aplicações' : 'Applications'} className="flex md:flex-col items-center py-2 md:py-4 px-2 md:w-16 overflow-x-auto md:overflow-visible bg-[#09090b] border-b md:border-b-0 md:border-r border-zinc-800/80 gap-3 shrink-0">
           <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest text-center mb-1 hidden md:block">
             APPS
           </div>
@@ -372,7 +372,7 @@ function SignalCatcherHub() {
         </aside>
 
         {/* Workspace Active Tab View */}
-        <main className="flex-1 min-w-0 overflow-y-auto relative p-2 sm:p-4 md:p-6 bg-[#09090b]">
+        <main className={`flex-1 min-w-0 min-h-0 relative bg-[#09090b] ${activeTab.appId === 'diarization' ? 'flex overflow-hidden' : 'overflow-y-auto p-2 sm:p-4 md:p-6'}`}>
           {activeTab.appId === 'signalcatcher' && (
             <SignalCatcherApp
               language={language}

@@ -1,9 +1,12 @@
-import {API_BASE_URL, apiFetch} from '../../api';
-import React, {useEffect, useState} from 'react';
-import {Check, ChevronLeft, ChevronRight, Mic, Play, RefreshCw, Search, X} from 'lucide-react';
-import {LanguageMode} from '../../types';
-import {getTranslation} from '../../locales';
-import {DiarizationViewer} from './diarization/DiarizationViewer';
+import React, { useEffect, useRef, useState } from 'react';
+import { AlertCircle, Check, FileText, Loader2, Mic, RefreshCw, Search, X } from 'lucide-react';
+import { API_BASE_URL, apiFetch } from '../../api';
+import type { LanguageMode } from '../../types';
+import { getTranslation } from '../../locales';
+import type { TranslationKeys } from '../../locales/pt';
+import { DiarizationViewer } from './diarization/DiarizationViewer';
+import { formatTime, type TranscriptResult } from './diarization/transcript';
+import { useInfiniteDiarizations } from '../../hooks/useInfiniteDiarizations';
 
 export interface DiarizationVideo {
   id: string;
@@ -11,358 +14,165 @@ export interface DiarizationVideo {
   thumbnail: string;
   channelName: string;
   duration: string;
-  step: 'STARTED' | 'PENDING' | 'TRANSCRIPTION' | 'ALIGNMENT' | 'DIARIZATION' | 'COMPLETED' | 'ERROR' | string;
+  step: string;
+  progress_percent?: number | null;
   entity_id?: string;
   entity_type?: string;
-  result_json?: any;
+  result_json?: TranscriptResult | null;
 }
-
-
-
 interface DiarizationAppProps {
   language?: LanguageMode;
   onAddLog: (app: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
 }
-
-const formatDuration = (duration: number | string | undefined | null): string => {
-  if (duration == null) return '00:00';
-  if (typeof duration === 'string') {
-    if (duration.includes(':')) {
-      const parts = duration.split(':');
-      if (parts.length === 3 && parts[0] === '00') {
-        return `${parts[1]}:${parts[2]}`;
-      }
-      return duration;
-    }
-    const parsed = parseInt(duration, 10);
-    if (isNaN(parsed)) return duration;
-    duration = parsed;
-  }
-
-  const h = Math.floor(duration / 3600);
-  const m = Math.floor((duration % 3600) / 60);
-  const s = Math.floor(duration % 60);
-
-  if (h > 0) {
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+const filters: { value: string; label: TranslationKeys }[] = [
+  { value: 'ALL', label: 'stepAll' }, { value: 'COMPLETED', label: 'stepCompletedPlural' },
+  { value: 'PROCESSING', label: 'stepProcessing' }, { value: 'PENDING', label: 'stepPendingPlural' },
+  { value: 'ERROR', label: 'stepErrorsPlural' },
+];
+const steps: Record<string, { label: TranslationKeys; color: string }> = {
+  STARTED: { label: 'stepStarted', color: 'text-zinc-300 bg-zinc-800/50' },
+  PENDING: { label: 'stepPending', color: 'text-zinc-300 bg-zinc-800/50' },
+  PROCESSING: { label: 'stepProcessing', color: 'text-amber-400 bg-amber-500/10' },
+  TRANSCRIPTION: { label: 'stepTranscription', color: 'text-amber-400 bg-amber-500/10' },
+  ALIGNMENT: { label: 'stepAlignment', color: 'text-blue-400 bg-blue-500/10' },
+  DIARIZATION: { label: 'stepDiarization', color: 'text-purple-400 bg-purple-500/10' },
+  DIARIZED: { label: 'stepDiarized', color: 'text-purple-400 bg-purple-500/10' },
+  COMPLETED: { label: 'stepCompleted', color: 'text-emerald-400 bg-emerald-500/10' },
+  ERROR: { label: 'stepError', color: 'text-red-400 bg-red-500/10' },
 };
+const button = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40';
+function durationLabel(duration: string) {
+  if (String(duration || '').includes(':')) return duration;
+  return formatTime(Number(duration));
+}
 
 export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en', onAddLog }) => {
   const { t } = getTranslation(language);
-  const [videos, setVideos] = useState<DiarizationVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<DiarizationVideo | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [stepFilter, setStepFilter] = useState<string>('ALL');
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(20);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalItems, setTotalItems] = useState<number>(0);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [stepFilter, setStepFilter] = useState('COMPLETED');
+  const [refresh, setRefresh] = useState(0);
   const [reprocessingIds, setReprocessingIds] = useState<Set<string>>(new Set());
-
-  const handleReprocessDiarization = async (e: React.MouseEvent, video: DiarizationVideo) => {
-    e.stopPropagation();
-    const videoId = video.id;
-    setReprocessingIds(prev => new Set(prev).add(videoId));
-    onAddLog('Diarization', 'info', `${t('btnReprocessDiarization')} (${video.title})...`);
-
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/api/diarization/${videoId}/reprocess`, {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${res.status}`);
-      }
-
-      onAddLog('Diarization', 'success', `${t('notifReprocessDiarizationSuccess')} (${video.title})`);
-      setVideos(prev =>
-        prev.map(v => (v.id === videoId ? { ...v, step: 'PENDING' } : v))
-      );
-    } catch (err: any) {
-      onAddLog('Diarization', 'error', `${t('notifReprocessDiarizationError')} ${err.message || err}`);
-    } finally {
-      setReprocessingIds(prev => {
-        const next = new Set(prev);
-        next.delete(videoId);
-        return next;
-      });
-    }
-  };
+  const [notice, setNotice] = useState('');
+  const openButtonRef = useRef<HTMLButtonElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const reportedError = useRef(false);
+  const { videos, setVideos, isLoading, isFetching, isLoadingMore, hasMore, loadError, totalItems, loadMore, retry } =
+    useInfiniteDiarizations(stepFilter, debouncedQuery, refresh);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchDiarizations = async () => {
-      try {
-        const params = new URLSearchParams();
-        params.append('page', currentPage.toString());
-        params.append('limit', limit.toString());
-        if (stepFilter && stepFilter !== 'ALL') {
-          params.append('step', stepFilter);
-        }
-        if (searchQuery.trim()) {
-          params.append('search', searchQuery.trim());
-        }
+    const timeout = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
-        const res = await apiFetch(`${API_BASE_URL}/api/diarization/list?${params.toString()}`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        
-        if (isMounted) {
-          setVideos(data.items || data.diarizations || []);
-          if (data.total_pages !== undefined) setTotalPages(data.total_pages);
-          if (data.total !== undefined) setTotalItems(data.total);
-        }
-      } catch (err) {
-        if (isMounted) {
-          onAddLog('Diarization', 'error', `${t('loadDiarizationsError')} ${err}`);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [stepFilter, debouncedQuery]);
 
-    fetchDiarizations();
-    const interval = setInterval(fetchDiarizations, 5000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [currentPage, limit, stepFilter, searchQuery, onAddLog]);
+  useEffect(() => {
+    if (!hasMore || isFetching || isLoading || loadError) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) loadMore();
+    }, { root: scrollRef.current, rootMargin: '300px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isFetching, isLoading, loadError, loadMore, videos.length, selectedVideo?.id]);
 
-  const handleStepFilterChange = (newStep: string) => {
-    setStepFilter(newStep);
-    setCurrentPage(1);
-  };
-
-  const handleSearchChange = (newSearch: string) => {
-    setSearchQuery(newSearch);
-    setCurrentPage(1);
-  };
-
-  const getStepBadge = (step: DiarizationVideo['step']) => {
-    const normalizedStep = (step || '').toUpperCase();
-    switch (normalizedStep) {
-      case 'STARTED':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepStarted')}</span>;
-      case 'PENDING':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-zinc-800/80 text-zinc-300 border border-zinc-700 uppercase tracking-wider"><Play className="w-3 h-3" /> {t('stepPending')}</span>;
-      case 'PROCESSING':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepProcessing')}</span>;
-      case 'TRANSCRIPTION':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepTranscription')}</span>;
-      case 'ALIGNMENT':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepAlignment')}</span>;
-      case 'DIARIZATION':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-purple-500/10 text-purple-500 border border-purple-500/20 uppercase tracking-wider"><RefreshCw className="w-3 h-3 animate-spin" /> {t('stepDiarization')}</span>;
-      case 'COMPLETED':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-wider"><Check className="w-3 h-3" /> {t('stepCompleted')}</span>;
-      case 'ERROR':
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider"><X className="w-3 h-3" /> {t('stepError')}</span>;
-      default:
-        return <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-zinc-800/80 text-zinc-400 border border-zinc-700 uppercase tracking-wider">{normalizedStep}</span>;
+  useEffect(() => {
+    if (loadError && !reportedError.current) {
+      onAddLog('Diarization', 'error', t('loadDiarizationsError'));
+      reportedError.current = true;
+    } else if (!isFetching && !loadError) {
+      reportedError.current = false;
     }
-  };
+  }, [loadError, isFetching, onAddLog, language]);
+
+  async function reprocess(video: DiarizationVideo) {
+    if (reprocessingIds.has(video.id)) return;
+    setReprocessingIds(previous => new Set(previous).add(video.id));
+    try {
+      const response = await apiFetch(API_BASE_URL + '/api/diarization/' + video.id + '/reprocess', { method: 'POST' });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'HTTP ' + response.status);
+      }
+      setVideos(previous => previous.map(item => item.id === video.id ? { ...item, step: 'PENDING', progress_percent: null } : item));
+      setNotice(t('notifReprocessDiarizationSuccess'));
+      onAddLog('Diarization', 'success', t('notifReprocessDiarizationSuccess') + ' (' + video.title + ')');
+      setRefresh(value => value + 1);
+    } catch (error) {
+      const message = t('notifReprocessDiarizationError') + ' ' + String(error);
+      setNotice(message);
+      onAddLog('Diarization', 'error', message);
+    } finally {
+      setReprocessingIds(previous => { const next = new Set(previous); next.delete(video.id); return next; });
+    }
+  }
+  function clearFilters() { setSearchQuery(''); setDebouncedQuery(''); setStepFilter('COMPLETED'); }
+  function closeViewer() { setSelectedVideo(null); requestAnimationFrame(() => openButtonRef.current?.focus()); }
+  function badge(step: string) {
+    const normalized = step.toUpperCase();
+    const config = steps[normalized];
+    const Icon = normalized === 'COMPLETED' || normalized === 'DIARIZED' ? Check : normalized === 'ERROR' ? AlertCircle : normalized === 'PENDING' || normalized === 'STARTED' ? Mic : Loader2;
+    return <span className={'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ' + (config?.color || 'text-zinc-300 bg-zinc-800')}><Icon className="h-3.5 w-3.5" />{config ? t(config.label) : step}</span>;
+  }
+
+  function status(video: DiarizationVideo) {
+    const measurable = ['ALIGNMENT', 'DIARIZATION'].includes(video.step.toUpperCase());
+    const percent = measurable && typeof video.progress_percent === 'number' && Number.isFinite(video.progress_percent)
+      ? Math.max(0, Math.min(100, Math.floor(video.progress_percent))) : null;
+    return <div className="min-w-0 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">{badge(video.step)}{percent !== null && <span className="text-xs tabular-nums text-zinc-300">{percent}%</span>}</div>
+      {percent !== null && <div role="progressbar" aria-label={t('diarizationStageProgress') + ': ' + t(steps[video.step.toUpperCase()].label)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 w-32 max-w-full overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full transition-[width] motion-reduce:transition-none ' + (video.step.toUpperCase() === 'ALIGNMENT' ? 'bg-blue-400' : 'bg-purple-400')} style={{ width: `${percent}%` }} /></div>}
+    </div>;
+  }
 
   return (
-    <div className="flex h-full bg-zinc-950 overflow-hidden">
-      
-      {/* Sidebar / Master List */}
-      <div className={`flex flex-col border-r border-zinc-800/80 bg-zinc-950/50 transition-all duration-300 ${selectedVideo ? 'w-0 lg:w-[380px] opacity-0 lg:opacity-100 overflow-hidden' : 'w-full lg:w-[450px]'}`}>
-        
-        {/* Header */}
-        <div className="p-6 border-b border-zinc-800/80 bg-zinc-900/30">
-          <h1 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2 mb-4">
-            <Mic className="w-5 h-5 text-indigo-500" />
-            {t('diarizationAppTitle')}
-          </h1>
-          
-          <div className="flex flex-col gap-3">
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
-              <input
-                type="text"
-                placeholder={t('searchDiarizationsPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-zinc-900/50 border border-zinc-800 rounded-xl text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all shadow-inner"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleStepFilterChange('ALL')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ALL' ? 'bg-zinc-800 text-white shadow-sm' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-                >
-                  {t('stepAll')}
-                </button>
-                <button
-                  onClick={() => handleStepFilterChange('PENDING')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PENDING' ? 'bg-zinc-800/80 text-zinc-300 shadow-sm border border-zinc-700' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-                >
-                  {t('stepPendingPlural')}
-                </button>
-                <button
-                  onClick={() => handleStepFilterChange('PROCESSING')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'PROCESSING' ? 'bg-amber-500/20 text-amber-400 shadow-sm border border-amber-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-                >
-                  {t('stepProcessing')}
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleStepFilterChange('ERROR')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'ERROR' ? 'bg-red-500/20 text-red-400 shadow-sm border border-red-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-                >
-                  {t('stepErrorsPlural')}
-                </button>
-                <button
-                  onClick={() => handleStepFilterChange('COMPLETED')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider text-center transition-all ${stepFilter === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 shadow-sm border border-emerald-500/30' : 'bg-zinc-900/50 text-zinc-500 hover:bg-zinc-800/80'}`}
-                >
-                  {t('stepCompletedPlural')}
-                </button>
-              </div>
-            </div>
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden bg-zinc-950">
+      <section aria-label={t('diarizationAppTitle')} className={'flex min-h-0 min-w-0 flex-col ' + (selectedVideo ? 'hidden lg:flex lg:w-80 lg:shrink-0 lg:border-r lg:border-zinc-800 xl:w-96' : 'w-full')}>
+        <header className="shrink-0 border-b border-zinc-800 bg-zinc-900/30 p-4 lg:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div><h1 className="flex items-center gap-2 text-xl font-semibold text-zinc-100"><Mic className="h-5 w-5 text-indigo-400" />{t('diarizationAppTitle')}</h1><p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-400">{t('diarizationLibraryDesc')}</p></div>
+            <button aria-label={t('diarizationRetry')} title={t('diarizationRetry')} onClick={() => setRefresh(value => value + 1)} disabled={isFetching} className={button + ' shrink-0'}><RefreshCw className={'h-4 w-4 ' + (isLoading ? 'animate-spin' : '')} /></button>
           </div>
-        </div>
-
-        {/* List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {videos.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
-              <Mic className="w-10 h-10 mb-3 opacity-20" />
-              <p className="text-sm">{t('noDiarizationsFound')}</p>
-            </div>
-          ) : (
-            videos.map(video => (
-              <div 
-                key={video.id}
-                onClick={() => video.step === 'COMPLETED' ? setSelectedVideo(video) : null}
-                className={`p-3 rounded-2xl border transition-all ${
-                  selectedVideo?.id === video.id 
-                    ? 'bg-indigo-500/10 border-indigo-500/30 shadow-sm' 
-                    : video.step === 'COMPLETED'
-                      ? 'bg-zinc-900/40 border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700 cursor-pointer'
-                      : 'bg-zinc-900/30 border-zinc-800/40 hover:border-zinc-700/60 cursor-default'
-                }`}
-              >
-                <div className="flex gap-3">
-                  <div className="relative w-24 h-14 shrink-0 rounded-lg overflow-hidden bg-zinc-800 shadow-inner">
-                    <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
-                    <div className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-xs font-mono font-bold text-zinc-300">
-                      {formatDuration(video.duration)}
-                    </div>
+          <div className={'mt-5 flex gap-3 ' + (selectedVideo ? 'flex-col' : 'flex-col xl:flex-row xl:items-center')}>
+            <label className="relative min-w-0 flex-1"><span className="sr-only">{t('searchDiarizationsPlaceholder')}</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-zinc-400" /><input type="search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder={t('searchDiarizationsPlaceholder')} className="min-h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30" /></label>
+            <div role="group" aria-label={t('diarizationStatus')} className="flex flex-wrap gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">{filters.map(filter => <button key={filter.value} aria-pressed={stepFilter === filter.value} onClick={() => setStepFilter(filter.value)} className={'min-h-10 flex-1 rounded-lg px-3 text-xs font-medium transition-colors ' + (stepFilter === filter.value ? 'bg-indigo-500/15 text-indigo-400' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200')}>{t(filter.label)}</button>)}</div>
+          </div>
+        </header>
+        <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" aria-busy={isLoading || isLoadingMore}>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-zinc-400 lg:px-6"><span role="status">{videos.length} / {totalItems} {t('diarizationResults')} · {t('diarizationLatest')}</span><span className={selectedVideo ? 'hidden' : 'inline-flex items-center gap-1.5'}><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{t('diarizationAutoUpdate')}</span></div>
+          {notice && <div role="status" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300"><p className="flex-1">{notice}</p><button aria-label={t('diarizationCancel')} onClick={() => setNotice('')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-zinc-800"><X className="h-4 w-4" /></button></div>}
+          {loadError && <div role="alert" className="mx-4 mb-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400"><div className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{t('loadDiarizationsError')}</div><button onClick={retry} disabled={isFetching} className={button + ' mt-3'}>{t('diarizationRetry')}</button></div>}
+          {isLoading ? <div role="status" className="flex items-center justify-center gap-2 p-12 text-sm text-zinc-400"><Loader2 className="h-5 w-5 animate-spin" />{t('diarizationLoading')}</div> : !videos.length && !loadError ? <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center"><FileText className="mb-4 h-10 w-10 text-zinc-500" /><h2 className="text-lg font-medium text-zinc-200">{t('noDiarizationsFound')}</h2><p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">{t('diarizationEmptyHint')}</p>{(searchQuery || stepFilter !== 'COMPLETED') && <button onClick={clearFilters} className={button + ' mt-5'}>{t('diarizationClearFilters')}</button>}</div> : <div className="w-full space-y-2 px-4 pb-4 lg:px-6">
+            {!selectedVideo && <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1fr)_160px_180px] gap-4 px-4 py-2 text-xs font-medium text-zinc-400 md:grid"><span>{t('diarizationContent')}</span><span>{t('diarizationStatus')}</span><span /></div>}
+            {videos.map(video => {
+              const completed = video.step.toUpperCase() === 'COMPLETED';
+              return <article key={video.id} className={'rounded-xl border p-3 transition-colors ' + (selectedVideo?.id === video.id ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-zinc-800 bg-zinc-900/20 hover:border-zinc-700')}>
+                <div className={selectedVideo ? 'flex flex-col gap-3' : 'grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_180px] md:items-center md:gap-4'}>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="relative flex h-14 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-800"><FileText className="h-5 w-5 text-zinc-400" />{video.thumbnail && <img src={video.thumbnail} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} className="absolute inset-0 h-full w-full object-cover" />}<span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 font-mono text-[11px] text-white">{durationLabel(video.duration)}</span></div>
+                    <div className="min-w-0 flex-1"><h2 className="line-clamp-2 break-words text-sm font-medium leading-5 text-zinc-200">{completed ? <button aria-current={selectedVideo?.id === video.id ? 'true' : undefined} onClick={event => { openButtonRef.current = event.currentTarget; setSelectedVideo(video); }} className="min-h-10 text-left hover:text-indigo-400">{video.title}</button> : video.title}</h2><p className="mt-1 truncate text-xs text-zinc-400">{video.channelName}</p></div>
                   </div>
-                  <div className="flex-1 flex flex-col min-w-0 justify-center">
-                    <h3 className={`text-sm font-bold truncate ${selectedVideo?.id === video.id ? 'text-indigo-100' : 'text-zinc-200'}`}>
-                      {video.title}
-                    </h3>
-                    <p className="text-xs text-zinc-500 truncate mt-0.5">
-                      {video.channelName}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="shrink-0">{getStepBadge(video.step)}</div>
-                      {(() => {
-                        const stepUpper = (video.step || '').toUpperCase();
-                        if (stepUpper === 'COMPLETED') return null;
-
-                        const isError = stepUpper === 'ERROR';
-                        const isPending = stepUpper === 'PENDING';
-
-                        const colorClasses = isError
-                          ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border-rose-500/40'
-                          : isPending
-                          ? 'bg-zinc-800/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
-                          : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border-amber-500/40';
-
-                        return (
-                          <button
-                            type="button"
-                            onClick={(e) => handleReprocessDiarization(e, video)}
-                            disabled={reprocessingIds.has(video.id)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all shrink-0 disabled:opacity-50 shadow-sm cursor-pointer ${colorClasses}`}
-                            title={t('btnReprocessDiarization')}
-                          >
-                            <RefreshCw className={`w-3 h-3 ${reprocessingIds.has(video.id) ? 'animate-spin' : ''}`} />
-                            <span>{reprocessingIds.has(video.id) ? t('reprocessingDiarization') : t('btnReprocessDiarization')}</span>
-                          </button>
-                        );
-                      })()}
-                    </div>
-                  </div>
+                  {status(video)}
+                  {completed ? <button onClick={event => { openButtonRef.current = event.currentTarget; setSelectedVideo(video); }} className={button + ' justify-self-start'}><FileText className="h-4 w-4" />{t('diarizationOpen')}</button> : <button onClick={() => void reprocess(video)} disabled={reprocessingIds.has(video.id)} className={button + ' justify-self-start'}><RefreshCw className={'h-4 w-4 ' + (reprocessingIds.has(video.id) ? 'animate-spin' : '')} />{t(reprocessingIds.has(video.id) ? 'reprocessingDiarization' : 'btnReprocessDiarization')}</button>}
                 </div>
-              </div>
-            ))
-          )}
+              </article>;
+            })}
+            {!!videos.length && <div ref={sentinelRef} className="flex min-h-16 shrink-0 items-center justify-center py-4">
+              {isLoadingMore ? <span role="status" className="flex items-center gap-2 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />{t('diarizationLoadingMore')}</span> :
+                loadError ? <button onClick={retry} disabled={isFetching} className={button}>{t('diarizationRetry')}</button> :
+                  hasMore ? <button onClick={loadMore} disabled={isFetching} className={button}>{t('diarizationLoadMore')}</button> :
+                    <span role="status" className="text-xs text-zinc-400">{t('diarizationEnd')}</span>}
+            </div>}
+          </div>}
         </div>
-
-        {/* Pagination Controls */}
-        {totalPages > 0 && (
-          <div className="p-3 border-t border-zinc-800/80 bg-zinc-900/30 flex items-center justify-between text-xs text-zinc-400">
-            <div className="flex items-center gap-1.5 font-mono text-xs">
-              <span>{totalItems} total</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage <= 1 || isLoading}
-                className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title={t('prevPage')}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="font-mono text-xs text-zinc-300">
-                {currentPage} / {totalPages || 1}
-              </span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages || isLoading}
-                className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title={t('nextPage')}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <select
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs rounded px-1.5 py-0.5 outline-none focus:border-indigo-500 font-mono ml-1"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Main Content / Detail View */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${!selectedVideo ? 'hidden lg:flex' : 'flex'}`}>
-        {selectedVideo ? (
-          <DiarizationViewer key={selectedVideo.id} video={selectedVideo} language={language} onClose={() => setSelectedVideo(null)} />
-        ) : (
-
-          <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/10 p-8 text-center">
-            <div className="w-24 h-24 mb-6 rounded-full bg-zinc-900/50 border border-zinc-800/80 flex items-center justify-center">
-              <Mic className="w-10 h-10 text-zinc-600" />
-            </div>
-            <h2 className="text-xl font-bold text-zinc-300 mb-2">{t('diarizationWorkspaceTitle')}</h2>
-            <p className="max-w-md text-sm text-zinc-500 leading-relaxed">
-              {t('diarizationWorkspaceDesc')}
-            </p>
-          </div>
-        )}
-      </div>
-
+      </section>
+      {selectedVideo && <DiarizationViewer key={selectedVideo.id} video={selectedVideo} language={language} onClose={closeViewer} />}
     </div>
   );
 };
