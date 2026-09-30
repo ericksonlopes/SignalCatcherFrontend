@@ -64,26 +64,28 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
 
   return (
     <section aria-label={t('diarizationTranscript')} className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-zinc-950">
-      <header className="shrink-0 border-b border-zinc-800 bg-zinc-900/30 p-4 lg:p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <button onClick={onClose} className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><ArrowLeft className="h-4 w-4" />{t('diarizationBack')}</button>
-          <button onClick={exportTranscript} disabled={!segments.length} className={'flex items-center gap-2 ' + control}><Download className="h-4 w-4" />{t('diarizationExport')}</button>
-        </div>
-        <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold leading-snug text-zinc-100 outline-none lg:text-2xl">{video.title}</h2>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-zinc-400">
+      <header className="shrink-0 border-b border-zinc-800 bg-zinc-900/30 px-4 py-3 lg:px-6">
+        <div className="flex items-start gap-3">
+          <button onClick={onClose} aria-label={t('diarizationBack')} title={t('diarizationBack')} className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><ArrowLeft className="h-4 w-4" /><span className="hidden xl:inline">{t('diarizationBack')}</span></button>
+          <div className="min-w-0 flex-1">
+        <h2 ref={headingRef} tabIndex={-1} title={video.title} className="line-clamp-2 text-base font-semibold leading-snug text-zinc-100 outline-none lg:text-lg">{video.title}</h2>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
           <span>{video.channelName}</span><span className="inline-flex items-center gap-1 text-emerald-400"><Check className="h-3.5 w-3.5" />{t('diarizationCompletedStatus')}</span>
           <span className="font-mono">{formatTime(endTime)}</span><span>{speakers.length} {t('speakersTitle').toLocaleLowerCase(language)}</span><span>{segments.length} {t('diarizationTurns')}</span>
+        </div>
+          </div>
+          <button onClick={exportTranscript} aria-label={t('diarizationExport')} title={t('diarizationExport')} disabled={!segments.length} className={'flex shrink-0 items-center gap-2 ' + control}><Download className="h-4 w-4" /><span className="hidden sm:inline">{t('diarizationExport')}</span></button>
         </div>
         <span className="sr-only" role="status">{notice}</span>
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-zinc-800 p-4">
-          <h3 className="mr-auto flex items-center gap-2 font-semibold text-zinc-200"><FileText className="h-4 w-4 text-indigo-400" />{t('diarizationTranscript')}</h3>
-          <button aria-expanded={showSpeakers} aria-controls="diarization-speakers" onClick={() => setShowSpeakers(!showSpeakers)} className={'flex items-center gap-2 ' + control}><Users className="h-4 w-4" />{t(showSpeakers ? 'diarizationHideSpeakers' : 'diarizationShowSpeakers')}</button>
-          <div className="flex w-full flex-wrap gap-2">
-            <label className="relative min-w-40 flex-1"><span className="sr-only">{t('diarizationSearchText')}</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-zinc-400" /><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('diarizationSearchText')} className={input + ' pl-9 pr-3'} /></label>
-            <select aria-label={t('speakersTitle')} value={speakerFilter} onChange={event => setSpeakerFilter(event.target.value)} className={input + ' sm:max-w-48 px-3'}><option value="">{t('diarizationAllSpeakers')}</option>{speakers.map(speaker => <option key={speaker.id} value={speaker.id}>{speaker.name}</option>)}</select>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-2 lg:px-6">
+          <h3 className="sr-only lg:not-sr-only lg:flex lg:shrink-0 lg:items-center lg:gap-2 lg:text-sm lg:font-semibold lg:text-zinc-200"><FileText className="h-4 w-4 text-indigo-400" />{t('diarizationTranscript')}</h3>
+          <div className="flex min-w-0 flex-[1_1_320px] gap-2">
+            <label className="relative min-w-0 flex-1"><span className="sr-only">{t('diarizationSearchText')}</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-zinc-400" /><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('diarizationSearchText')} className={input + ' pl-9 pr-3'} /></label>
+            <select aria-label={t('speakersTitle')} value={speakerFilter} onChange={event => setSpeakerFilter(event.target.value)} className={input.replace('w-full', 'w-28 sm:w-40') + ' shrink-0 px-3'}><option value="">{t('diarizationAllSpeakers')}</option>{speakers.map(speaker => <option key={speaker.id} value={speaker.id}>{speaker.name}</option>)}</select>
           </div>
+          <button aria-expanded={showSpeakers} aria-controls="diarization-speakers" onClick={() => setShowSpeakers(!showSpeakers)} className={'flex shrink-0 items-center gap-2 ' + control}><Users className="h-4 w-4" />{t(showSpeakers ? 'diarizationHideSpeakers' : 'diarizationShowSpeakers')}</button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden">
           {showSpeakers && <aside id="diarization-speakers" aria-label={t('speakersTitle')} className="order-first shrink-0 border-b border-zinc-800 bg-zinc-900/30 p-4 xl:order-last xl:w-64 xl:overflow-y-auto xl:border-b-0 xl:border-l 2xl:w-72">
