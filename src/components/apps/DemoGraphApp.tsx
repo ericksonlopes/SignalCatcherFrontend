@@ -140,7 +140,8 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await request<{id: string}>(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
-      setNotice(t('dgQueuedNotice')); log.current('DemoGraph', 'info', t('dgQueuedNotice'));
+      const message = t(path.endsWith('/cancel') ? 'dgCancelNotice' : 'dgStartedNotice');
+      setNotice(message); log.current('DemoGraph', 'info', message);
       setRefresh(value => value + 1);
       if (path === '/runs' || path.includes('/load') || path === '/schema/refresh') {
         const detail = await request<DemoRun>(`/runs/${result.id}`);
@@ -158,7 +159,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
   const activeDataset = datasetDetail?.id === selectedDataset ? datasetDetail : catalog.find(dataset => dataset.id === selectedDataset);
   function stageLabel(stage: string) {
     const [kind, dataset] = stage.split(':');
-    const label = t(kind === 'extract' ? 'dgExtractStage' : kind === 'load' ? 'dgLoadStage' : kind === 'schema' ? 'dgSchema' : kind === 'queued' ? 'dgQueued' : 'dgCompleted');
+    const label = t(kind === 'extract' ? 'dgExtractStage' : kind === 'load' ? 'dgLoadStage' : kind === 'schema' ? 'dgSchema' : kind === 'queued' ? 'dgQueued' : kind === 'starting' ? 'dgStarting' : 'dgCompleted');
     return dataset && datasets.includes(dataset as DemoDatasetId) ? `${label}: ${t(datasetKeys[dataset as DemoDatasetId])}` : label;
   }
   const issueKeys: Record<string, TranslationKeys> = {'Invalid record.': 'dgIssueInvalid', 'Source resource unavailable (404).': 'dgIssueMissing', 'Pipeline stopped.': 'dgIssueStopped', 'Schema refresh failed.': 'dgIssueSchema'};
@@ -170,7 +171,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
       <button className={button} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={15} />{t('dgRefresh')}</button>
     </header>
     {health && <div className="flex flex-wrap gap-4 text-xs text-zinc-400">
-      <span>{t('dgWorker')}: <b className={health.worker ? 'text-emerald-400' : 'text-amber-400'}>{t(health.worker ? 'dgOnline' : 'dgOffline')}</b></span>
+      <span>{t('dgExecution')}: <b className="text-emerald-400">{t('dgOnline')}</b></span>
       <span>{t('dgStorage')}: {t(health.storage ? 'dgOnline' : 'dgOffline')}</span>
       <span>Neo4j: {t(health.neo4j === 'online' ? 'dgOnline' : health.neo4j === 'unconfigured' ? 'dgUnconfigured' : 'dgOffline')}</span>
       <span>{t('dgLive')}</span>
@@ -262,7 +263,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
       <div className="flex items-center justify-between gap-3"><h2 className="font-medium">{t('dgVersion')} · <span className="font-mono text-sm">{selectedRun.id.slice(0, 8)}</span> · {statusLabel(selectedRun.status)}</h2><button className={button} aria-label={t('dgCancel')} onClick={() => setSelectedRun(null)}><X size={16} /></button></div>
       <div className="flex flex-wrap gap-2">
         {['queued', 'running'].includes(selectedRun.status) && <button className={button} disabled={busy || selectedRun.cancel_requested} onClick={() => {void command(`/runs/${selectedRun.id}/cancel`);}}>{t('dgCancel')}</button>}
-        {['failed', 'cancelled'].includes(selectedRun.status) && <button className={button} disabled={busy} onClick={() => {void command(`/runs/${selectedRun.id}/retry`);}}>{t('dgRetry')}</button>}
+        {['queued', 'failed', 'cancelled'].includes(selectedRun.status) && <button className={button} disabled={busy} onClick={() => {void command(`/runs/${selectedRun.id}/retry`);}}>{t('dgRetry')}</button>}
         {['extract', 'pipeline'].includes(selectedRun.operation) && selectedRun.progress.extraction_complete && <button className={button} disabled={busy || ['queued', 'running'].includes(selectedRun.status)} onClick={() => {void command(`/extractions/${selectedRun.extraction_id}/load`);}}><Database size={15} />{t('dgLoad')}</button>}
       </div>
       <p className="text-xs text-zinc-400">{t('dgStage')}: {stageLabel(selectedRun.stage)} · {selectedRun.parameters.start} → {selectedRun.parameters.end}</p>

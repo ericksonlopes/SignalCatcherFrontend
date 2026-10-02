@@ -33,4 +33,4 @@ export interface DemoGraphSchema {
   observed_at: string | null; stale: boolean; nodes: DemoNode[]; relationships: DemoRelationship[];
   constraints: {name: string; type: string; labelsOrTypes: string[]; properties: string[]}[];
 }
-export interface DemoHealth {worker: boolean; storage: boolean; neo4j: 'online' | 'unavailable' | 'unconfigured'}
+export interface DemoHealth {execution: 'api'; storage: boolean; neo4j: 'online' | 'unavailable' | 'unconfigured'}

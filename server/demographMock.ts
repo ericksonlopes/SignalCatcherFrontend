@@ -13,9 +13,9 @@ export function demographMock(): Router {
   function create(operation: DemoRun['operation'], datasets: DemoDatasetId[], start?: string, end?: string, extractionId?: string) {
     const id = randomUUID();
     const run: DemoRun = {id, operation, extraction_id: extractionId || id,
-      parameters: {datasets, start, end}, status: 'queued', stage: 'queued', progress: {},
+      parameters: {datasets, start, end}, status: 'running', stage: 'starting', progress: {},
       completed_stages: [], cancel_requested: false, schema_stale: false, error: null,
-      created_at: new Date().toISOString(), started_at: null, finished_at: null, artifacts: [], issues: []};
+      created_at: new Date().toISOString(), started_at: new Date().toISOString(), finished_at: null, artifacts: [], issues: []};
     runs.unshift(run);
     return run;
   }
@@ -37,15 +37,14 @@ export function demographMock(): Router {
     run.artifacts?.push(file);
   }
   const timer = setInterval(() => {
-    const run = runs.find(item => item.status === 'running') || [...runs].reverse().find(item => item.status === 'queued');
-    if (!run) return;
+    for (const run of runs.filter(item => item.status === 'running')) {
     run.status = 'running'; run.started_at ||= new Date().toISOString();
     if (run.operation !== 'load' && run.operation !== 'schema') {
       const next = run.parameters.datasets.find(dataset => !run.completed_stages.includes(`extract:${dataset}`));
       if (next) {
         run.stage = `extract:${next}`; fixture(run, next); run.completed_stages.push(run.stage);
         run.progress.files_saved = run.artifacts?.length;
-        return;
+        continue;
       }
       run.progress.extraction_complete = true;
     }
@@ -55,7 +54,7 @@ export function demographMock(): Router {
         processed: run.artifacts?.length || 0, duplicates: 0};
       run.progress.load_by_dataset = Object.fromEntries(run.parameters.datasets.map(dataset => [dataset,
         {read: 1, outside_period: 0, rejected: 0, processed: 1, duplicates: 0}]));
-      return;
+      continue;
     }
     if (run.operation !== 'extract') {
       const props = [{path: 'camara_id', types: ['integer'], inferred_types: [], present: 1, nulls: 0, examples: ['1']}];
@@ -66,6 +65,7 @@ export function demographMock(): Router {
         constraints: [{name: 'demograph_person', type: 'UNIQUENESS', labelsOrTypes: ['Person'], properties: ['camara_id']}]};
     }
     run.status = 'completed'; run.stage = 'finished'; run.finished_at = new Date().toISOString();
+    }
   }, 1500);
   timer.unref();
   function catalog(versionPage = 1) {
@@ -100,7 +100,7 @@ export function demographMock(): Router {
     if (resolved.has('votes') || resolved.has('topics')) resolved.add('votings');
     if (resolved.has('histories') && !resolved.has('votes')) resolved.add('deputies');
     const run = create(req.body.operation, ids.filter(id => resolved.has(id)), req.body.start, req.body.end);
-    return res.status(202).json({id: run.id, status: 'queued'});
+    return res.status(202).json({id: run.id, status: 'running'});
   });
   router.get('/runs', (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20));
@@ -121,9 +121,9 @@ export function demographMock(): Router {
   router.post('/runs/:id/retry', (req, res) => {
     const run = runs.find(item => item.id === req.params.id);
     if (!run) return res.status(404).json({detail: 'Run not found.'});
-    if (!['failed', 'cancelled'].includes(run.status)) return res.status(409).json({detail: 'Run cannot be resumed.'});
-    run.status = 'queued'; run.cancel_requested = false; run.finished_at = null;
-    return res.status(202).json({id: run.id, status: 'queued'});
+    if (!['queued', 'failed', 'cancelled'].includes(run.status)) return res.status(409).json({detail: 'Run cannot be resumed.'});
+    run.status = 'running'; run.stage = 'starting'; run.cancel_requested = false; run.finished_at = null;
+    return res.status(202).json({id: run.id, status: 'running'});
   });
   router.post('/extractions/:id/load', (req, res) => {
     const original = runs.find(run => run.id === req.params.id);
@@ -131,7 +131,7 @@ export function demographMock(): Router {
     if (!original.progress.extraction_complete || original.operation === 'load') return res.status(409).json({detail: 'Extraction is incomplete.'});
     const run = create('load', original.parameters.datasets, original.parameters.start, original.parameters.end, original.id);
     run.artifacts = original.artifacts;
-    return res.status(202).json({id: run.id, status: 'queued'});
+    return res.status(202).json({id: run.id, status: 'running'});
   });
   router.get('/artifacts/:id/:action', (req, res) => {
     const file = artifacts.get(req.params.id);
@@ -144,8 +144,8 @@ export function demographMock(): Router {
   router.get('/schema', (_req, res) => {res.json(graph);});
   router.post('/schema/refresh', (_req, res) => {
     const run = create('schema', []);
-    res.status(202).json({id: run.id, status: 'queued'});
+    res.status(202).json({id: run.id, status: 'running'});
   });
-  router.get('/health', (_req, res) => {res.json({worker: true, storage: true, neo4j: 'online'});});
+  router.get('/health', (_req, res) => {res.json({execution: 'api', storage: true, neo4j: 'online'});});
   return router;
 }
