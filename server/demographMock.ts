@@ -39,11 +39,23 @@ export function demographMock(): Router {
   const timer = setInterval(() => {
     for (const run of runs.filter(item => item.status === 'running')) {
     run.status = 'running'; run.started_at ||= new Date().toISOString();
+    if (run.operation === 'analysis') {
+      run.progress.analysis = {analysis_key: `majority_sim_nao_v1:${run.parameters.start}:${run.parameters.end}:${run.parameters.min_party_votes}:${run.parameters.min_common}`,
+        observed_start_date: run.parameters.start, observed_end_date: run.parameters.end,
+        included_votings: 30, included_votes: 3000, parties: 2, historical_party_corrections: 0,
+        compared_pairs: 1, sufficient_pairs: (run.parameters.min_common ?? 30) <= 30 ? 1 : 0, excluded: {}};
+      run.progress.analysis_complete = true; run.stage = 'finished'; run.status = 'completed';
+      run.finished_at = new Date().toISOString(); continue;
+    }
     if (run.operation !== 'load' && run.operation !== 'schema') {
       const next = run.parameters.datasets.find(dataset => !run.completed_stages.includes(`extract:${dataset}`));
       if (next) {
         run.stage = `extract:${next}`; fixture(run, next); run.completed_stages.push(run.stage);
         run.progress.files_saved = run.artifacts?.length;
+        if (next === 'topics') {
+          run.progress.resources_phase = 'proposition_topics';
+          run.progress.resources_done = 1; run.progress.resources_total = 1;
+        }
         continue;
       }
       run.progress.extraction_complete = true;
@@ -102,6 +114,16 @@ export function demographMock(): Router {
     const run = create(req.body.operation, ids.filter(id => resolved.has(id)), req.body.start, req.body.end);
     return res.status(202).json({id: run.id, status: 'running'});
   });
+  router.post('/analyses/party-similarity', (req, res) => {
+    const {start, end, min_party_votes = 1, min_common = 30} = req.body;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '') || start > end || end > new Date().toISOString().slice(0, 10) ||
+      !Number.isInteger(min_party_votes) || min_party_votes < 1 || min_party_votes > 1000 || !Number.isInteger(min_common) || min_common < 1 || min_common > 100000) {
+      return res.status(422).json({detail: 'Invalid analysis request.'});
+    }
+    const run = create('analysis', [], start, end);
+    run.parameters.min_party_votes = min_party_votes; run.parameters.min_common = min_common;
+    return res.status(202).json({id: run.id, status: 'running'});
+  });
   router.get('/runs', (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20));
     const filtered = runs.filter(run => !req.query.status || run.status === req.query.status);
@@ -129,7 +151,7 @@ export function demographMock(): Router {
     const original = runs.find(run => run.id === req.params.id && ['extract', 'pipeline'].includes(run.operation));
     if (!original) return res.status(404).json({detail: 'Extraction not found.'});
     const associated = runs.filter(run => run.extraction_id === original.id);
-    if (associated.some(run => ['running', 'deleting'].includes(run.status)) || runs.some(run => run.status === 'running' && ['pipeline', 'load', 'schema'].includes(run.operation))) {
+    if (associated.some(run => ['running', 'deleting'].includes(run.status)) || runs.some(run => run.status === 'running' && ['pipeline', 'load', 'schema', 'analysis'].includes(run.operation))) {
       return res.status(409).json({detail: 'Wait for active runs to finish.'});
     }
     const files = original.artifacts?.length ?? 0;

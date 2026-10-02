@@ -6,6 +6,7 @@ import type {DemoArtifact, DemoDataset, DemoDatasetId, DemoField, DemoFileSchema
   DemoGraphSchema, DemoHealth, DemoNode, DemoRelationship, DemoRun, DemoRunStatus} from '../../demographTypes';
 import {getTranslation} from '../../locales';
 import type {TranslationKeys} from '../../locales/pt';
+import {PartySimilarityForm, PartySimilarityReport} from './demograph/PartySimilarity';
 import {SchemaDiagram} from './demograph/SchemaDiagram';
 
 const api = `${API_BASE_URL}/api/demograph`;
@@ -152,7 +153,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
       const message = t(path.endsWith('/cancel') ? 'dgCancelNotice' : 'dgStartedNotice');
       setNotice(message); log.current('DemoGraph', 'info', message);
       setRefresh(value => value + 1);
-      if (path === '/runs' || path.includes('/load') || path === '/schema/refresh') {
+      if (path === '/runs' || path.includes('/load') || path === '/schema/refresh' || path === '/analyses/party-similarity') {
         const detail = await request<DemoRun>(`/runs/${result.id}`);
         setSelectedRun(detail); setTab('runs');
       }
@@ -181,7 +182,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
   const activeDataset = datasetDetail?.id === selectedDataset ? datasetDetail : catalog.find(dataset => dataset.id === selectedDataset);
   function stageLabel(stage: string) {
     const [kind, dataset] = stage.split(':');
-    const label = t(kind === 'delete' ? 'dgDeleting' : kind === 'extract' ? 'dgExtractStage' : kind === 'load' ? 'dgLoadStage' : kind === 'schema' ? 'dgSchema' : kind === 'queued' ? 'dgQueued' : kind === 'starting' ? 'dgStarting' : 'dgCompleted');
+    const label = t(kind === 'analysis' ? 'dgPartySimilarity' : kind === 'delete' ? 'dgDeleting' : kind === 'extract' ? 'dgExtractStage' : kind === 'load' ? 'dgLoadStage' : kind === 'schema' ? 'dgSchema' : kind === 'queued' ? 'dgQueued' : kind === 'starting' ? 'dgStarting' : 'dgCompleted');
     return dataset && datasets.includes(dataset as DemoDatasetId) ? `${label}: ${t(datasetKeys[dataset as DemoDatasetId])}` : label;
   }
   const issueKeys: Record<string, TranslationKeys> = {'Invalid record.': 'dgIssueInvalid', 'Source resource unavailable (404).': 'dgIssueMissing', 'Pipeline stopped.': 'dgIssueStopped', 'Schema refresh failed.': 'dgIssueSchema'};
@@ -239,6 +240,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
     </>}
 
     {tab === 'runs' && <>
+      <PartySimilarityForm t={t} busy={busy} today={localDate(new Date())} submit={parameters => {void command('/analyses/party-similarity', parameters);}} />
       <form className={panel} onSubmit={event => {event.preventDefault(); void command('/runs', {operation, datasets: selected, start, end});}}>
         <h2 className="font-medium mb-4">{t('dgNewRun')}</h2>
         <div className="flex flex-wrap gap-4 mb-3">{datasets.map(dataset => <label key={dataset} className="flex gap-2 items-center text-sm">
@@ -257,7 +259,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
           onChange={event => {setStatus(event.target.value); setPage(1);}}><option value="">{t('dgAll')}</option>{Object.keys(statuses).map(value => <option key={value} value={value}>{statusLabel(value as DemoRunStatus)}</option>)}</select></div>
         <div className="overflow-auto"><table className="w-full text-sm text-left"><tbody>{runs.map(run => <tr key={run.id} className="border-b border-zinc-800">
           <td className="py-3 pr-4">{dateTime(run.created_at)}<div className="text-xs text-zinc-500 font-mono">{run.id.slice(0, 8)}</div></td>
-          <td className="p-3">{run.operation === 'schema' ? t('dgRefreshSchema') : run.parameters.datasets.map(dataset => t(datasetKeys[dataset])).join(', ')}</td>
+          <td className="p-3">{run.operation === 'analysis' ? t('dgPartySimilarity') : run.operation === 'schema' ? t('dgRefreshSchema') : run.parameters.datasets.map(dataset => t(datasetKeys[dataset])).join(', ')}</td>
           <td className="p-3"><span className={run.status === 'failed' ? 'text-red-400' : run.status.startsWith('completed') ? 'text-emerald-400' : 'text-amber-400'}>{statusLabel(run.status)}</span><div className="text-xs text-zinc-500">{stageLabel(run.stage)}</div></td>
           <td className="p-3"><button className={button} onClick={() => {void openRun(run.id);}}>{t('dgOpen')}</button></td>
         </tr>)}</tbody></table></div>
@@ -282,20 +284,21 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
     </section>}
 
     {selectedRun && <section className={`${panel} space-y-4`}>
-      <div className="flex items-center justify-between gap-3"><h2 className="font-medium">{t('dgVersion')} · <span className="font-mono text-sm">{selectedRun.id.slice(0, 8)}</span> · {statusLabel(selectedRun.status)}</h2><button className={button} aria-label={t('dgCancel')} onClick={() => setSelectedRun(null)}><X size={16} /></button></div>
+      <div className="flex items-center justify-between gap-3"><h2 className="font-medium">{t(selectedRun.operation === 'analysis' ? 'dgPartySimilarity' : 'dgVersion')} · <span className="font-mono text-sm">{selectedRun.id.slice(0, 8)}</span> · {statusLabel(selectedRun.status)}</h2><button className={button} aria-label={t('dgCancel')} onClick={() => setSelectedRun(null)}><X size={16} /></button></div>
       <div className="flex flex-wrap gap-2">
         {['queued', 'running'].includes(selectedRun.status) && <button className={button} disabled={busy || selectedRun.cancel_requested} onClick={() => {void command(`/runs/${selectedRun.id}/cancel`);}}>{t('dgCancel')}</button>}
         {['queued', 'failed', 'cancelled'].includes(selectedRun.status) && <button className={button} disabled={busy} onClick={() => {void command(`/runs/${selectedRun.id}/retry`);}}>{t('dgRetry')}</button>}
         {['extract', 'pipeline'].includes(selectedRun.operation) && selectedRun.progress.extraction_complete && <button className={button} disabled={busy || ['queued', 'running', 'deleting', 'delete_failed'].includes(selectedRun.status)} onClick={() => {void command(`/extractions/${selectedRun.extraction_id}/load`);}}><Database size={15} />{t('dgLoad')}</button>}
-        {selectedRun.operation !== 'schema' && <button className={`${button} text-red-300 border-red-900`} disabled={busy || selectedRun.status === 'running'} onClick={() => setDeleteTarget(selectedRun)}><Trash2 size={15} />{t(['delete_failed', 'deleting'].includes(selectedRun.status) ? 'dgRetryDelete' : 'dgDelete')}</button>}
+        {!['schema', 'analysis'].includes(selectedRun.operation) && <button className={`${button} text-red-300 border-red-900`} disabled={busy || selectedRun.status === 'running'} onClick={() => setDeleteTarget(selectedRun)}><Trash2 size={15} />{t(['delete_failed', 'deleting'].includes(selectedRun.status) ? 'dgRetryDelete' : 'dgDelete')}</button>}
       </div>
       <p className="text-xs text-zinc-400">{t('dgStage')}: {stageLabel(selectedRun.stage)} · {selectedRun.parameters.start} → {selectedRun.parameters.end}</p>
       {selectedRun.progress.current_file && <div className="text-xs text-zinc-400">{selectedRun.progress.current_file} · {size(selectedRun.progress.bytes_received ?? 0)} / {selectedRun.progress.bytes_total ? size(Number(selectedRun.progress.bytes_total)) : t('dgUnknownTotal')}
         {Number(selectedRun.progress.bytes_total) > 0 && <progress className="w-full mt-2 accent-indigo-500" value={selectedRun.progress.bytes_received ?? 0} max={Number(selectedRun.progress.bytes_total)} />}</div>}
-      {selectedRun.progress.resources_total !== undefined && <p className="text-xs text-zinc-400">{selectedRun.progress.resources_done} / {selectedRun.progress.resources_total}</p>}
+      <PartySimilarityReport run={selectedRun} t={t} />
+      {selectedRun.progress.resources_total !== undefined && <p className="text-xs text-zinc-400">{selectedRun.progress.resources_phase === 'voting_details' ? t('dgVotingDetails') : selectedRun.progress.resources_phase === 'proposition_topics' ? t('dgPropositionTopics') : ''} {selectedRun.progress.resources_done} / {selectedRun.progress.resources_total}</p>}
       {selectedRun.progress.load && <div className="flex flex-wrap gap-4 text-sm">{Object.entries(selectedRun.progress.load).map(([key, value]) => <span key={key}>{t(({read: 'dgRead', outside_period: 'dgOutside', rejected: 'dgRejected', processed: 'dgProcessed', duplicates: 'dgDuplicates'} as Record<string, TranslationKeys>)[key])}: <b>{value.toLocaleString()}</b></span>)}</div>}
       {!!selectedRun.issues?.length && <details><summary className="text-sm text-amber-400 cursor-pointer">{t('dgIssues')} · {selectedRun.progress.issues ?? 0}</summary><ul className="text-xs space-y-2 mt-3">{selectedRun.issues.map(issue => <li key={issue.id}>{issueKeys[issue.message] ? t(issueKeys[issue.message]) : issue.message} <code>{JSON.stringify(issue.context)}</code></li>)}</ul></details>}
-      <h3 className="text-sm">{t('dgFiles')} · {selectedRun.artifacts?.length ?? 0}</h3>
+      {selectedRun.operation !== 'analysis' && <h3 className="text-sm">{t('dgFiles')} · {selectedRun.artifacts?.length ?? 0}</h3>}
       <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">{selectedRun.artifacts?.slice(0, filesLimit).map(file => <button key={file.id} className={`${button} justify-start text-left ${artifact?.id === file.id ? 'border-indigo-500' : ''}`} onClick={() => setArtifact(file)}>
         <FileJson size={16} className="shrink-0" /><span className="truncate">{file.path.split('/').pop()}<span className="block text-xs text-zinc-500">{file.records.toLocaleString()} · {size(file.bytes)}</span></span>
       </button>)}</div>

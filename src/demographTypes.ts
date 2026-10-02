@@ -10,12 +10,17 @@ export interface DemoArtifact {
   metadata_json: Record<string, unknown>;
 }
 export interface DemoRun {
-  id: string; extraction_id: string; operation: 'extract' | 'pipeline' | 'load' | 'schema';
-  parameters: {datasets: DemoDatasetId[]; start?: string; end?: string}; status: DemoRunStatus;
+  id: string; extraction_id: string; operation: 'extract' | 'pipeline' | 'load' | 'schema' | 'analysis';
+  parameters: {datasets: DemoDatasetId[]; start?: string; end?: string; min_party_votes?: number; min_common?: number}; status: DemoRunStatus;
   stage: string; progress: { issues?: number; files_saved?: number; current_file?: string;
     bytes_received?: number; bytes_total?: string | null; resources_done?: number; resources_total?: number;
+    resources_phase?: 'voting_details' | 'proposition_topics';
     load?: Record<'read' | 'outside_period' | 'rejected' | 'processed' | 'duplicates', number>;
     extraction_complete?: boolean; load_complete?: boolean;
+    analysis_complete?: boolean;
+    analysis?: {analysis_key: string; included_votings: number; included_votes: number; parties: number;
+      observed_start_date?: string | null; observed_end_date?: string | null;
+      historical_party_corrections: number; compared_pairs: number; sufficient_pairs: number; excluded: Record<string, number>};
     load_by_dataset?: Partial<Record<DemoDatasetId, Record<'read' | 'outside_period' | 'rejected' | 'processed' | 'duplicates', number>>>; };
   completed_stages: string[]; cancel_requested: boolean; schema_stale: boolean; error: string | null;
   created_at: string; started_at: string | null; finished_at: string | null;
