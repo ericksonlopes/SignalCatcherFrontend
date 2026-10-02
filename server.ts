@@ -2,10 +2,11 @@ import express from "express";
 import {timingSafeEqual} from "node:crypto";
 import path from "path";
 import {createServer as createViteServer} from "vite";
+import {demographMock} from './server/demographMock';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
   // Match the backend's administrative access contract; keep the key server-side.
@@ -21,6 +22,8 @@ async function startServer() {
     }
     next();
   });
+
+  app.use('/api/demograph', demographMock());
 
   // In-memory data store for YouTube sources and content
   const youtubeSources: Array<{

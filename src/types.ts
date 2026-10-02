@@ -1,4 +1,5 @@
 export type AppId = 'signalcatcher' | 'smarthome' | 'followers' | 'creatordash' | 'fastapi' | string;
+export type {DemoDataset, DemoRun, DemoArtifact, DemoGraphSchema} from './demographTypes';
 
 export interface AppTab {
   id: string; // Unique tab instance ID

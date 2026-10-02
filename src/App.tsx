@@ -3,7 +3,8 @@ import {readWorkspace, saveWorkspace} from './navigationStorage';
 import {API_BASE_URL, apiFetch} from './api';
 import {createLogId} from './logId';
 import React, {useEffect, useRef, useState} from 'react';
-import {BarChart3, Home, Mic, Radio, Sparkles, Terminal, TrendingDown} from 'lucide-react';
+import {BarChart3, Home, Mic, Network, Radio, Sparkles, Terminal, TrendingDown} from 'lucide-react';
+import {DemoGraphApp} from './components/apps/DemoGraphApp';
 import {Header} from './components/Header';
 import {CommandPalette} from './components/CommandPalette';
 import {NotificationDrawer} from './components/NotificationDrawer';
@@ -291,6 +292,7 @@ function SignalCatcherHub() {
       case 'creatordash': return <BarChart3 className="w-4 h-4" />;
       case 'fastapi': return <Terminal className="w-4 h-4" />;
       case 'diarization': return <Mic className="w-4 h-4" />;
+      case 'demograph': return <Network className="w-4 h-4" />;
       default: return <Sparkles className="w-4 h-4" />;
     }
   };
@@ -327,6 +329,7 @@ function SignalCatcherHub() {
           {[
             { id: 'signalcatcher', name: 'SignalCatcher', disabled: false },
             { id: 'diarization', name: language === 'pt' ? 'Diarização' : 'Diarization', disabled: false },
+            { id: 'demograph', name: 'DemoGraph', disabled: false },
             { id: 'smarthome', name: language === 'pt' ? 'Casa Inteligente' : 'Smart Home', disabled: true },
             { id: 'followers', name: language === 'pt' ? 'Seguidores' : 'Followers', disabled: true },
             { id: 'creatordash', name: language === 'pt' ? 'Criadores' : 'Creators', disabled: true }
@@ -435,6 +438,7 @@ function SignalCatcherHub() {
               onAddLog={addLog}
             />
           )}
+          {activeTab.appId === 'demograph' && <DemoGraphApp language={language} onAddLog={addLog} />}
         </main>
       </div>
 

@@ -106,6 +106,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               Aplicações do Hub
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button onClick={() => {onSelectApp('demograph', 'DemoGraph'); onClose();}}
+                className="flex items-center gap-2 p-2 rounded-xl bg-slate-800/60 hover:bg-cyan-950/60 border border-slate-700/60 text-slate-200 transition-all text-left">
+                <BarChart3 className="w-4 h-4" /> DemoGraph
+              </button>
               <button
                 onClick={() => {
                   onSelectApp('signalcatcher', 'SignalCatcher Ingestor');

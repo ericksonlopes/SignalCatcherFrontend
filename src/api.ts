@@ -33,6 +33,6 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
             throw new Error(t('adminKeyNotConfigured'));
         }
     }
-    if (response.status === 409) throw new Error(t('contentBusy'));
+    if (response.status === 409) throw new Error(t(url.pathname.includes('/api/demograph/') ? 'dgConflict' : 'contentBusy'));
     return response;
 }
