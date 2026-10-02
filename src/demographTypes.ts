@@ -1,5 +1,5 @@
 export type DemoDatasetId = 'deputies' | 'votings' | 'votes' | 'histories' | 'topics';
-export type DemoRunStatus = 'queued' | 'running' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled';
+export type DemoRunStatus = 'queued' | 'running' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled' | 'deleting' | 'delete_failed';
 export interface DemoField {
   path: string; types: string[]; present: number; nulls: number; examples: string[]; inferred_types: string[];
 }

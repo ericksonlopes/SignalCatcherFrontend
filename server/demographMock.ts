@@ -125,6 +125,21 @@ export function demographMock(): Router {
     run.status = 'running'; run.stage = 'starting'; run.cancel_requested = false; run.finished_at = null;
     return res.status(202).json({id: run.id, status: 'running'});
   });
+  router.delete('/extractions/:id', (req, res) => {
+    const original = runs.find(run => run.id === req.params.id && ['extract', 'pipeline'].includes(run.operation));
+    if (!original) return res.status(404).json({detail: 'Extraction not found.'});
+    const associated = runs.filter(run => run.extraction_id === original.id);
+    if (associated.some(run => ['running', 'deleting'].includes(run.status)) || runs.some(run => run.status === 'running' && ['pipeline', 'load', 'schema'].includes(run.operation))) {
+      return res.status(409).json({detail: 'Wait for active runs to finish.'});
+    }
+    const files = original.artifacts?.length ?? 0;
+    for (const [id, file] of artifacts) if (file.artifact.extraction_id === original.id) artifacts.delete(id);
+    for (let index = runs.length - 1; index >= 0; index--) if (runs[index].extraction_id === original.id) runs.splice(index, 1);
+    if (!runs.some(run => ['pipeline', 'load'].includes(run.operation) && run.progress.load_complete)) {
+      graph = {observed_at: new Date().toISOString(), stale: false, nodes: [], relationships: [], constraints: graph.constraints};
+    }
+    return res.json({id: original.id, status: 'deleted', files});
+  });
   router.post('/extractions/:id/load', (req, res) => {
     const original = runs.find(run => run.id === req.params.id);
     if (!original) return res.status(404).json({detail: 'Extraction not found.'});

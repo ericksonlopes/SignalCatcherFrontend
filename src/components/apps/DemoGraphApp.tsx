@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Database, Download, FileJson, Loader2, Network, Play, RefreshCw, X} from 'lucide-react';
+import {Database, Download, FileJson, Loader2, Network, Play, RefreshCw, Trash2, X} from 'lucide-react';
 import {API_BASE_URL, apiFetch} from '../../api';
 import type {LanguageMode} from '../../types';
 import type {DemoArtifact, DemoDataset, DemoDatasetId, DemoField, DemoFileSchema,
@@ -18,7 +18,7 @@ const datasetKeys: Record<DemoDatasetId, TranslationKeys> = {
 };
 const statuses: Record<DemoRunStatus, TranslationKeys> = {
   queued: 'dgQueued', running: 'dgRunning', completed: 'dgCompleted', completed_with_errors: 'dgCompletedErrors',
-  failed: 'dgFailed', cancelled: 'dgCancelled',
+  failed: 'dgFailed', cancelled: 'dgCancelled', deleting: 'dgDeleting', delete_failed: 'dgDeleteFailed',
 };
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await apiFetch(`${api}${path}`, init);
@@ -60,6 +60,7 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
   const [versionPage, setVersionPage] = useState(1);
   const [datasetDetail, setDatasetDetail] = useState<DemoDataset | null>(null);
   const [selectedRun, setSelectedRun] = useState<DemoRun | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DemoRun | null>(null);
   const [artifact, setArtifact] = useState<DemoArtifact | null>(null);
   const [fileSchema, setFileSchema] = useState<DemoFileSchema | null>(null);
   const [preview, setPreview] = useState<Record<string, unknown>[]>([]);
@@ -154,12 +155,25 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
     try {setSelectedRun(await request<DemoRun>(`/runs/${id}`));}
     catch (reason) {setError(String(reason));}
   }
+  async function removeExtraction() {
+    if (!deleteTarget) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await request(`/extractions/${deleteTarget.extraction_id}`, {method: 'DELETE'});
+      setSelectedRun(null); setArtifact(null); setFileSchema(null); setPreview([]); setGraphSelection(null);
+      setDeleteTarget(null); setRefresh(value => value + 1);
+      setNotice(t('dgDeletedNotice')); log.current('DemoGraph', 'success', t('dgDeletedNotice'));
+    } catch (reason) {
+      setError(String(reason)); setDeleteTarget(null); setRefresh(value => value + 1);
+      log.current('DemoGraph', 'error', String(reason));
+    } finally {setBusy(false);}
+  }
   const dateTime = (value: string | null) => value ? new Date(value).toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US') : '—';
   const statusLabel = (value: DemoRunStatus) => t(statuses[value]);
   const activeDataset = datasetDetail?.id === selectedDataset ? datasetDetail : catalog.find(dataset => dataset.id === selectedDataset);
   function stageLabel(stage: string) {
     const [kind, dataset] = stage.split(':');
-    const label = t(kind === 'extract' ? 'dgExtractStage' : kind === 'load' ? 'dgLoadStage' : kind === 'schema' ? 'dgSchema' : kind === 'queued' ? 'dgQueued' : kind === 'starting' ? 'dgStarting' : 'dgCompleted');
+    const label = t(kind === 'delete' ? 'dgDeleting' : kind === 'extract' ? 'dgExtractStage' : kind === 'load' ? 'dgLoadStage' : kind === 'schema' ? 'dgSchema' : kind === 'queued' ? 'dgQueued' : kind === 'starting' ? 'dgStarting' : 'dgCompleted');
     return dataset && datasets.includes(dataset as DemoDatasetId) ? `${label}: ${t(datasetKeys[dataset as DemoDatasetId])}` : label;
   }
   const issueKeys: Record<string, TranslationKeys> = {'Invalid record.': 'dgIssueInvalid', 'Source resource unavailable (404).': 'dgIssueMissing', 'Pipeline stopped.': 'dgIssueStopped', 'Schema refresh failed.': 'dgIssueSchema'};
@@ -264,7 +278,8 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
       <div className="flex flex-wrap gap-2">
         {['queued', 'running'].includes(selectedRun.status) && <button className={button} disabled={busy || selectedRun.cancel_requested} onClick={() => {void command(`/runs/${selectedRun.id}/cancel`);}}>{t('dgCancel')}</button>}
         {['queued', 'failed', 'cancelled'].includes(selectedRun.status) && <button className={button} disabled={busy} onClick={() => {void command(`/runs/${selectedRun.id}/retry`);}}>{t('dgRetry')}</button>}
-        {['extract', 'pipeline'].includes(selectedRun.operation) && selectedRun.progress.extraction_complete && <button className={button} disabled={busy || ['queued', 'running'].includes(selectedRun.status)} onClick={() => {void command(`/extractions/${selectedRun.extraction_id}/load`);}}><Database size={15} />{t('dgLoad')}</button>}
+        {['extract', 'pipeline'].includes(selectedRun.operation) && selectedRun.progress.extraction_complete && <button className={button} disabled={busy || ['queued', 'running', 'deleting', 'delete_failed'].includes(selectedRun.status)} onClick={() => {void command(`/extractions/${selectedRun.extraction_id}/load`);}}><Database size={15} />{t('dgLoad')}</button>}
+        {selectedRun.operation !== 'schema' && <button className={`${button} text-red-300 border-red-900`} disabled={busy || selectedRun.status === 'running'} onClick={() => setDeleteTarget(selectedRun)}><Trash2 size={15} />{t(['delete_failed', 'deleting'].includes(selectedRun.status) ? 'dgRetryDelete' : 'dgDelete')}</button>}
       </div>
       <p className="text-xs text-zinc-400">{t('dgStage')}: {stageLabel(selectedRun.stage)} · {selectedRun.parameters.start} → {selectedRun.parameters.end}</p>
       {selectedRun.progress.current_file && <div className="text-xs text-zinc-400">{selectedRun.progress.current_file} · {size(selectedRun.progress.bytes_received ?? 0)} / {selectedRun.progress.bytes_total ? size(Number(selectedRun.progress.bytes_total)) : t('dgUnknownTotal')}
@@ -286,5 +301,15 @@ export function DemoGraphApp({language = 'pt', onAddLog}: {
         <details><summary className="cursor-pointer text-sm">{t('dgPreview')}</summary><pre className="text-xs max-h-96 overflow-auto bg-zinc-950 rounded-lg p-3 mt-3">{JSON.stringify(preview, null, 2)}</pre></details>
       </div>}
     </section>}
+    {deleteTarget && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      <div role="alertdialog" aria-modal="true" aria-labelledby="dg-delete-title" aria-describedby="dg-delete-description" className={`${panel} bg-zinc-950 max-w-lg w-full space-y-4`}>
+        <h2 id="dg-delete-title" className="font-semibold text-lg">{t('dgDelete')}</h2>
+        <p id="dg-delete-description" className="text-sm text-zinc-300">{t('dgDeleteDescription')}</p>
+        <p className="font-mono text-xs break-all">{deleteTarget.extraction_id}</p>
+        <p className="text-sm text-zinc-400">{deleteTarget.artifacts?.length ?? 0} {t('dgFiles')} · {deleteTarget.parameters.start} → {deleteTarget.parameters.end}</p>
+        <div className="flex justify-end gap-2"><button autoFocus className={button} disabled={busy} onClick={() => setDeleteTarget(null)}>{t('dgKeepData')}</button>
+          <button className={`${button} text-red-300 border-red-800`} disabled={busy} onClick={() => {void removeExtraction();}}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}{t(busy ? 'dgDeleting' : 'dgConfirmDelete')}</button></div>
+      </div>
+    </div>}
   </div>;
 }
