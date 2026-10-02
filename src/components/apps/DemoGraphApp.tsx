@@ -24,7 +24,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await apiFetch(`${api}${path}`, init);
   if (!response.ok) {
     const body: {detail?: unknown} = await response.json().catch(() => ({}));
-    throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
+    const {t} = getTranslation(localStorage.getItem('signalcatcher_language') || 'en');
+    const errors: Record<string, TranslationKeys> = {
+      'Wait for execution or cancellation to finish before deleting.': 'dgDeleteBusy',
+      'Wait for the current graph operation to finish before deleting.': 'dgDeleteGraphBusy',
+      'Cannot delete: a retained artifact is missing, changed or unsafe.': 'dgDeleteIntegrity',
+      'Deletion failed. Check storage and Neo4j, then retry deletion.': 'dgDeleteUnavailable',
+      'Wait for active runs to finish.': 'dgDeleteBusy',
+    };
+    throw new Error(typeof body.detail === 'string' ? (errors[body.detail] ? t(errors[body.detail]) : body.detail) : `HTTP ${response.status}`);
   }
   return response.json() as Promise<T>;
 }
