@@ -3,7 +3,7 @@ import {AppTab} from './types';
 const WORKSPACE_KEY = 'signalcatcher_workspace_v1';
 const SECTION_KEY = 'signalcatcher_section_v1';
 const DEFAULT_TAB: AppTab = {id: 'tab-1', appId: 'signalcatcher', title: 'SignalCatcher Ingestor', icon: 'radio', isPinned: true};
-const APP_IDS = new Set(['signalcatcher', 'diarization', 'demograph', 'smarthome', 'followers', 'creatordash', 'fastapi']);
+const APP_IDS = new Set(['signalcatcher', 'diarization', 'smarthome', 'followers', 'creatordash', 'fastapi']);
 export type CaptureSection = 'captures' | 'saved_channels' | 'sources' | 'tracking';
 
 function isRecord(value: unknown): value is Record<string, unknown> {

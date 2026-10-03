@@ -2,7 +2,6 @@ import express from "express";
 import {timingSafeEqual} from "node:crypto";
 import path from "path";
 import {createServer as createViteServer} from "vite";
-import {demographMock} from './server/demographMock';
 
 async function startServer() {
   const app = express();
@@ -22,8 +21,6 @@ async function startServer() {
     }
     next();
   });
-
-  app.use('/api/demograph', demographMock());
 
   // In-memory data store for YouTube sources and content
   const youtubeSources: Array<{

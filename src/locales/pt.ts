@@ -1,7 +1,5 @@
-import {demographPt} from './demograph';
 
 export const pt = {
-    ...demographPt,
     savedChannelsDescription: "Canais identificados nos vídeos ingeridos e suas contagens de vídeos salvos.",
     savedChannelsSort: "Ordenar canais",
     savedChannelsSortName: "Nome do canal",

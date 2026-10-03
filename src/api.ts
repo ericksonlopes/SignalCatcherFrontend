@@ -33,7 +33,6 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
             throw new Error(t('adminKeyNotConfigured'));
         }
     }
-    // DemoGraph displays the endpoint's specific conflict instead of hiding it.
-    if (response.status === 409 && !url.pathname.includes('/api/demograph/')) throw new Error(t('contentBusy'));
+    if (response.status === 409) throw new Error(t('contentBusy'));
     return response;
 }

@@ -1,8 +1,6 @@
 import {TranslationKeys} from './pt';
-import {demographEn} from './demograph';
 
 export const en: Record<TranslationKeys, string> = {
-    ...demographEn,
     savedChannelsDescription: "Channels identified in ingested videos and their saved video counts.",
     savedChannelsSort: "Sort channels",
     savedChannelsSortName: "Channel name",
