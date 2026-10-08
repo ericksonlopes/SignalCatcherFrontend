@@ -2,7 +2,6 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Bell, Check, Globe, Moon, RefreshCw, Search, Server, Settings, Sliders, Sun, X, Zap} from 'lucide-react';
 import {LanguageMode, ThemeMode} from '../types';
 import {getTranslation} from '../locales';
-import {getAdminKey, setAdminKey} from '../api';
 
 interface HeaderProps {
   theme: ThemeMode;
@@ -34,7 +33,6 @@ export const Header: React.FC<HeaderProps> = ({
   setIsSimulatingLive
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [adminKey, updateAdminKey] = useState<string>(() => getAdminKey());
   const [currentLang, setCurrentLang] = useState<LanguageMode>(language);
   const settingsRef = useRef<HTMLDivElement>(null);
   const { t } = getTranslation(language);
@@ -225,57 +223,6 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* Language Settings Section */}
-              <div className="space-y-2 mb-4 pt-3 border-t border-zinc-800">
-                <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 flex items-center justify-between mb-1">
-                  <span>{t('languageLabel')}</span>
-                  <Globe className="w-3.5 h-3.5 text-indigo-400" />
-                </label>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Portuguese (BR) */}
-                  <button
-                    onClick={() => handleSelectLanguage('pt')}
-                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all ${
-                      currentLang === 'pt'
-                        ? 'bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-semibold shadow-sm'
-                        : 'bg-zinc-950/50 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    <span className="text-base">🇧🇷</span>
-                    <span className="text-xs">PT-BR</span>
-                  </button>
-
-                  {/* English (US) */}
-                  <button
-                    onClick={() => handleSelectLanguage('en')}
-                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all ${
-                      currentLang === 'en'
-                        ? 'bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-semibold shadow-sm'
-                        : 'bg-zinc-950/50 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    <span className="text-base">🇺🇸</span>
-                    <span className="text-xs">EN-US</span>
-                  </button>
-                </div>
-              </div>
-
-                <div className="space-y-2 mb-4 pt-3 border-t border-zinc-800">
-                    <label htmlFor="admin-api-key" className="text-xs text-zinc-300">{t('adminKeyLabel')}</label>
-                    <input id="admin-api-key" type="password" autoComplete="off" value={adminKey}
-                           onChange={event => {
-                               updateAdminKey(event.target.value);
-                               setAdminKey(event.target.value);
-                           }}
-                           className="w-full p-2 rounded-lg bg-zinc-950 border border-zinc-700 text-xs"
-                           placeholder={t('adminKeyPlaceholder')}/>
-                    <p className="text-xs text-zinc-400">{t('adminKeyHelp')}</p>
-                    <button onClick={() => {
-                        updateAdminKey('');
-                        setAdminKey('');
-                    }}
-                            className="text-xs text-zinc-400 hover:text-zinc-100">{t('adminKeyClear')}</button>
-                </div>
 
               {/* Additional Options */}
               <div className="pt-3 border-t border-zinc-800 space-y-2">
@@ -307,4 +254,7 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
+
+
 

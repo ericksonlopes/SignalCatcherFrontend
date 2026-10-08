@@ -48,14 +48,6 @@ export const en: Record<TranslationKeys, string> = {
     lastUpdated: "Last updated",
     checkingHealth: "Checking connection",
     jobName: "Job",
-
-    adminKeyLabel: "Administrative key",
-    adminKeyPlaceholder: "Enter the key to authorize changes",
-    adminKeyHelp: "The key is available only in this browser tab.",
-    adminKeyClear: "Remove key",
-    adminKeyRequired: "Enter the administrative key in settings.",
-    adminKeyInvalid: "Invalid administrative key.",
-    adminKeyNotConfigured: "The server has no administrative key configured yet.",
     contentBusy: "The video is being processed. Wait before changing or deleting it.",
     deletionPending: "Deletion pending",
     deletionQueued: "Deletion queued. The status will update after the file is removed.",
@@ -333,3 +325,4 @@ export const en: Record<TranslationKeys, string> = {
   toastWarning: "Warning",
   toastInfo: "Information"
 };
+

@@ -73,12 +73,9 @@ export function TrackingTelemetry({language, onAddLog}: {
 
         void refresh();
         const interval = window.setInterval(() => void refresh(), 5000);
-        const onKeyChanged = () => void refresh();
-        window.addEventListener('signalcatcher-admin-key-changed', onKeyChanged);
         return () => {
             active = false;
             window.clearInterval(interval);
-            window.removeEventListener('signalcatcher-admin-key-changed', onKeyChanged);
         };
     }, [language]);
 
@@ -170,3 +167,4 @@ export function TrackingTelemetry({language, onAddLog}: {
         </>}
     </section>;
 }
+

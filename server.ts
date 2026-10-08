@@ -8,21 +8,7 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
-  // Match the backend's administrative access contract; keep the key server-side.
-  app.use((req, res, next) => {
-    const administrative = req.path === '/metrics' || (req.path.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method));
-    if (!administrative) return next();
-    const expected = process.env.ADMIN_API_KEY;
-    if (!expected) return res.status(503).json({detail: 'Administrative access is not configured.'});
-    const supplied = Buffer.from(req.header('X-API-Key') || '');
-    const expectedBytes = Buffer.from(expected);
-    if (supplied.length !== expectedBytes.length || !timingSafeEqual(supplied, expectedBytes)) {
-      return res.status(401).json({detail: 'Invalid administrative API key.'});
-    }
-    next();
-  });
-
-  // In-memory data store for YouTube sources and content
+// In-memory data store for YouTube sources and content
   const youtubeSources: Array<{
     id: string;
     name: string;
@@ -533,3 +519,4 @@ async function startServer() {
 }
 
 startServer();
+

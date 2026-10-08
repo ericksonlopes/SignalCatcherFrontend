@@ -47,14 +47,6 @@ export const pt = {
     lastUpdated: "Última atualização",
     checkingHealth: "Verificando conexão",
     jobName: "Tarefa",
-
-  adminKeyLabel: "Chave administrativa",
-  adminKeyPlaceholder: "Informe a chave para autorizar alterações",
-  adminKeyHelp: "A chave fica disponível apenas nesta aba do navegador.",
-  adminKeyClear: "Remover chave",
-  adminKeyRequired: "Informe a chave administrativa nas configurações.",
-  adminKeyInvalid: "Chave administrativa inválida.",
-  adminKeyNotConfigured: "O servidor ainda não tem uma chave administrativa configurada.",
   contentBusy: "O vídeo está em processamento. Aguarde antes de alterar ou excluir.",
   deletionPending: "Exclusão pendente",
   deletionQueued: "Exclusão enfileirada. O status será atualizado após a remoção do arquivo.",
@@ -334,3 +326,4 @@ export const pt = {
 };
 
 export type TranslationKeys = keyof typeof pt;
+
