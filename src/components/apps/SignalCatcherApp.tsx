@@ -152,6 +152,7 @@ const getStatusColor = (status: string) => {
     case 'COPYRIGHT_REMOVED':
     case 'ACCOUNT_TERMINATED':
     case 'VIDEO_REMOVED':
+    case 'COURT_ORDER':
     case 'PRIVATE_VIDEO':
     case 'AGE_RESTRICTED':
     case 'MEMBERS_ONLY':
@@ -1155,6 +1156,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 <option value="COPYRIGHT_REMOVED">COPYRIGHT_REMOVED ({statusCounts['COPYRIGHT_REMOVED'] || 0})</option>
                 <option value="ACCOUNT_TERMINATED">ACCOUNT_TERMINATED ({statusCounts['ACCOUNT_TERMINATED'] || 0})</option>
                 <option value="VIDEO_REMOVED">VIDEO_REMOVED ({statusCounts['VIDEO_REMOVED'] || 0})</option>
+                <option value="COURT_ORDER">COURT_ORDER ({statusCounts['COURT_ORDER'] || 0})</option>
                 <option value="REPROCESSING">REPROCESSING ({statusCounts['REPROCESSING'] || 0})</option>
                 <option value="DELETED">DELETED ({statusCounts['DELETED'] || 0})</option>
               </select>

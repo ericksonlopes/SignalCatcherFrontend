@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Gavel,
   Loader2,
   PlayCircle,
   RefreshCw,
@@ -43,6 +44,7 @@ const PIPELINE_EXCEPTIONS: PipelineStepDef[] = [
   { id: 'COPYRIGHT_REMOVED', label: 'COPYRIGHT REMOVED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
   { id: 'ACCOUNT_TERMINATED', label: 'ACCOUNT TERMINATED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
   { id: 'VIDEO_REMOVED', label: 'VIDEO REMOVED', icon: ServerCrash, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
+  { id: 'COURT_ORDER', label: 'COURT ORDER', icon: Gavel, color: 'text-red-600', bg: 'bg-red-600/10', border: 'border-red-600/20' },
 ];
 
 const PIPELINE_OTHER: PipelineStepDef[] = [

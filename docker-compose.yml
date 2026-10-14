@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   frontend:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
       args:
@@ -10,10 +8,38 @@ services:
     image: signal-catcher-frontend:latest
     container_name: signal-catcher-frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
+      - PORT=3000
     restart: unless-stopped
+    init: true
+    stop_grace_period: 10s
+
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 128M
+
     networks:
       - shared_postgres_network
 
