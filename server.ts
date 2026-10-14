@@ -44,6 +44,7 @@ async function startServer() {
     sentimentScore: number;
     is_diarized?: boolean;
     diarization_status?: string | null;
+    diarization_progress?: number | null;
     deletion_requested?: boolean;
   }> = [];
 

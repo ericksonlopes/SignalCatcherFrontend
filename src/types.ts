@@ -55,6 +55,7 @@ export interface CapturedVideo {
   errorInfo?: string | null;
   isDiarized?: boolean;
   diarizationStatus?: string | null;
+  diarizationProgress?: number | null;
 }
 
 export interface SystemLog {

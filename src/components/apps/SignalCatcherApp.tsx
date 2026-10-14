@@ -5,7 +5,7 @@ import {CaptureSection, readCaptureSection, saveCaptureSection} from '../../navi
 import {API_BASE_URL, apiFetch} from '../../api';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
-  Activity,
+  Activity,
   ExternalLink,
   ListMusic,
   ListVideo,
@@ -26,6 +26,8 @@ import {
 import {CapturedVideo, ContentSource, LanguageMode} from '../../types';
 import {getTranslation} from '../../locales';
 import { PipelineTrackingView } from './PipelineTrackingView';
+import { canDiarizeVideo, canDeleteVideo, isDiarizationInProgress } from './videoActions';
+export { canDiarizeVideo, canDeleteVideo, isDiarizationInProgress };
 
 
 function parseTimeString(duration: string): number | string {
@@ -177,6 +179,7 @@ interface DiarizationBadgeInfo {
 function getDiarizationBadgeInfo(
   isDiarized: boolean | undefined,
   diarizationStatus: string | null | undefined,
+  diarizationProgress: number | null | undefined,
   t: (key: any) => string
 ): DiarizationBadgeInfo | null {
   if (!isDiarized && !diarizationStatus) return null;
@@ -197,10 +200,15 @@ function getDiarizationBadgeInfo(
     };
   }
 
+  if (diarizationStatus === 'CANCELLED') {
+    return null;
+  }
+
+  const label = diarizationProgress != null ? `${t('diarizing')} ${diarizationProgress}%` : t('diarizing');
   return {
     className: 'bg-amber-950/90 text-amber-300 border-amber-500/40',
     icon: <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />,
-    label: t('diarizing'),
+    label,
   };
 }
 
@@ -218,7 +226,7 @@ type DiarizationBtnState = 'cancelling' | 'showCancel' | 'pending' | 'completed'
 
 function getDiarizationButtonState(video: CapturedVideo, isHovered: boolean, isCancelling: boolean): DiarizationBtnState {
   if (isCancelling) return 'cancelling';
-  const isPending = video.diarizationStatus === 'PENDING' || video.diarizationStatus === 'PROCESSING';
+  const isPending = isDiarizationInProgress(video.diarizationStatus);
   if (isPending && isHovered) return 'showCancel';
   if (isPending) return 'pending';
   if (video.isDiarized || video.diarizationStatus === 'COMPLETED') return 'completed';
@@ -226,7 +234,7 @@ function getDiarizationButtonState(video: CapturedVideo, isHovered: boolean, isC
   return 'default';
 }
 
-function getDiarizationButtonConfig(state: DiarizationBtnState, t: (key: any) => string) {
+function getDiarizationButtonConfig(state: DiarizationBtnState, t: (key: any) => string, progress?: number | null) {
   switch (state) {
     case 'cancelling':
       return {
@@ -247,8 +255,8 @@ function getDiarizationButtonConfig(state: DiarizationBtnState, t: (key: any) =>
     case 'pending':
       return {
         style: "bg-amber-500/10 border-amber-500/30 text-amber-300 cursor-default opacity-90",
-        title: t('diarizing'),
-        text: t('diarizing'),
+        title: progress != null ? `${t('diarizing')} ${progress}%` : t('diarizing'),
+        text: progress != null ? `${t('diarizing')} ${progress}%` : t('diarizing'),
         icon: <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />,
         disabled: false,
       };
@@ -289,12 +297,12 @@ const DiarizationButton: React.FC<DiarizationButtonProps> = ({
   t,
 }) => {
   const state = getDiarizationButtonState(video, isHovered, isCancelling);
-  const cfg = getDiarizationButtonConfig(state, t);
+  const cfg = getDiarizationButtonConfig(state, t, video.diarizationProgress);
 
   const handleClick = (e: React.MouseEvent) => {
     if (state === 'showCancel') {
       void onCancel(e, video);
-    } else {
+    } else if (state === 'default' || state === 'error') {
       onClick(e, video);
     }
   };
@@ -314,6 +322,142 @@ const DiarizationButton: React.FC<DiarizationButtonProps> = ({
     </button>
   );
 };
+
+interface VideoThumbnailProps {
+  video: CapturedVideo;
+  canDiarize: boolean;
+  t: (key: any) => string;
+}
+
+const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ video, canDiarize, t }) => {
+  const diarBadge = canDiarize
+    ? getDiarizationBadgeInfo(video.isDiarized, video.diarizationStatus, video.diarizationProgress, t)
+    : null;
+  const statusText = video.deletionRequested ? t('deletionPending') : video.status?.replaceAll('_', ' ');
+  const statusColorClass = video.deletionRequested ? 'text-amber-400' : getStatusColor(video.status);
+
+  return (
+    <div className="relative mb-3.5 rounded-xl overflow-hidden aspect-video bg-zinc-950 border border-zinc-800">
+      {video.thumbnail ? (
+        <img
+          src={video.thumbnail}
+          alt={video.title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-zinc-900 group-hover:bg-zinc-800 transition-colors duration-300">
+          <YoutubeIcon className="w-12 h-12 text-zinc-700 opacity-50 group-hover:text-red-600 group-hover:opacity-100 transition-all duration-300" />
+        </div>
+      )}
+
+      {/* Duration Badge */}
+      <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700">
+        {formatDuration(video.duration)}
+      </span>
+
+      {/* Diarization Badge */}
+      {diarBadge && (
+        <div className={`absolute bottom-2 left-2 flex items-center gap-1 text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm ${diarBadge.className}`}>
+          {diarBadge.icon}
+          <span>{diarBadge.label}</span>
+        </div>
+      )}
+
+      {/* Status Badge */}
+      {video.status && (
+        <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${statusColorClass} text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
+          <span>{statusText}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface VideoCardActionsProps {
+  video: CapturedVideo;
+  canDelete: boolean;
+  canDiarize: boolean;
+  isRetrying: boolean;
+  isDeleting: boolean;
+  isCancellingDiar: boolean;
+  isHoveredDiar: boolean;
+  onRetry: (e: React.MouseEvent, video: CapturedVideo) => void;
+  onDeleteRequest: (video: CapturedVideo) => void;
+  onDiarizeClick: (e: React.MouseEvent, video: CapturedVideo) => void;
+  onCancelDiarize: (e: React.MouseEvent, video: CapturedVideo) => void;
+  onHoverDiar: (id: string | null) => void;
+  t: (key: any) => string;
+}
+
+const VideoCardActions: React.FC<VideoCardActionsProps> = ({
+  video,
+  canDelete,
+  canDiarize,
+  isRetrying,
+  isDeleting,
+  isCancellingDiar,
+  isHoveredDiar,
+  onRetry,
+  onDeleteRequest,
+  onDiarizeClick,
+  onCancelDiarize,
+  onHoverDiar,
+  t,
+}) => (
+  <div className="pt-3 border-t border-zinc-800/80 mt-auto flex items-center justify-between gap-2 min-h-[44px]">
+    <div className="flex items-center gap-1">
+      {video.videoUrl && (
+        <a
+          href={video.videoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          title={t('openOnYouTube')}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      )}
+      {video.status === 'ERROR' && (
+        <button
+          type="button"
+          onClick={(e) => onRetry(e, video)}
+          disabled={isRetrying}
+          className="p-1.5 rounded-lg hover:bg-zinc-800 text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
+          title={t('retryProcessing')}
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+        </button>
+      )}
+      {canDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteRequest(video);
+          }}
+          disabled={isDeleting || video.deletionRequested}
+          className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-red-400 transition-colors disabled:opacity-50"
+          title={t('deleteVideo')}
+        >
+          <Trash className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+
+    {canDiarize && (
+      <DiarizationButton
+        video={video}
+        isHovered={isHoveredDiar}
+        isCancelling={isCancellingDiar}
+        onHover={onHoverDiar}
+        onClick={onDiarizeClick}
+        onCancel={onCancelDiarize}
+        t={t}
+      />
+    )}
+  </div>
+);
 
 interface VideoCardProps {
   video: CapturedVideo;
@@ -346,7 +490,8 @@ const VideoCard: React.FC<VideoCardProps> = ({
   onHoverDiar,
   t,
 }) => {
-  const diarBadge = getDiarizationBadgeInfo(video.isDiarized, video.diarizationStatus, t);
+  const canDiarize = canDiarizeVideo(video);
+  const canDelete = canDeleteVideo(video);
 
   return (
     <div className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-lg hover:-translate-y-1 relative">
@@ -361,39 +506,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
         </div>
 
         {/* Thumbnail & Badges */}
-        <div className="relative mb-3.5 rounded-xl overflow-hidden aspect-video bg-zinc-950 border border-zinc-800">
-          {video.thumbnail ? (
-            <img
-              src={video.thumbnail}
-              alt={video.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-zinc-900 group-hover:bg-zinc-800 transition-colors duration-300">
-              <YoutubeIcon className="w-12 h-12 text-zinc-700 opacity-50 group-hover:text-red-600 group-hover:opacity-100 transition-all duration-300" />
-            </div>
-          )}
-
-          {/* Duration Badge */}
-          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700">
-            {formatDuration(video.duration)}
-          </span>
-
-          {/* Diarization Badge */}
-          {diarBadge && (
-            <div className={`absolute bottom-2 left-2 flex items-center gap-1 text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm ${diarBadge.className}`}>
-              {diarBadge.icon}
-              <span>{diarBadge.label}</span>
-            </div>
-          )}
-
-          {/* Status Badge */}
-          {video.status && (
-            <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${video.deletionRequested ? 'text-amber-400' : getStatusColor(video.status)} text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
-              <span>{video.deletionRequested ? t('deletionPending') : video.status.replaceAll('_', ' ')}</span>
-            </div>
-          )}
-        </div>
+        <VideoThumbnail video={video} canDiarize={canDiarize} t={t} />
 
         {/* Title */}
         <h4 className="text-sm font-semibold text-zinc-100 group-hover:text-indigo-400 transition-colors line-clamp-2 leading-snug mb-2">
@@ -409,55 +522,21 @@ const VideoCard: React.FC<VideoCardProps> = ({
       </button>
 
       {/* Footer / Actions Bar */}
-      <div className="pt-3 border-t border-zinc-800/80 mt-auto flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          {video.videoUrl && (
-            <a
-              href={video.videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-              title={t('openOnYouTube')}
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
-          {video.status === 'ERROR' && (
-            <button
-              type="button"
-              onClick={(e) => onRetry(e, video)}
-              disabled={isRetrying}
-              className="p-1.5 rounded-lg hover:bg-zinc-800 text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
-              title={t('retryProcessing')}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteRequest(video);
-            }}
-            disabled={isDeleting || video.deletionRequested}
-            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-red-400 transition-colors disabled:opacity-50"
-            title={t('deleteVideo')}
-          >
-            <Trash className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <DiarizationButton
-          video={video}
-          isHovered={isHoveredDiar}
-          isCancelling={isCancellingDiar}
-          onHover={onHoverDiar}
-          onClick={onDiarizeClick}
-          onCancel={onCancelDiarize}
-          t={t}
-        />
-      </div>
+      <VideoCardActions
+        video={video}
+        canDelete={canDelete}
+        canDiarize={canDiarize}
+        isRetrying={isRetrying}
+        isDeleting={isDeleting}
+        isCancellingDiar={isCancellingDiar}
+        isHoveredDiar={isHoveredDiar}
+        onRetry={onRetry}
+        onDeleteRequest={onDeleteRequest}
+        onDiarizeClick={onDiarizeClick}
+        onCancelDiarize={onCancelDiarize}
+        onHoverDiar={onHoverDiar}
+        t={t}
+      />
     </div>
   );
 };
@@ -609,8 +688,14 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     }
   };
 
+  const handleDeleteRequest = (video: CapturedVideo) => {
+    if (!canDeleteVideo(video) || video.deletionRequested) return;
+    setVideoToDelete(video);
+  };
+
   const handleIndividualDelete = async (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
+    if (!canDeleteVideo(video) || video.deletionRequested) return;
 
     const externalId = extractExternalId(video.videoUrl, video.postgresRecordId || video.id);
 
@@ -645,6 +730,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
   const handleDiarizationClick = (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
+    if (!canDiarizeVideo(video) || isDiarizationInProgress(video.diarizationStatus)) return;
     setDiarizationModalVideo(video);
     setDiarizationLanguage(video.language || 'en');
     setDiarizationStartNow(false);
@@ -875,14 +961,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             key={video.id}
             video={video}
             channelDisplayName={channelMap.get(channelIdentity(video.sourceName)) || video.sourceName}
-            isSelected={selectedVideo?.id === video.id}
             isRetrying={retryingVideoIds.has(video.id)}
             isDeleting={deletingVideoIds.has(video.id)}
             isCancellingDiar={cancellingDiarIds.has(video.id)}
             isHoveredDiar={hoveredDiarBtnId === video.id}
             onSelect={setSelectedVideo}
             onRetry={handleIndividualRetry}
-            onDeleteRequest={setVideoToDelete}
+            onDeleteRequest={handleDeleteRequest}
             onDiarizeClick={handleDiarizationClick}
             onCancelDiarize={handleCancelDiarization}
             onHoverDiar={setHoveredDiarBtnId}
@@ -1424,7 +1509,8 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       {selectedVideo.deletionRequested ? t('deletionPending') : selectedVideo.status.replaceAll('_', ' ')}
                     </span>
                     {(() => {
-                    const modalDiarBadge = getDiarizationBadgeInfo(selectedVideo.isDiarized, selectedVideo.diarizationStatus, t);
+                    if (!canDiarizeVideo(selectedVideo)) return null;
+                    const modalDiarBadge = getDiarizationBadgeInfo(selectedVideo.isDiarized, selectedVideo.diarizationStatus, selectedVideo.diarizationProgress, t);
                     if (!modalDiarBadge) return null;
                     return (
                       <span className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${modalDiarBadge.className}`}>
@@ -1487,7 +1573,8 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
             {/* Modal Footer */}
             <div className="p-4 border-t border-zinc-800/80 flex items-center justify-between bg-zinc-950">
               <div className="flex items-center gap-2">
-                <button
+                {canDeleteVideo(selectedVideo) && (
+                  <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedVideo(null);
@@ -1499,14 +1586,22 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                   <Trash className={`w-4 h-4 ${deletingVideoIds.has(selectedVideo.id) ? 'animate-pulse' : ''}`} />
                   <span>{selectedVideo.deletionRequested ? t('deletionPending') : t('btnConfirmDelete')}</span>
                 </button>
-                {selectedVideo.status === 'COMPLETED' && !selectedVideo.deletionRequested && (
-                  <button
+                )}
+                {canDiarizeVideo(selectedVideo) && (
+                  isDiarizationInProgress(selectedVideo.diarizationStatus) ? (
+                    <span className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-300 text-xs font-bold flex items-center gap-1.5 border border-amber-500/20 cursor-default">
+                      <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                      {selectedVideo.diarizationProgress != null ? `${t('diarizing')} ${selectedVideo.diarizationProgress}%` : t('diarizing')}
+                    </span>
+                  ) : (
+                    <button
                       onClick={(e) => handleDiarizationClick(e, selectedVideo)}
                       className="px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold shadow-sm shadow-purple-500/10 transition-colors flex items-center gap-1.5 border border-purple-500/20"
                     >
                       <ListMusic className="w-3.5 h-3.5" />
                       {selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED' ? 'Refazer Diarização' : 'Diarização'}
                     </button>
+                  )
                 )}
 
               </div>

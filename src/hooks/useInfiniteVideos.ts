@@ -7,10 +7,11 @@ interface VideoDTO {
     created_at?: string; published_at?: string; duration?: number | string; step?: string;
     tags?: string[]; description?: string; language?: string; deletion_requested?: boolean;
     attempt_count?: number; next_retry_at?: string | null; error_info?: string | null;
-    is_diarized?: boolean; diarization_status?: string | null;
+    is_diarized?: boolean; diarization_status?: string | null; diarization_progress?: number | null;
 }
 interface VideoPage {items: VideoDTO[]; total_pages: number;}
 interface RequestContext {controller: AbortController; busy: boolean; pages: number; hasMore: boolean;}
+interface PageFetchResult {videos: CapturedVideo[]; lastPage: number; hasMore: boolean;}
 const PAGE_SIZE = 24;
 
 function mapVideo(item: VideoDTO): CapturedVideo {
@@ -24,7 +25,43 @@ function mapVideo(item: VideoDTO): CapturedVideo {
         attemptCount: item.attempt_count ?? 0, nextRetryAt: item.next_retry_at ?? null,
         errorInfo: item.error_info ?? null, isDiarized: item.is_diarized ?? false,
         diarizationStatus: item.diarization_status || null,
+        diarizationProgress: item.diarization_progress ?? null,
     };
+}
+
+function shouldSkipRequest(context: RequestContext | null, mode: 'more' | 'refresh'): boolean {
+    if (!context || context.busy || context.controller.signal.aborted) return true;
+    return mode === 'more' && !context.hasMore;
+}
+
+function getPageRange(mode: 'more' | 'refresh', currentPages: number): { start: number; end: number } {
+    const start = mode === 'refresh' ? 1 : currentPages + 1;
+    const end = mode === 'refresh' ? Math.max(1, currentPages) : start;
+    return { start, end };
+}
+
+async function fetchPages(
+    start: number,
+    end: number,
+    signal: AbortSignal,
+    fetchPage: (page: number, signal: AbortSignal) => Promise<VideoPage>
+): Promise<PageFetchResult> {
+    const videos: CapturedVideo[] = [];
+    let lastPage = start;
+    let hasMore = false;
+    for (let page = start; page <= end; page++) {
+        const data = await fetchPage(page, signal);
+        videos.push(...data.items.map(mapVideo));
+        lastPage = page;
+        hasMore = page < data.total_pages && data.items.length > 0;
+        if (!hasMore) break;
+    }
+    return { videos, lastPage, hasMore };
+}
+
+function mergeVideos(mode: 'more' | 'refresh', previous: CapturedVideo[], incoming: CapturedVideo[]): CapturedVideo[] {
+    const combined = mode === 'refresh' ? incoming : [...previous, ...incoming];
+    return Array.from(new Map(combined.map(video => [video.id, video])).values());
 }
 
 export function useInfiniteVideos(step: string, search: string, channel: string, refreshTrigger: number) {
@@ -49,31 +86,18 @@ export function useInfiniteVideos(step: string, search: string, channel: string,
 
     const request = useCallback(async (mode: 'more' | 'refresh') => {
         const current = context.current;
-        if (!current || current.busy || current.controller.signal.aborted || (mode === 'more' && !current.hasMore)) return;
+        if (shouldSkipRequest(current, mode) || !current) return;
         current.busy = true;
         setError(false);
         if (current.pages > 0) setLoadingMore(true);
         try {
-            const start = mode === 'refresh' ? 1 : current.pages + 1;
-            const end = mode === 'refresh' ? Math.max(1, current.pages) : start;
-            let videos: CapturedVideo[] = [];
-            let lastPage = start;
-            let more = false;
-            for (let page = start; page <= end; page++) {
-                const data = await fetchPage(page, current.controller.signal);
-                videos.push(...data.items.map(mapVideo));
-                lastPage = page;
-                more = page < data.total_pages && data.items.length > 0;
-                if (!more) break;
-            }
+            const { start, end } = getPageRange(mode, current.pages);
+            const result = await fetchPages(start, end, current.controller.signal, fetchPage);
             if (context.current !== current || current.controller.signal.aborted) return;
-            setCaptures(previous => {
-                const combined = mode === 'refresh' ? videos : [...previous, ...videos];
-                return Array.from(new Map(combined.map(video => [video.id, video])).values());
-            });
-            current.pages = lastPage;
-            current.hasMore = more;
-            setHasMore(more);
+            setCaptures(previous => mergeVideos(mode, previous, result.videos));
+            current.pages = result.lastPage;
+            current.hasMore = result.hasMore;
+            setHasMore(result.hasMore);
         } catch {
             if (!current.controller.signal.aborted && context.current === current) setError(true);
         } finally {
