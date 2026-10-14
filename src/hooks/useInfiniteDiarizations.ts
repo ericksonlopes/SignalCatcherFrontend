@@ -17,13 +17,54 @@ interface RequestContext {
   failedMode: RequestMode;
 }
 const PAGE_SIZE = 20;
+const ACTIVE_POLL_STEPS = new Set(['ALL', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION']);
+
 const fingerprint = (page: DiarizationPage) => JSON.stringify([page.total, page.items.map(item => [item.id, item.step, item.progress_percent, item.queue_priority])]);
 
-export function mergeDiarizations(previous: DiarizationVideo[], incoming: DiarizationVideo[]) {
+function mergeDiarizations(previous: DiarizationVideo[], incoming: DiarizationVideo[]) {
   return Array.from(new Map([...previous, ...incoming].map(item => [item.id, item])).values());
 }
 
-export function useInfiniteDiarizations(step: string, search: string, refreshTrigger: number) {
+function shouldSkipPoll(firstPage: DiarizationPage, head: string, step: string): boolean {
+  return fingerprint(firstPage) === head && !ACTIVE_POLL_STEPS.has(step);
+}
+
+interface LoadedPagesResult {
+  items: DiarizationVideo[];
+  lastPage: number;
+  more: boolean;
+  total: number;
+  head: string;
+}
+
+async function fetchPagesRange(
+  start: number,
+  end: number,
+  fetchPage: (page: number, signal: AbortSignal) => Promise<DiarizationPage>,
+  signal: AbortSignal,
+  firstPage?: DiarizationPage,
+  initialHead: string = ''
+): Promise<LoadedPagesResult> {
+  let items: DiarizationVideo[] = [];
+  let lastPage = start;
+  let more = false;
+  let total = 0;
+  let head = initialHead;
+
+  for (let page = start; page <= end; page++) {
+    const data = page === 1 && firstPage ? firstPage : await fetchPage(page, signal);
+    items = mergeDiarizations(items, data.items);
+    lastPage = page;
+    total = data.total;
+    more = page < data.total_pages && data.items.length > 0;
+    if (page === 1) head = fingerprint(data);
+    if (!more) break;
+  }
+
+  return { items, lastPage, more, total, head };
+}
+
+export function useInfiniteDiarizations(step: string = 'ALL', search: string = '', refreshTrigger: number = 0) {
   const [videos, setVideos] = useState<DiarizationVideo[]>([]);
   const [isLoading, setLoading] = useState(true);
   const [isFetching, setFetching] = useState(false);
@@ -42,7 +83,7 @@ export function useInfiniteDiarizations(step: string, search: string, refreshTri
     const data = await response.json();
     const items = data.items ?? data.diarizations;
     if (!Array.isArray(items) || typeof data.total !== 'number' || typeof data.total_pages !== 'number') {
-      throw new Error('Invalid diarization page');
+      throw new TypeError('Invalid diarization page');
     }
     return { items, total: data.total, total_pages: data.total_pages };
   }, [step, search]);
@@ -58,33 +99,19 @@ export function useInfiniteDiarizations(step: string, search: string, refreshTri
       let firstPage: DiarizationPage | undefined;
       if (mode === 'poll') {
         firstPage = await fetchPage(1, current.controller.signal);
-        // Most polls only fetch the newest page. Refresh the loaded window when its
-        // head changes, so offset pagination stays aligned without losing older rows.
-        if (fingerprint(firstPage) === current.head && !['ALL', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION'].includes(step)) return;
+        if (shouldSkipPoll(firstPage, current.head, step)) return;
       }
       const start = mode === 'more' ? current.pages + 1 : 1;
       const end = mode === 'more' ? start : Math.max(1, current.pages);
-      let items: DiarizationVideo[] = [];
-      let lastPage = start;
-      let more = false;
-      let total = 0;
-      let head = current.head;
-      for (let page = start; page <= end; page++) {
-        const data = page === 1 && firstPage ? firstPage : await fetchPage(page, current.controller.signal);
-        items = mergeDiarizations(items, data.items);
-        lastPage = page;
-        total = data.total;
-        more = page < data.total_pages && data.items.length > 0;
-        if (page === 1) head = fingerprint(data);
-        if (!more) break;
-      }
+      const result = await fetchPagesRange(start, end, fetchPage, current.controller.signal, firstPage, current.head);
+
       if (context.current !== current || current.controller.signal.aborted) return;
-      setVideos(previous => mode === 'more' ? mergeDiarizations(previous, items) : items);
-      current.pages = lastPage;
-      current.hasMore = more;
-      current.head = head;
-      setHasMore(more);
-      setTotalItems(total);
+      setVideos(previous => mode === 'more' ? mergeDiarizations(previous, result.items) : result.items);
+      current.pages = result.lastPage;
+      current.hasMore = result.more;
+      current.head = result.head;
+      setHasMore(result.more);
+      setTotalItems(result.total);
     } catch {
       if (context.current === current && !current.controller.signal.aborted) {
         current.failedMode = mode;
@@ -98,7 +125,7 @@ export function useInfiniteDiarizations(step: string, search: string, refreshTri
         setFetching(false);
       }
     }
-  }, [fetchPage]);
+  }, [fetchPage, step]);
 
   useEffect(() => {
     const current: RequestContext = {

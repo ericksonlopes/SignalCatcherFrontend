@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Bell, Check, Globe, Moon, RefreshCw, Search, Server, Settings, Sliders, Sun, X, Zap} from 'lucide-react';
+import {Bell, Check, Moon, RefreshCw, Search, Server, Settings, Sliders, Sun, X, Zap} from 'lucide-react';
 import {LanguageMode, ThemeMode} from '../types';
 import {getTranslation} from '../locales';
 
@@ -9,7 +9,6 @@ interface HeaderProps {
   language?: LanguageMode;
   setLanguage?: (lang: LanguageMode) => void;
   isBackendConnected: boolean;
-  setIsBackendConnected: (connected: boolean) => void;
   latency: number;
   onOpenCommandPalette: () => void;
   onToggleNotifications: () => void;
@@ -24,7 +23,6 @@ export const Header: React.FC<HeaderProps> = ({
   language = 'en',
   setLanguage,
   isBackendConnected,
-  setIsBackendConnected,
   latency,
   onOpenCommandPalette,
   onToggleNotifications,
@@ -33,20 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
   setIsSimulatingLive
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentLang, setCurrentLang] = useState<LanguageMode>(language);
   const settingsRef = useRef<HTMLDivElement>(null);
   const { t } = getTranslation(language);
-
-  useEffect(() => {
-    setCurrentLang(language);
-  }, [language]);
-
-  const handleSelectLanguage = (lang: LanguageMode) => {
-    setCurrentLang(lang);
-    if (setLanguage) {
-      setLanguage(lang);
-    }
-  };
 
   // Close settings popover on click outside
   useEffect(() => {
@@ -67,13 +53,11 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="border-b border-zinc-800/80 bg-[#09090b]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between gap-4 sticky top-0 z-40 text-zinc-100">
       {/* Brand & Logo */}
       <div className="flex items-center gap-3 min-w-max">
-        <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-cyan-600 to-emerald-500 p-0.5 shadow-md shadow-indigo-500/20">
-          <div className="w-full h-full bg-zinc-950 rounded-[10px] flex items-center justify-center">
-            <Zap className="w-5 h-5 text-indigo-400 " />
-          </div>
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className=" absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+        <div className="relative flex items-center justify-center w-10 h-10 rounded-xl overflow-hidden shadow-md shadow-indigo-500/20 border border-zinc-800 bg-zinc-950">
+          <img src="/logo.jpg" alt="SignalCatcher Logo" className="w-full h-full object-cover" />
+          <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75 animate-ping"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
           </span>
         </div>
 
@@ -88,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <p className="text-xs text-zinc-400 flex items-center gap-1.5">
             <Server className={`w-3.5 h-3.5 ${isBackendConnected ? 'text-emerald-400' : 'text-rose-400'}`} />
-            <span role="status">{t(isBackendConnected ? 'apiConnected' : 'apiDisconnected')}{isBackendConnected && latency > 0 ? ` · ${Math.round(latency)} ms` : ''}</span>
+            <output>{t(isBackendConnected ? 'apiConnected' : 'apiDisconnected')}{isBackendConnected && latency > 0 ? ` · ${Math.round(latency)} ms` : ''}</output>
           </p>
         </div>
       </div>
@@ -223,7 +207,37 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* Language Settings Section */}
-
+              {setLanguage && (
+                <div className="space-y-2 mb-4">
+                  <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 block mb-1">
+                    {t('languageLabel')}
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => setLanguage('en')}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                        language === 'en'
+                          ? 'bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-semibold'
+                          : 'bg-zinc-950/50 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <span>English</span>
+                      {language === 'en' && <Check className="w-4 h-4 text-indigo-400" />}
+                    </button>
+                    <button
+                      onClick={() => setLanguage('pt')}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                        language === 'pt'
+                          ? 'bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-semibold'
+                          : 'bg-zinc-950/50 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <span>Português</span>
+                      {language === 'pt' && <Check className="w-4 h-4 text-indigo-400" />}
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Additional Options */}
               <div className="pt-3 border-t border-zinc-800 space-y-2">
                 <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 block">

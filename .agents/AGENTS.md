@@ -9,9 +9,8 @@ Este é o **SignalCatcherFrontend** — interface web para o sistema SignalCatch
 - **TailwindCSS v4** (estilização)
 - **shadcn/ui** + **Radix UI** (componentes)
 - **Framer Motion** (animações)
-- **Recharts** + **D3** (gráficos)
-- **Express** (server.ts — API local de desenvolvimento)
 - **Lucide React** (ícones)
+- **Express** (server.ts — API local de desenvolvimento)
 
 ## Estrutura
 
@@ -22,9 +21,8 @@ src/
 ├── types.ts                    → Interfaces TypeScript compartilhadas
 ├── components/apps/            → Módulos da aplicação
 │   ├── SignalCatcherApp.tsx     → Módulo principal YouTube
-│   ├── CreatorDashboardsApp.tsx → Dashboard de criadores
-│   └── FollowerAnalyticsApp.tsx → Analytics de seguidores
-├── data/initialData.ts         → Dados mock iniciais
+│   └── DiarizationApp.tsx       → Módulo de Diarização e transcrição
+├── data/initialData.ts         → Metadados e endpoints da API
 └── locales/                    → Internacionalização (en, pt)
 ```
 

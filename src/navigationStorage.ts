@@ -1,9 +1,11 @@
-import {AppTab} from './types';
+import {AppId, AppTab} from './types';
 
 const WORKSPACE_KEY = 'signalcatcher_workspace_v1';
 const SECTION_KEY = 'signalcatcher_section_v1';
 const DEFAULT_TAB: AppTab = {id: 'tab-1', appId: 'signalcatcher', title: 'SignalCatcher Ingestor', icon: 'radio', isPinned: true};
-const APP_IDS = new Set(['signalcatcher', 'diarization', 'smarthome', 'followers', 'creatordash', 'fastapi']);
+function isAppId(value: unknown): value is AppId {
+    return value === 'signalcatcher' || value === 'diarization';
+}
 export type CaptureSection = 'captures' | 'saved_channels' | 'sources' | 'tracking';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -18,7 +20,7 @@ export function readWorkspace(): {tabs: AppTab[]; activeTabId: string} {
             const tabs: AppTab[] = [];
             for (const item of value.tabs.slice(0, 50)) {
                 if (!isRecord(item) || typeof item.id !== 'string' || !item.id || ids.has(item.id) ||
-                    typeof item.appId !== 'string' || !APP_IDS.has(item.appId) ||
+                    !isAppId(item.appId) ||
                     typeof item.title !== 'string' || typeof item.icon !== 'string') continue;
                 ids.add(item.id);
                 tabs.push({id: item.id, appId: item.appId, title: item.title, icon: item.icon, isPinned: item.isPinned === true});

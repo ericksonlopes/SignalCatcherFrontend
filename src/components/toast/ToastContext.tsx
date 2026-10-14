@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { ToastNotification, ToastType } from '../../types';
+import { ToastNotification } from '../../types';
 
 interface ToastOptions {
   title?: string;
@@ -43,7 +43,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const showToast = useCallback(
     (item: Omit<ToastNotification, 'id'> & { id?: string }) => {
-      const id = item.id || `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const randomId = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Date.now().toString(36);
+      const id = item.id || `toast-${Date.now()}-${randomId}`;
       const newToast: ToastNotification = {
         ...item,
         id,
@@ -78,16 +79,19 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [showToast, dismissToast, clearAllToasts]
   );
 
+  const contextValue = useMemo(
+    () => ({
+      toasts,
+      showToast,
+      dismissToast,
+      clearAllToasts,
+      toast,
+    }),
+    [toasts, showToast, dismissToast, clearAllToasts, toast]
+  );
+
   return (
-    <ToastContext.Provider
-      value={{
-        toasts,
-        showToast,
-        dismissToast,
-        clearAllToasts,
-        toast,
-      }}
-    >
+    <ToastContext.Provider value={contextValue}>
       {children}
     </ToastContext.Provider>
   );

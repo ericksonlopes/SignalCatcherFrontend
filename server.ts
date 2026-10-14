@@ -1,10 +1,12 @@
 import express from "express";
-import {timingSafeEqual} from "node:crypto";
-import path from "path";
+
+import { randomBytes, randomInt } from "node:crypto";
+import path from "node:path";
 import {createServer as createViteServer} from "vite";
 
 async function startServer() {
   const app = express();
+  app.disable("x-powered-by");
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
@@ -91,9 +93,9 @@ async function startServer() {
       name: String(channelName),
       url: String(url),
       type: "youtube",
-      channelId: `UC_${Math.random().toString(36).substring(2, 9)}`,
+      channelId: `UC_${randomBytes(4).toString("hex")}`,
       avatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
-      subscriberCount: Math.floor(Math.random() * 50000 + 5000),
+      subscriberCount: randomInt(5000, 55000),
       lastCaptured: new Date().toISOString(),
       status: "active",
       totalCaptured: 0
@@ -146,7 +148,7 @@ async function startServer() {
     }
 
     const isPlaylist = String(url).includes("playlist") || String(url).includes("list=");
-    const randomPgId = `pg_vid_${Math.floor(Math.random() * 8999 + 1000)}`;
+    const randomPgId = `pg_vid_${randomInt(1000, 10000)}`;
 
     const newContent = {
       id: `vid-${Date.now()}`,
@@ -160,9 +162,9 @@ async function startServer() {
       thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
       publishedAt: new Date().toISOString(),
       duration: "12:45",
-      views: Math.floor(Math.random() * 5000 + 500),
-      likes: Math.floor(Math.random() * 400 + 50),
-      commentsCount: Math.floor(Math.random() * 50 + 5),
+      views: randomInt(500, 5500),
+      likes: randomInt(50, 450),
+      commentsCount: randomInt(5, 55),
       status: "ingested",
       postgresRecordId: randomPgId,
       tags: ["YouTube", isPlaylist ? "Playlist" : "Video", "API"],
@@ -194,7 +196,7 @@ async function startServer() {
       });
     }
 
-    const playlistId = `pl_${Math.floor(Math.random() * 8999 + 1000)}`;
+    const playlistId = `pl_${randomInt(1000, 10000)}`;
     const items = [
       {
         id: `vid-${Date.now()}-1`,
@@ -252,14 +254,14 @@ async function startServer() {
    */
   app.get("/api/youtube/content", (req, res) => {
     let items = youtubeContents;
-    const channelQuery = (req.query.channel as string || "").toLowerCase();
+    const channelQuery = (typeof req.query.channel === "string" ? req.query.channel : "").toLowerCase();
     if (channelQuery) {
       items = items.filter(i => (i.sourceName || "").toLowerCase().includes(channelQuery));
     }
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
-    const step = String(req.query.step || '');
-    const search = String(req.query.search || '').toLowerCase();
+    const step = typeof req.query.step === "string" ? req.query.step : "";
+    const search = (typeof req.query.search === "string" ? req.query.search : "").toLowerCase();
     if (step) items = items.filter(item => item.status === step);
     if (search) items = items.filter(item => item.title.toLowerCase().includes(search));
     const total = items.length;
@@ -304,15 +306,15 @@ async function startServer() {
       mockDiarizations.unshift(task);
     }
     if (!task) return undefined;
-    const active = ['STARTED', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'DIARIZED'];
+    const active = new Set(['STARTED', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'DIARIZED']);
     for (const item of mockDiarizations) {
       item.queue_priority = 0;
-      if (active.includes(item.step)) {
+      if (active.has(item.step)) {
         item.step = 'PENDING'; item.progress_percent = null;
       }
     }
     for (const item of youtubeContents) {
-      if (active.includes(item.diarization_status || '')) item.diarization_status = 'PENDING';
+      if (active.has(item.diarization_status || '')) item.diarization_status = 'PENDING';
     }
     task.step = 'PENDING'; task.queue_priority = 1; task.progress_percent = null; task.result_json = null;
     if (video) { video.diarization_status = 'PENDING'; video.is_diarized = false; }
@@ -326,10 +328,10 @@ async function startServer() {
   });
 
   app.get(["/api/diarization/list", "/api/diarization"], (req, res) => {
-    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 20));
-    const stepFilter = (req.query.step as string || "").toUpperCase();
-    const searchQuery = (req.query.search as string || "").toLowerCase();
+    const page = Math.max(1, Number.parseInt(typeof req.query.page === "string" ? req.query.page : "", 10) || 1);
+    const limit = Math.max(1, Math.min(100, Number.parseInt(typeof req.query.limit === "string" ? req.query.limit : "", 10) || 20));
+    const stepFilter = (typeof req.query.step === "string" ? req.query.step : "").toUpperCase();
+    const searchQuery = (typeof req.query.search === "string" ? req.query.search : "").toLowerCase();
 
     let items = [...mockDiarizations];
 
@@ -356,8 +358,8 @@ async function startServer() {
       if (stepFilter === "PENDING") {
         items = items.filter(d => (d.step || "").toUpperCase() === "PENDING");
       } else if (stepFilter === "PROCESSING") {
-        const processingSteps = ["STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION", "DIARIZED", "PROCESSING"];
-        items = items.filter(d => processingSteps.includes((d.step || "").toUpperCase()));
+        const processingSteps = new Set(["STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION", "DIARIZED", "PROCESSING"]);
+        items = items.filter(d => processingSteps.has((d.step || "").toUpperCase()));
       } else if (stepFilter === "ERROR") {
         items = items.filter(d => (d.step || "").toUpperCase() === "ERROR");
       } else if (stepFilter === "COMPLETED") {
@@ -518,5 +520,5 @@ async function startServer() {
   });
 }
 
-startServer();
+await startServer();
 

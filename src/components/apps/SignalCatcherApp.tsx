@@ -8,18 +8,18 @@ import {
   Activity,
   AlertCircle,
   CheckCircle2,
-  ChevronLeft,
+
   ChevronRight,
   Clock,
-  Database,
+
   ExternalLink,
   ListMusic,
   ListVideo,
   Loader2,
   Mic,
   MicOff,
-  PauseCircle,
-  Play,
+
+
   PlayCircle,
   Plus,
   Radio,
@@ -31,30 +31,35 @@ import {
   UploadCloud,
   Video,
   X,
-  Youtube
+
 } from 'lucide-react';
 
-import {CapturedVideo, ContentSource, LanguageMode, ScheduledJob} from '../../types';
+import {CapturedVideo, ContentSource, LanguageMode} from '../../types';
 import {getTranslation} from '../../locales';
 import {TrackingTelemetry} from './TrackingTelemetry';
 
 
+function parseTimeString(duration: string): number | string {
+  if (!duration.includes(':')) {
+    const parsed = Number.parseInt(duration, 10);
+    return Number.isNaN(parsed) ? duration : parsed;
+  }
+  const parts = duration.split(':');
+  if (parts.length === 2) {
+    return `00:${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+  }
+  if (parts.length === 3) {
+    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+  }
+  return duration;
+}
+
 const formatDuration = (duration: number | string | undefined | null): string => {
   if (duration == null) return '00:00:00';
   if (typeof duration === 'string') {
-    if (duration.includes(':')) {
-      const parts = duration.split(':');
-      if (parts.length === 2) {
-        return `00:${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
-      }
-      if (parts.length === 3) {
-        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
-      }
-      return duration;
-    }
-    const parsed = parseInt(duration, 10);
-    if (isNaN(parsed)) return duration;
-    duration = parsed;
+    const res = parseTimeString(duration);
+    if (typeof res === 'string') return res;
+    duration = res;
   }
 
   const h = Math.floor(duration / 3600);
@@ -63,6 +68,58 @@ const formatDuration = (duration: number | string | undefined | null): string =>
 
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
+
+async function extractResponseError(response: Response): Promise<string> {
+  try {
+    const errorData = await response.json();
+    if (errorData?.detail) return errorData.detail;
+  } catch {
+    // Ignore json parse error
+  }
+  return `HTTP error! status: ${response.status}`;
+}
+
+function updateDiarizationVideoStatus(
+  setCaptures: React.Dispatch<React.SetStateAction<CapturedVideo[]>>,
+  setSelectedVideo: React.Dispatch<React.SetStateAction<CapturedVideo | null>>,
+  videoId: string,
+  status: string
+): void {
+  setCaptures((prev) =>
+    prev.map((c) => (c.id === videoId ? { ...c, isDiarized: false, diarizationStatus: status } : c))
+  );
+  setSelectedVideo((prev) =>
+    prev?.id === videoId ? { ...prev, isDiarized: false, diarizationStatus: status } : prev
+  );
+}
+
+const YoutubeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    width="24"
+    height="24"
+    stroke="currentColor"
+    strokeWidth="2"
+    fill="none"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    {...props}
+  >
+    <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
+    <path d="m10 15 5-3-5-3z" />
+  </svg>
+);
+
+const YOUTUBE_ID_REGEX = /(?:v=|\/)([\w-]{11})(?:\?|&|$)/;
+
+function extractExternalId(videoUrl?: string, fallbackId?: string): string {
+  if (videoUrl) {
+    const match = YOUTUBE_ID_REGEX.exec(videoUrl);
+    if (match) return match[1];
+  }
+  return fallbackId || '';
+}
 
 
 
@@ -73,9 +130,9 @@ interface SignalCatcherAppProps {
   savedChannels?: ContentSource[];
   captures: CapturedVideo[];
   setCaptures: React.Dispatch<React.SetStateAction<CapturedVideo[]>>;
-  jobs: ScheduledJob[];
-  setJobs: React.Dispatch<React.SetStateAction<ScheduledJob[]>>;
-  onTriggerJob: (jobId: string) => void;
+
+
+
   onAddLog: (sourceApp: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
   hasMoreVideos?: boolean;
   isLoadingMoreVideos?: boolean;
@@ -122,6 +179,300 @@ const getStatusColor = (status: string) => {
   }
 };
 
+interface DiarizationBadgeInfo {
+  className: string;
+  icon: React.ReactNode;
+  label: string;
+}
+
+function getDiarizationBadgeInfo(
+  isDiarized: boolean | undefined,
+  diarizationStatus: string | null | undefined,
+  t: (key: any) => string
+): DiarizationBadgeInfo | null {
+  if (!isDiarized && !diarizationStatus) return null;
+
+  if (isDiarized || diarizationStatus === 'COMPLETED') {
+    return {
+      className: 'bg-purple-950/90 text-purple-300 border-purple-500/40',
+      icon: <Mic className="w-3 h-3 text-purple-400" />,
+      label: t('diarized'),
+    };
+  }
+
+  if (diarizationStatus === 'ERROR') {
+    return {
+      className: 'bg-rose-950/90 text-rose-300 border-rose-500/40',
+      icon: <MicOff className="w-3 h-3 text-rose-400" />,
+      label: t('diarizationError'),
+    };
+  }
+
+  return {
+    className: 'bg-amber-950/90 text-amber-300 border-amber-500/40',
+    icon: <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />,
+    label: t('diarizing'),
+  };
+}
+
+interface DiarizationButtonProps {
+  video: CapturedVideo;
+  isHovered: boolean;
+  isCancelling: boolean;
+  onHover: (id: string | null) => void;
+  onClick: (e: React.MouseEvent, video: CapturedVideo) => void;
+  onCancel: (e: React.MouseEvent, video: CapturedVideo) => void;
+  t: (key: any) => string;
+}
+
+type DiarizationBtnState = 'cancelling' | 'showCancel' | 'pending' | 'completed' | 'error' | 'default';
+
+function getDiarizationButtonState(video: CapturedVideo, isHovered: boolean, isCancelling: boolean): DiarizationBtnState {
+  if (isCancelling) return 'cancelling';
+  const isPending = video.diarizationStatus === 'PENDING' || video.diarizationStatus === 'PROCESSING';
+  if (isPending && isHovered) return 'showCancel';
+  if (isPending) return 'pending';
+  if (video.isDiarized || video.diarizationStatus === 'COMPLETED') return 'completed';
+  if (video.diarizationStatus === 'ERROR') return 'error';
+  return 'default';
+}
+
+function getDiarizationButtonConfig(state: DiarizationBtnState, t: (key: any) => string) {
+  switch (state) {
+    case 'cancelling':
+      return {
+        style: "bg-rose-500/10 border-rose-500/30 text-rose-300 cursor-not-allowed opacity-70",
+        title: t('btnCancelDiarization'),
+        text: t('btnCancelDiarization'),
+        icon: <Loader2 className="w-3.5 h-3.5 text-rose-400 animate-spin" />,
+        disabled: true,
+      };
+    case 'showCancel':
+      return {
+        style: "bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/40 text-rose-300 hover:text-rose-200",
+        title: t('btnCancelDiarization'),
+        text: t('btnCancelDiarization'),
+        icon: <X className="w-3.5 h-3.5 text-rose-400" />,
+        disabled: false,
+      };
+    case 'pending':
+      return {
+        style: "bg-amber-500/10 border-amber-500/30 text-amber-300 cursor-default opacity-90",
+        title: t('diarizing'),
+        text: t('diarizing'),
+        icon: <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />,
+        disabled: false,
+      };
+    case 'completed':
+      return {
+        style: "bg-purple-500/10 border-purple-500/30 text-purple-400/80 cursor-not-allowed opacity-75",
+        title: t('diarized'),
+        text: t('diarized'),
+        icon: <Mic className="w-3.5 h-3.5 text-purple-400/70" />,
+        disabled: true,
+      };
+    case 'error':
+      return {
+        style: "bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-300 hover:text-rose-200",
+        title: t('btnRediarize'),
+        text: t('diarizationError'),
+        icon: <MicOff className="w-3.5 h-3.5 text-rose-400" />,
+        disabled: false,
+      };
+    default:
+      return {
+        style: "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 hover:text-purple-200",
+        title: t('btnStartDiarization'),
+        text: t('btnStartDiarization'),
+        icon: <Mic className="w-3.5 h-3.5 text-purple-400" />,
+        disabled: false,
+      };
+  }
+}
+
+const DiarizationButton: React.FC<DiarizationButtonProps> = ({
+  video,
+  isHovered,
+  isCancelling,
+  onHover,
+  onClick,
+  onCancel,
+  t,
+}) => {
+  const state = getDiarizationButtonState(video, isHovered, isCancelling);
+  const cfg = getDiarizationButtonConfig(state, t);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (state === 'showCancel') {
+      void onCancel(e, video);
+    } else {
+      onClick(e, video);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={cfg.disabled}
+      onMouseEnter={() => onHover(video.id)}
+      onMouseLeave={() => onHover(null)}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-xs border transition-all shadow-sm ${cfg.style}`}
+      title={cfg.title}
+    >
+      {cfg.icon}
+      <span>{cfg.text}</span>
+    </button>
+  );
+};
+
+interface VideoCardProps {
+  video: CapturedVideo;
+  channelDisplayName: string;
+  isRetrying: boolean;
+  isDeleting: boolean;
+  isCancellingDiar: boolean;
+  isHoveredDiar: boolean;
+  onSelect: (video: CapturedVideo) => void;
+  onRetry: (e: React.MouseEvent, video: CapturedVideo) => void;
+  onDeleteRequest: (video: CapturedVideo) => void;
+  onDiarizeClick: (e: React.MouseEvent, video: CapturedVideo) => void;
+  onCancelDiarize: (e: React.MouseEvent, video: CapturedVideo) => void;
+  onHoverDiar: (id: string | null) => void;
+  t: (key: any) => string;
+}
+
+const VideoCard: React.FC<VideoCardProps> = ({
+  video,
+  channelDisplayName,
+  isRetrying,
+  isDeleting,
+  isCancellingDiar,
+  isHoveredDiar,
+  onSelect,
+  onRetry,
+  onDeleteRequest,
+  onDiarizeClick,
+  onCancelDiarize,
+  onHoverDiar,
+  t,
+}) => {
+  const diarBadge = getDiarizationBadgeInfo(video.isDiarized, video.diarizationStatus, t);
+
+  return (
+    <div className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-lg hover:-translate-y-1 relative">
+      <button
+        type="button"
+        onClick={() => onSelect(video)}
+        className="flex flex-col flex-1 text-left w-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-lg"
+      >
+        {/* Card Header: Channel Info */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-semibold text-zinc-200">{channelDisplayName}</span>
+        </div>
+
+        {/* Thumbnail & Badges */}
+        <div className="relative mb-3.5 rounded-xl overflow-hidden aspect-video bg-zinc-950 border border-zinc-800">
+          {video.thumbnail ? (
+            <img
+              src={video.thumbnail}
+              alt={video.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-zinc-900 group-hover:bg-zinc-800 transition-colors duration-300">
+              <YoutubeIcon className="w-12 h-12 text-zinc-700 opacity-50 group-hover:text-red-600 group-hover:opacity-100 transition-all duration-300" />
+            </div>
+          )}
+
+          {/* Duration Badge */}
+          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700">
+            {formatDuration(video.duration)}
+          </span>
+
+          {/* Diarization Badge */}
+          {diarBadge && (
+            <div className={`absolute bottom-2 left-2 flex items-center gap-1 text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm ${diarBadge.className}`}>
+              {diarBadge.icon}
+              <span>{diarBadge.label}</span>
+            </div>
+          )}
+
+          {/* Status Badge */}
+          {video.status && (
+            <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${video.deletionRequested ? 'text-amber-400' : getStatusColor(video.status)} text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
+              <span>{video.deletionRequested ? t('deletionPending') : video.status.replaceAll('_', ' ')}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Title */}
+        <h4 className="text-sm font-semibold text-zinc-100 group-hover:text-indigo-400 transition-colors line-clamp-2 leading-snug mb-2">
+          {video.title}
+        </h4>
+
+        {/* Summary Snippet */}
+        {video.summary && (
+          <p className="text-xs text-zinc-400 line-clamp-2 mb-3 leading-relaxed">
+            {video.summary}
+          </p>
+        )}
+      </button>
+
+      {/* Footer / Actions Bar */}
+      <div className="pt-3 border-t border-zinc-800/80 mt-auto flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          {video.videoUrl && (
+            <a
+              href={video.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              title={t('openOnYouTube')}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+          {video.status === 'ERROR' && (
+            <button
+              type="button"
+              onClick={(e) => onRetry(e, video)}
+              disabled={isRetrying}
+              className="p-1.5 rounded-lg hover:bg-zinc-800 text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
+              title={t('retryProcessing')}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteRequest(video);
+            }}
+            disabled={isDeleting || video.deletionRequested}
+            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-red-400 transition-colors disabled:opacity-50"
+            title={t('deleteVideo')}
+          >
+            <Trash className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <DiarizationButton
+          video={video}
+          isHovered={isHoveredDiar}
+          isCancelling={isCancellingDiar}
+          onHover={onHoverDiar}
+          onClick={onDiarizeClick}
+          onCancel={onCancelDiarize}
+          t={t}
+        />
+      </div>
+    </div>
+  );
+};
+
 export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   language = 'en',
   sources,
@@ -129,9 +480,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   savedChannels = [],
   captures,
   setCaptures,
-  jobs,
-  setJobs,
-  onTriggerJob,
+
+
+
   onAddLog,
   hasMoreVideos = false,
   isLoadingMoreVideos = false,
@@ -195,7 +546,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   ), [channelOptions]);
 
   // New source form state
-  const [newSourceName, setNewSourceName] = useState('');
+
   const [newSourceUrl, setNewSourceUrl] = useState('');
 
   // Filtered captures
@@ -223,11 +574,11 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         method: 'POST',
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      await response.json();
 
       onAddLog('SignalCatcher', 'success', t('notifGlobalRetrySuccess'));
-      if (onRefresh) onRefresh();
-      if (onOpenNotifications) onOpenNotifications();
+      onRefresh?.();
+      onOpenNotifications?.();
     } catch (err) {
       onAddLog('SignalCatcher', 'error', `${t('notifGlobalRetryError')} ${err}`);
     } finally {
@@ -238,11 +589,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const handleIndividualRetry = async (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
 
-    let externalId = video.postgresRecordId || video.id;
-    if (video.videoUrl) {
-      const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
-      if (match) externalId = match[1];
-    }
+    const externalId = extractExternalId(video.videoUrl, video.postgresRecordId || video.id);
 
     setRetryingVideoIds(prev => new Set(prev).add(video.id));
     onAddLog('SignalCatcher', 'info', `${t('notifIndivRetryStart')} ${externalId}...`);
@@ -252,7 +599,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         method: 'POST',
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      await response.json();
 
       onAddLog('SignalCatcher', 'success', t('notifIndivRetrySuccess'));
 
@@ -276,11 +623,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const handleIndividualDelete = async (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
 
-    let externalId = video.postgresRecordId || video.id;
-    if (video.videoUrl) {
-      const match = video.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
-      if (match) externalId = match[1];
-    }
+    const externalId = extractExternalId(video.videoUrl, video.postgresRecordId || video.id);
 
     setDeletingVideoIds(prev => new Set(prev).add(video.id));
     onAddLog('SignalCatcher', 'info', `Excluindo vídeo e arquivo ${externalId}...`);
@@ -290,7 +633,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         method: 'DELETE',
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      await response.json();
 
       onAddLog('SignalCatcher', 'info', t('deletionQueued'));
 
@@ -321,11 +664,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const confirmDiarization = async () => {
     if (!diarizationModalVideo || isDiarizing) return;
 
-    let externalId = diarizationModalVideo.postgresRecordId || diarizationModalVideo.id;
-    if (diarizationModalVideo.videoUrl) {
-      const match = diarizationModalVideo.videoUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/);
-      if (match) externalId = match[1];
-    }
+    const externalId = extractExternalId(diarizationModalVideo.videoUrl, diarizationModalVideo.postgresRecordId || diarizationModalVideo.id);
 
     setIsDiarizing(true);
 
@@ -343,18 +682,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       const data = await response.json();
 
       onAddLog('SignalCatcher', 'success', `Diarização iniciada com sucesso (Task ID: ${data.task_id})`);
-      setCaptures((prevCaptures) =>
-        prevCaptures.map((c) =>
-          c.id === diarizationModalVideo.id
-            ? { ...c, isDiarized: false, diarizationStatus: 'PENDING' }
-            : c
-        )
-      );
-      if (selectedVideo && selectedVideo.id === diarizationModalVideo.id) {
-        setSelectedVideo((prev) =>
-          prev ? { ...prev, isDiarized: false, diarizationStatus: 'PENDING' } : null
-        );
-      }
+      updateDiarizationVideoStatus(setCaptures, setSelectedVideo, diarizationModalVideo.id, 'PENDING');
       setDiarizationModalVideo(null);
 
 
@@ -368,11 +696,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   const handleCancelDiarization = async (e: React.MouseEvent, video: CapturedVideo) => {
     e.stopPropagation();
 
-    let externalId = video.postgresRecordId || video.id;
-    if (video.videoUrl) {
-      const match = video.videoUrl.match(/(?:v=|\/)([\\w-]{11})(?:\\?|&|$)/);
-      if (match) externalId = match[1];
-    }
+    const externalId = extractExternalId(video.videoUrl, video.postgresRecordId || video.id);
 
     setCancellingDiarIds(prev => new Set(prev).add(video.id));
     onAddLog('SignalCatcher', 'info', `Cancelando diarização para o vídeo ${externalId}...`);
@@ -387,18 +711,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       }
 
       onAddLog('SignalCatcher', 'success', t('notifCancelDiarizationSuccess'));
-      setCaptures(prev =>
-        prev.map(c =>
-          c.id === video.id
-            ? { ...c, isDiarized: false, diarizationStatus: 'CANCELLED' }
-            : c
-        )
-      );
-      if (selectedVideo && selectedVideo.id === video.id) {
-        setSelectedVideo(prev =>
-          prev ? { ...prev, isDiarized: false, diarizationStatus: 'CANCELLED' } : null
-        );
-      }
+      updateDiarizationVideoStatus(setCaptures, setSelectedVideo, video.id, 'CANCELLED');
     } catch (err: any) {
       onAddLog('SignalCatcher', 'error', `${t('notifCancelDiarizationError')} ${err.message || err}`);
     } finally {
@@ -435,9 +748,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       const resData = await response.json();
       onAddLog('SignalCatcher', 'success', `${t('notifSuccessSource')} ${resData.id || 'OK'})`);
 
-      if (onOpenNotifications) {
-        onOpenNotifications();
-      }
+      onOpenNotifications?.();
 
       setNewSourceUrl('');
       setIsIngestionModalOpen(false);
@@ -464,37 +775,22 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       });
 
       if (!response.ok) {
-        let errorDetail = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          if (errorData && errorData.detail) {
-            errorDetail = errorData.detail;
-          }
-        } catch (e) {
-          // Ignore json parse error
-        }
-        throw new Error(errorDetail);
+        throw new Error(await extractResponseError(response));
       }
 
       const resData = await response.json();
 
       onAddLog('SignalCatcher', 'success', `${t('notifSuccessVideo')} ${resData.message || 'OK'})`);
 
-      if (onOpenNotifications) {
-        onOpenNotifications();
-      }
+      onOpenNotifications?.();
 
-      if (onRefresh) {
-        onRefresh();
-      }
+      onRefresh?.();
 
       setManualUrl('');
       setIsIngestionModalOpen(false);
     } catch (err) {
       onAddLog('SignalCatcher', 'error', `${t('notifErrorVideo')} ${err instanceof Error ? err.message : String(err)}`);
-      if (onOpenNotifications) {
-        onOpenNotifications();
-      }
+      onOpenNotifications?.();
     } finally {
       setIsProcessingManual(false);
     }
@@ -526,13 +822,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
       onAddLog('SignalCatcher', 'success', `${t('notifSuccessPlaylist')} (${resData.message || 'OK'})`);
 
-      if (onOpenNotifications) {
-        onOpenNotifications();
-      }
+      onOpenNotifications?.();
 
-      if (onRefresh) {
-        onRefresh();
-      }
+      onRefresh?.();
 
       setManualUrl('');
       setIsIngestionModalOpen(false);
@@ -564,6 +856,80 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
     } catch (err) {
       onAddLog('SignalCatcher', 'error', `Erro ao alternar status do canal: ${err}`);
     }
+  };
+
+  const dateLocale = language === 'pt' ? 'pt-BR' : 'en-US';
+
+  const renderCapturesGrid = () => {
+    if (isLoadingData) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 animate-in fade-in duration-300">
+          <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-4" />
+          <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest animate-pulse">
+            Carregando Dados da API...
+          </p>
+        </div>
+      );
+    }
+    if (captures.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/20 rounded-2xl border border-zinc-800/50 border-dashed">
+          <Search className="w-12 h-12 text-zinc-700 mb-4" />
+          <p className="text-zinc-500 font-mono text-sm">Nenhuma captura encontrada.</p>
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+        {captures.map((video) => (
+          <VideoCard
+            key={video.id}
+            video={video}
+            channelDisplayName={channelMap.get(channelIdentity(video.sourceName)) || video.sourceName}
+            isSelected={selectedVideo?.id === video.id}
+            isRetrying={retryingVideoIds.has(video.id)}
+            isDeleting={deletingVideoIds.has(video.id)}
+            isCancellingDiar={cancellingDiarIds.has(video.id)}
+            isHoveredDiar={hoveredDiarBtnId === video.id}
+            onSelect={setSelectedVideo}
+            onRetry={handleIndividualRetry}
+            onDeleteRequest={setVideoToDelete}
+            onDiarizeClick={handleDiarizationClick}
+            onCancelDiarize={handleCancelDiarization}
+            onHoverDiar={setHoveredDiarBtnId}
+            t={t}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const renderLoadMoreStatus = () => {
+    if (videoLoadError) {
+      return (
+        <>
+          <p role="alert">{t('videosLoadError')}</p>
+          <button onClick={onLoadMoreVideos} className="rounded-lg border border-zinc-700 px-3 py-2 text-indigo-400">{t('videosRetry')}</button>
+        </>
+      );
+    }
+    if (isLoadingMoreVideos) {
+      return (
+        <span className="inline-flex items-center gap-2">
+          <Loader2 className="size-4 animate-spin" />
+          {t('videosLoadingMore')}
+        </span>
+      );
+    }
+    if (hasMoreVideos && !isLoadingData) {
+      return (
+        <button onClick={onLoadMoreVideos} className="rounded-lg border border-zinc-800 px-3 py-2 hover:text-zinc-100">{t('videosLoadMore')}</button>
+      );
+    }
+    if (captures.length > 0 && !isLoadingData) {
+      return <p>{t('videosEnd')} · {captures.length}</p>;
+    }
+    return null;
   };
 
   return (
@@ -611,7 +977,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                 : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <Youtube className="w-3.5 h-3.5 text-red-500" />
+            <YoutubeIcon className="w-3.5 h-3.5 text-red-500" />
             <span>{t('savedChannels')} ({totalSavedCount || savedChannels.length})</span>
           </button>
 
@@ -882,243 +1248,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
 
           {/* Videos Bento Grid */}
-          {isLoadingData ? (
-            <div className="flex flex-col items-center justify-center py-24 animate-in fade-in duration-300">
-              <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-4" />
-              <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest animate-pulse">
-                Carregando Dados da API...
-              </p>
-            </div>
-          ) : captures.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/20 rounded-2xl border border-zinc-800/50 border-dashed">
-              <Search className="w-12 h-12 text-zinc-700 mb-4" />
-              <p className="text-zinc-500 font-mono text-sm">Nenhuma captura encontrada.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-              {captures.map((video) => (
-              <div
-                key={video.id}
-                className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-lg cursor-pointer hover:-translate-y-1 relative"
-                onClick={() => setSelectedVideo(video)}
-              >
-                <div className="flex flex-col flex-1">
-                  {/* Card Header: Channel Info */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-semibold text-zinc-200">{channelMap.get(channelIdentity(video.sourceName)) || video.sourceName}</span>
-                  </div>
-
-                  {/* Thumbnail & Badges */}
-                  <div className="relative mb-3.5 rounded-xl overflow-hidden aspect-video bg-zinc-950 border border-zinc-800">
-                    {video.thumbnail ? (
-                      <img
-                        src={video.thumbnail}
-                        alt={video.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-zinc-900 group-hover:bg-zinc-800 transition-colors duration-300">
-                        <Youtube className="w-12 h-12 text-zinc-700 opacity-50 group-hover:text-red-600 group-hover:opacity-100 transition-all duration-300" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
-
-                    {/* Duration Badge */}
-                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700">
-                      {formatDuration(video.duration)}
-                    </span>
-
-                    {/* Diarization Badge */}
-                    {(video.isDiarized || video.diarizationStatus) && (
-                      <div className={`absolute bottom-2 left-2 flex items-center gap-1 text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm ${
-                        video.isDiarized || video.diarizationStatus === 'COMPLETED'
-                          ? 'bg-purple-950/90 text-purple-300 border-purple-500/40'
-                          : video.diarizationStatus === 'ERROR'
-                          ? 'bg-rose-950/90 text-rose-300 border-rose-500/40'
-                          : 'bg-amber-950/90 text-amber-300 border-amber-500/40'
-                      }`}>
-                        {video.isDiarized || video.diarizationStatus === 'COMPLETED' ? (
-                          <>
-                            <Mic className="w-3 h-3 text-purple-400" />
-                            <span>{t('diarized')}</span>
-                          </>
-                        ) : video.diarizationStatus === 'ERROR' ? (
-                          <>
-                            <MicOff className="w-3 h-3 text-rose-400" />
-                            <span>{t('diarizationError')}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
-                            <span>{t('diarizing')}</span>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Step Badge */}
-
-                    {video.status && (
-                      <div className={`absolute top-2 left-2 flex items-center gap-1 bg-zinc-900/90 ${video.deletionRequested ? 'text-amber-400' : getStatusColor(video.status)} text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-700 backdrop-blur-md`}>
-                        <span>{video.deletionRequested ? t('deletionPending') : video.status.replace(/_/g, ' ')}</span>
-                      </div>
-                    )}
-
-                    {/* PostgreSQL Record ID Badge */}
-                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-indigo-500/10 text-indigo-300 text-xs font-mono px-2 py-0.5 rounded-full border border-indigo-500/20 backdrop-blur-md">
-                      <Database className="w-3 h-3 text-indigo-400" />
-                      <span>{video.postgresRecordId}</span>
-                    </div>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="font-bold text-sm text-zinc-100 group-hover:text-indigo-300 transition-colors duration-300 line-clamp-2 mb-2 h-[40px]">
-                    {video.title}
-                  </h3>
-
-                  <div className="mt-auto pt-2 flex flex-col gap-3">
-                    {/* Description Box - Fixed height for perfect alignment */}
-                    <div className="h-[52px] w-full">
-                      {video.description ? (
-                        <p className="text-xs text-zinc-400 line-clamp-2 font-sans bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/60 h-full">
-                          {video.description}
-                        </p>
-                      ) : (
-                        <div className="h-full bg-zinc-950/30 rounded-xl border border-zinc-800/30 border-dashed flex items-center justify-center">
-                          <span className="text-xs text-zinc-600 font-mono">{t('noDescription')}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Tags */}
-                    <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 h-[22px]">
-                      {video.tags.slice(0, 3).map((tItem) => (
-                        <span
-                          key={tItem}
-                          className="text-xs shrink truncate max-w-[90px] font-mono px-2.5 py-0.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800"
-                          title={tItem}
-                        >
-                          #{tItem}
-                        </span>
-                      ))}
-                      {video.tags.length > 3 && (
-                        <span
-                          className="text-xs shrink-0 font-mono px-2 py-0.5 rounded-full bg-zinc-800/50 text-zinc-400 border border-zinc-700/50"
-                          title={video.tags.slice(3).join(', ')}
-                        >
-                          +{video.tags.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Footer: Buttons */}
-                <div className="pt-3 mt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 overflow-hidden">
-                    {video.status === 'ERROR' && !video.deletionRequested && (
-                      <button
-                        onClick={(e) => handleIndividualRetry(e, video)}
-                        disabled={retryingVideoIds.has(video.id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-xs transition-all disabled:opacity-50 shadow-sm bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 hover:shadow-rose-500/10`}
-                        title={t('titleReprocessVideo')}
-                      >
-                        <RefreshCw className={`w-3 h-3 ${retryingVideoIds.has(video.id) ? 'animate-spin' : ''}`} />
-                        <span className="hidden xl:inline">{t('btnReprocess')}</span>
-                      </button>
-                    )}
-
-                    {video.status === 'COMPLETED' && !video.deletionRequested && (() => {
-                      const isPending = ['PENDING', 'STARTED', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION', 'IN_PROGRESS', 'PROCESSING'].includes(video.diarizationStatus || '') || (isDiarizing && diarizationModalVideo?.id === video.id);
-                      const isCompleted = video.isDiarized || video.diarizationStatus === 'COMPLETED';
-                      const isError = video.diarizationStatus === 'ERROR';
-                      const isCancelled = video.diarizationStatus === 'CANCELLED';
-                      const isCancelling = cancellingDiarIds.has(video.id);
-                      const isHovered = hoveredDiarBtnId === video.id;
-
-                      // When pending and hovered → show cancel button
-                      const showCancel = isPending && isHovered;
-
-                      let btnStyle = "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 hover:text-purple-200";
-                      let btnTitle = t('btnStartDiarization');
-                      let btnText = t('btnStartDiarization');
-                      let btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400" />;
-                      let btnDisabled = false;
-                      let btnOnClick = (e: React.MouseEvent) => handleDiarizationClick(e, video);
-
-                      if (isCancelling) {
-                        btnStyle = "bg-rose-500/10 border-rose-500/30 text-rose-300 cursor-not-allowed opacity-70";
-                        btnTitle = t('btnCancelDiarization');
-                        btnText = t('btnCancelDiarization');
-                        btnIcon = <Loader2 className="w-3.5 h-3.5 text-rose-400 animate-spin" />;
-                        btnDisabled = true;
-                      } else if (showCancel) {
-                        btnStyle = "bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/40 text-rose-300 hover:text-rose-200";
-                        btnTitle = t('btnCancelDiarization');
-                        btnText = t('btnCancelDiarization');
-                        btnIcon = <X className="w-3.5 h-3.5 text-rose-400" />;
-                        btnOnClick = (e: React.MouseEvent) => handleCancelDiarization(e, video);
-                      } else if (isPending) {
-                        btnStyle = "bg-amber-500/10 border-amber-500/30 text-amber-300 cursor-default opacity-90";
-                        btnTitle = t('diarizing');
-                        btnText = t('diarizing');
-                        btnIcon = <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />;
-                      } else if (isCompleted) {
-                        btnStyle = "bg-purple-500/10 border-purple-500/30 text-purple-400/80 cursor-not-allowed opacity-75";
-                        btnTitle = t('diarized');
-                        btnText = t('diarized');
-                        btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400/70" />;
-                        btnDisabled = true;
-                      } else if (isError) {
-                        btnStyle = "bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-300 hover:text-rose-200";
-                        btnTitle = t('btnRediarize');
-                        btnText = t('diarizationError');
-                        btnIcon = <MicOff className="w-3.5 h-3.5 text-rose-400" />;
-                      } else if (isCancelled) {
-                        btnStyle = "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 hover:text-purple-200";
-                        btnTitle = t('btnStartDiarization');
-                        btnText = t('btnStartDiarization');
-                        btnIcon = <Mic className="w-3.5 h-3.5 text-purple-400" />;
-                      }
-
-                      return (
-                        <button
-                          onClick={btnOnClick}
-                          disabled={btnDisabled}
-                          onMouseEnter={() => setHoveredDiarBtnId(video.id)}
-                          onMouseLeave={() => setHoveredDiarBtnId(null)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-medium text-xs border transition-all shadow-sm ${btnStyle}`}
-                          title={btnTitle}
-                        >
-                          {btnIcon}
-                          <span>{btnText}</span>
-                        </button>
-                      );
-                    })()}
-                  </div>
-                  <a
-                    href={video.videoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-sm hover:scale-[1.02] shrink-0"
-                  >
-                    <span>{t('openVideo')}</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-          )}
+          {renderCapturesGrid()}
 
           <div ref={loadMoreSentinel} className="flex flex-col items-center justify-center gap-2 py-5 text-xs text-zinc-400" aria-live="polite">
-            {videoLoadError ? <>
-              <p role="alert">{t('videosLoadError')}</p>
-              <button onClick={onLoadMoreVideos} className="rounded-lg border border-zinc-700 px-3 py-2 text-indigo-400">{t('videosRetry')}</button>
-            </> : isLoadingMoreVideos ? <span className="inline-flex items-center gap-2"><Loader2 className="size-4 animate-spin" />{t('videosLoadingMore')}</span> : hasMoreVideos && !isLoadingData ?
-              <button onClick={onLoadMoreVideos} className="rounded-lg border border-zinc-800 px-3 py-2 hover:text-zinc-100">{t('videosLoadMore')}</button> : captures.length > 0 && !isLoadingData ?
-              <p>{t('videosEnd')} · {captures.length}</p> : null}
+            {renderLoadMoreStatus()}
           </div>
         </div>
       )}
@@ -1137,14 +1270,18 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
       {/* INGESTION & SOURCE CREATION MODAL */}
       {isIngestionModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={() => setIsIngestionModalOpen(false)}
+        <dialog
+          open
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 border-0 m-0 max-w-none max-h-none w-full h-full"
         >
-          <div
-            className="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <button
+            type="button"
+            aria-label={t('cancel') || 'Fechar'}
+            className="fixed inset-0 bg-transparent border-0 cursor-default"
+            onClick={() => setIsIngestionModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/60">
               <div className="flex items-center gap-2.5">
@@ -1383,16 +1520,23 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {/* Video Details Modal */}
       {selectedVideo && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedVideo(null)}>
-          <div
-            className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <dialog
+          open
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm border-0 m-0 max-w-none max-h-none w-full h-full"
+        >
+          <button
+            type="button"
+            aria-label={t('cancel') || 'Fechar'}
+            className="fixed inset-0 bg-transparent border-0 cursor-default"
+            onClick={() => setSelectedVideo(null)}
+          />
+          <div className="relative z-10 bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/30">
               <div className="flex items-center gap-3">
@@ -1415,7 +1559,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     <img src={selectedVideo.thumbnail} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-                      <Youtube className="w-16 h-16 text-zinc-700 opacity-50" />
+                      <YoutubeIcon className="w-16 h-16 text-zinc-700 opacity-50" />
                     </div>
                   )}
                   <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700/50">{formatDuration(selectedVideo.duration)}</span>
@@ -1430,34 +1574,18 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                       {selectedVideo.sourceName}
                     </span>
                     <span className={`px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 ${selectedVideo.deletionRequested ? 'text-amber-400' : getStatusColor(selectedVideo.status)} text-xs uppercase font-mono font-bold tracking-wider shadow-sm`}>
-                      {selectedVideo.deletionRequested ? t('deletionPending') : selectedVideo.status.replace(/_/g, ' ')}
+                      {selectedVideo.deletionRequested ? t('deletionPending') : selectedVideo.status.replaceAll('_', ' ')}
                     </span>
-                    {(selectedVideo.isDiarized || selectedVideo.diarizationStatus) && (
-                      <span className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${
-                        selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED'
-                          ? 'bg-purple-950/90 border-purple-500/40 text-purple-300'
-                          : selectedVideo.diarizationStatus === 'ERROR'
-                          ? 'bg-rose-950/90 border-rose-500/40 text-rose-300'
-                          : 'bg-amber-950/90 border-amber-500/40 text-amber-300'
-                      }`}>
-                        {selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED' ? (
-                          <>
-                            <Mic className="w-3 h-3 text-purple-400" />
-                            <span>{t('diarized')}</span>
-                          </>
-                        ) : selectedVideo.diarizationStatus === 'ERROR' ? (
-                          <>
-                            <MicOff className="w-3 h-3 text-rose-400" />
-                            <span>{t('diarizationError')}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
-                            <span>{t('diarizing')}</span>
-                          </>
-                        )}
+                    {(() => {
+                    const modalDiarBadge = getDiarizationBadgeInfo(selectedVideo.isDiarized, selectedVideo.diarizationStatus, t);
+                    if (!modalDiarBadge) return null;
+                    return (
+                      <span className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${modalDiarBadge.className}`}>
+                        {modalDiarBadge.icon}
+                        <span>{modalDiarBadge.label}</span>
                       </span>
-                    )}
+                    );
+                  })()}
                     {selectedVideo.publishedAt && (
                       <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5 ml-2 bg-zinc-900/50 px-2 py-1 rounded-md border border-zinc-800/50">
                         <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
@@ -1502,7 +1630,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
                     {t('createdAt')}
                   </span>
                   <span className="text-sm text-zinc-300 font-mono ml-3">
-                    {selectedVideo.createdAt ? new Date(selectedVideo.createdAt).toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US') : '-'}
+                    {selectedVideo.createdAt ? new Date(selectedVideo.createdAt).toLocaleString(dateLocale) : '-'}
                   </span>
                 </div>
               </div>
@@ -1554,13 +1682,23 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {/* Delete Confirmation Modal */}
       {videoToDelete && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setVideoToDelete(null)}>
-          <div className="bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <dialog
+          open
+          aria-modal="true"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 border-0 m-0 max-w-none max-h-none w-full h-full"
+        >
+          <button
+            type="button"
+            aria-label={t('btnCancelDelete')}
+            className="fixed inset-0 bg-transparent border-0 cursor-default"
+            onClick={() => setVideoToDelete(null)}
+          />
+          <div className="relative z-10 bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
               <h3 className="text-zinc-100 font-bold flex items-center gap-2">
                 <Trash className="w-5 h-5 text-red-400" />
@@ -1608,13 +1746,23 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {/* Diarization Config Modal */}
       {diarizationModalVideo && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDiarizationModalVideo(null)}>
-          <div className="bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <dialog
+          open
+          aria-modal="true"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 border-0 m-0 max-w-none max-h-none w-full h-full"
+        >
+          <button
+            type="button"
+            aria-label={t('cancel') || 'Fechar'}
+            className="fixed inset-0 bg-transparent border-0 cursor-default"
+            onClick={() => setDiarizationModalVideo(null)}
+          />
+          <div className="relative z-10 bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
               <h3 className="text-zinc-100 font-bold flex items-center gap-2">
                 <ListMusic className="w-5 h-5 text-purple-400" />
@@ -1680,7 +1828,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   );

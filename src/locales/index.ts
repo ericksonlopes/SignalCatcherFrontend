@@ -2,12 +2,12 @@ import { pt, TranslationKeys } from './pt';
 import { en } from './en';
 import { LanguageMode } from '../types';
 
-export const translations = {
+const translations = {
   en,
   pt,
 };
 
-export function getTranslation(lang: LanguageMode | string = 'en') {
+export function getTranslation(lang: string = 'en') {
   const selectedLang: LanguageMode = lang === 'pt' ? 'pt' : 'en';
   const currentLocale = translations[selectedLang] || translations.en;
 

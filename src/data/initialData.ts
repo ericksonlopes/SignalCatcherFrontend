@@ -1,18 +1,4 @@
-import { ContentSource, CapturedVideo, ScheduledJob, SmartDevice, FollowerStats, CreatorMetric, SystemLog, ApiEndpoint } from '../types';
-
-export const INITIAL_SOURCES: ContentSource[] = [];
-
-export const INITIAL_CAPTURES: CapturedVideo[] = [];
-
-export const INITIAL_JOBS: ScheduledJob[] = [];
-
-export const INITIAL_DEVICES: SmartDevice[] = [];
-
-export const INITIAL_FOLLOWER_HISTORY: FollowerStats[] = [];
-
-export const INITIAL_CREATORS: CreatorMetric[] = [];
-
-export const INITIAL_LOGS: SystemLog[] = [];
+import { ApiEndpoint } from '../types';
 
 export const FASTAPI_ENDPOINTS: ApiEndpoint[] = [
   {
@@ -51,4 +37,3 @@ export const FASTAPI_ENDPOINTS: ApiEndpoint[] = [
     description: 'Fetch paginated diarization tasks'
   }
 ];
-
