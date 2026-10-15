@@ -5,7 +5,8 @@ import {
   Radio, 
   Mic,
   Play, 
-  Tv
+  Tv,
+  Sparkles
 } from 'lucide-react';
 import { CapturedVideo, ContentSource, ApiEndpoint, AppId } from '../types';
 
@@ -127,6 +128,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               >
                 <Mic className="w-4 h-4 text-indigo-400" />
                 <span className="truncate font-medium">Diarização</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectApp('search', 'Busca Semântica');
+                  onClose();
+                }}
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-800/60 hover:bg-cyan-950/60 border border-slate-700/60 hover:border-cyan-500/50 text-slate-200 transition-all text-left"
+              >
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+                <span className="truncate font-medium">Busca Semântica</span>
               </button>
             </div>
           </div>

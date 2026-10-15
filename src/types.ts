@@ -1,4 +1,4 @@
-export type AppId = 'signalcatcher' | 'diarization';
+export type AppId = 'signalcatcher' | 'diarization' | 'search';
 
 export interface AppTab {
   id: string; // Unique tab instance ID
@@ -8,6 +8,45 @@ export interface AppTab {
   isPinned?: boolean;
   activeSubTab?: string;
   customData?: any;
+}
+
+export interface SemanticSearchResult {
+  chunk_id: string;
+  source_type: string;
+  source_id: string;
+  parent_id?: string | null;
+  title?: string | null;
+  subtitle?: string | null;
+  thumbnail_url?: string | null;
+  text: string;
+  similarity_score: number;
+  metadata?: Record<string, any>;
+  deep_link?: string | null;
+
+  // Audio/Video convenience fields
+  diarization_id?: string;
+  content_id?: string;
+  video_title?: string | null;
+  channel_title?: string | null;
+  speaker?: string | null;
+  start_time?: number | null;
+  end_time?: number | null;
+  formatted_start_time?: string | null;
+  formatted_end_time?: string | null;
+  youtube_url_with_timestamp?: string | null;
+}
+
+export interface VectorizationStatus {
+  diarization_id: string;
+  content_id: string | null;
+  chunks_count: number;
+  indexed: boolean;
+}
+
+export interface VectorizationStats {
+  total_chunks: number;
+  total_indexed_diarizations: number;
+  tei_healthy: boolean;
 }
 
 export type ThemeMode = 'cyberpunk' | 'oled' | 'light';

@@ -1,37 +1,42 @@
-# SignalCatcher frontend
+# SignalCatcher Frontend
 
-The React interface uses the SignalCatcher API and its dedicated worker.
+The React 19 interface for the SignalCatcher ecosystem, built with **Vite 6**, **TailwindCSS v4**, **shadcn/ui**, and **Lucide React**.
+
+## Features & Apps
+
+- **SignalCatcher (Ingestion & Tracking):** Live channel monitoring, automated video capture schedules, error retry controls, and real-time worker telemetry.
+- **Diarization (WhisperX Intelligence):** Speaker-assigned transcripts, word-level audio synchronization, interactive speaker renaming, and TXT transcript exports.
+- **Semantic Search (Vector Intelligence):** Natural language concept search across video transcripts and documents, similarity score filtering, TEI cluster health monitoring, and one-click **Jump to Timestamp** playback buttons.
 
 ## Configuration
 
-Set `VITE_API_BASE_URL` before starting/building the frontend. All API consumers now share
-one base URL; the default is `http://127.0.0.1:8000`.
+Set `VITE_API_BASE_URL` before starting/building the frontend. All API consumers share one base URL; the default is `http://127.0.0.1:8000`.
 
-Configure `ADMIN_API_KEY` on the backend. In the interface, open **Settings** and enter
-that same administrative key. It is kept in `sessionStorage` for the current browser tab
-and sent through `X-API-Key` for administrative writes and metrics. Never put the key in
-`VITE_*` variables, which are embedded into the public browser bundle.
+Configure `ADMIN_API_KEY` on the backend if required. In the interface, open **Settings** and enter that same administrative key. It is kept in `sessionStorage` for the current browser tab and sent through `X-API-Key` for administrative writes and metrics. Never put the key in `VITE_*` variables, which are embedded into the public browser bundle.
 
-The **Tracking** tab combines pipeline stage counts with real worker readiness, pending
-requests, completed job runs, failures, queue age and exhausted processing/deletion retries.
-Manual job controls appear once in the jobs table below the pipeline. Its Run buttons
-queue work in PostgreSQL; they do not imply that a job has completed.
+## Navigation & Workspaces
 
-Ingested videos load in batches of 24 as you scroll. Search and filter changes restart
-the list; background refreshes preserve the loaded window. A Load more button is
-available alongside automatic scrolling, and failed requests can be retried.
+- Use the top navigation tabs or open the Command Palette with `Ctrl+K` to quickly switch between the **Ingestor**, **Diarization**, and **Semantic Search** apps.
+- Tab workspaces persist automatically in `localStorage`.
 
-Deletion is asynchronous: the UI shows **Deletion pending** until the worker confirms
-file removal and persists `DELETED`. Active processing returns a conflict instead of
-allowing an overlapping delete or retry.
+## Development Server
 
-## Development server
+`npm run dev` runs the local Express/Vite server. It includes in-memory mock endpoints for:
+- Video ingestion, channel monitoring, and pipeline telemetry.
+- Diarization retry, start-now, and cancel workflows.
+- Vectorization batch jobs and semantic search queries.
 
-`npm run dev` runs the Express/Vite server. To use its in-memory mock administrative
-endpoints, configure `ADMIN_API_KEY` in the server's environment and set
-`VITE_API_BASE_URL=http://localhost:3000`. Mock readiness/metrics do not measure a real
-PostgreSQL database or worker, and queued mock requests do not process real files.
+To connect the frontend to the real backend in development:
+```sh
+VITE_API_BASE_URL=http://localhost:8000 npm run dev
+```
 
-## Static checks
+## Static Checks & Build
 
-`npm run lint` runs TypeScript with `--noEmit`. It does not execute a test suite.
+```sh
+# TypeScript check
+npm run lint
+
+# Production build (Vite bundle + Express backend)
+npm run build
+```

@@ -323,6 +323,22 @@ export const en: Record<TranslationKeys, string> = {
   toastSuccess: "Success",
   toastError: "Error",
   toastWarning: "Warning",
-  toastInfo: "Information"
+  toastInfo: "Information",
+  // Semantic Search & Vectorization
+  semanticSearchTab: "Semantic Search",
+  semanticSearchPlaceholder: "Search by concepts, speech, or topics in videos...",
+  semanticSearchButton: "Search",
+  semanticSearchSearching: "Searching...",
+  semanticSearchResults: "Semantic Search Results",
+  semanticSearchEmpty: "No results found for your search.",
+  semanticSearchHelp: "Try searching for ideas or questions in natural language.",
+  semanticSearchMinScore: "Minimum similarity",
+  semanticSearchJumpToVideo: "Jump to timestamp",
+  semanticSearchSpeaker: "Speaker",
+  semanticSearchDuration: "Timestamp",
+  vectorizeButton: "Vectorize",
+  vectorizing: "Vectorizing...",
+  vectorizedSuccess: "Successfully vectorized",
+  vectorizedBadge: "Vectorized",
 };
 

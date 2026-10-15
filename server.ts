@@ -496,6 +496,87 @@ async function startServer() {
     });
   });
 
+  // Semantic search mock
+  app.post("/api/search/semantic", (req, res) => {
+    const { query } = req.body || {};
+    const queryStr = (query || "").toLowerCase();
+
+    const mockResults = [
+      {
+        chunk_id: "mock-chunk-1",
+        diarization_id: "mock-diar-1",
+        content_id: "mock-video-1",
+        video_title: "Tech Podcast #42 - Futuro da Inteligência Artificial",
+        channel_title: "Canal Tech IA",
+        thumbnail_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
+        text: `[SPEAKER_00]: Quando pensamos em ${queryStr || "inteligência artificial"}, o mais importante é entender o contexto e as aplicações reais em produção.\n[SPEAKER_01]: Com certeza, especialmente quando integramos modelos de linguagem e embeddings locais.`,
+        speaker: "SPEAKER_00, SPEAKER_01",
+        start_time: 142.0,
+        end_time: 185.0,
+        formatted_start_time: "02:22",
+        formatted_end_time: "03:05",
+        similarity_score: 0.884,
+        youtube_url_with_timestamp: "https://www.youtube.com/watch?v=mock-video-1&t=142s"
+      },
+      {
+        chunk_id: "mock-chunk-2",
+        diarization_id: "mock-diar-2",
+        content_id: "mock-video-2",
+        video_title: "Arquitetura de Dados em Escala",
+        channel_title: "Engenharia de Software",
+        thumbnail_url: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&auto=format&fit=crop&q=80",
+        text: "[SPEAKER_02]: O banco vetorial com pgvector permite fazer consultas semânticas diretas junto com os dados relacionais de forma performática.",
+        speaker: "SPEAKER_02",
+        start_time: 310.0,
+        end_time: 345.0,
+        formatted_start_time: "05:10",
+        formatted_end_time: "05:45",
+        similarity_score: 0.812,
+        youtube_url_with_timestamp: "https://www.youtube.com/watch?v=mock-video-2&t=310s"
+      }
+    ];
+
+    return res.json(mockResults);
+  });
+
+  // Vectorization mock endpoints
+  app.post("/api/vectorization/diarization/:id", (req, res) => {
+    return res.json({
+      diarization_id: req.params.id,
+      content_id: "mock-video-1",
+      chunks_count: 12,
+      indexed: true
+    });
+  });
+
+  app.get("/api/vectorization/status/:id", (req, res) => {
+    return res.json({
+      diarization_id: req.params.id,
+      content_id: "mock-video-1",
+      chunks_count: 12,
+      indexed: true
+    });
+  });
+
+  app.get("/api/vectorization/stats", (_req, res) => {
+    return res.json({
+      total_chunks: 142,
+      total_indexed_diarizations: 18,
+      tei_healthy: true
+    });
+  });
+
+  app.post("/api/vectorization/batch", (_req, res) => {
+    return res.json([
+      {
+        diarization_id: "mock-diar-1",
+        content_id: "mock-video-1",
+        chunks_count: 12,
+        indexed: true
+      }
+    ]);
+  });
+
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });

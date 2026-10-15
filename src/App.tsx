@@ -3,12 +3,13 @@ import {readWorkspace, saveWorkspace} from './navigationStorage';
 import {API_BASE_URL, apiFetch} from './api';
 import {createLogId} from './logId';
 import React, {useEffect, useRef, useState} from 'react';
-import {Mic, Radio} from 'lucide-react';
+import {Mic, Radio, Sparkles} from 'lucide-react';
 import {Header} from './components/Header';
 import {CommandPalette} from './components/CommandPalette';
 import {NotificationDrawer} from './components/NotificationDrawer';
 import {SignalCatcherApp} from './components/apps/SignalCatcherApp';
 import {DiarizationApp} from './components/apps/DiarizationApp';
+import {SemanticSearchApp} from './components/apps/SemanticSearchApp';
 import {ToastContainer, ToastProvider, useToast} from './components/toast';
 
 import {
@@ -235,12 +236,13 @@ function SignalCatcherHub() {
     switch (appId) {
       case 'signalcatcher': return <Radio className="w-4 h-4" />;
       case 'diarization': return <Mic className="w-4 h-4" />;
+      case 'search': return <Sparkles className="w-4 h-4" />;
       default: return <Radio className="w-4 h-4" />;
     }
   };
 
   return (
-    <div data-theme={theme} className={`${activeTab.appId === 'diarization' ? 'h-dvh overflow-hidden' : 'min-h-screen'} flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
+    <div data-theme={theme} className={`${(activeTab.appId === 'diarization' || activeTab.appId === 'search') ? 'h-dvh overflow-hidden' : 'min-h-screen'} flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
       {/* Top Header */}
       <Header
         theme={theme}
@@ -345,6 +347,13 @@ function SignalCatcherHub() {
 
           {activeTab.appId === 'diarization' && (
             <DiarizationApp 
+              language={language}
+              onAddLog={addLog}
+            />
+          )}
+
+          {activeTab.appId === 'search' && (
+            <SemanticSearchApp
               language={language}
               onAddLog={addLog}
             />

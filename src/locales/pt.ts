@@ -322,7 +322,23 @@ export const pt = {
   toastSuccess: "Sucesso",
   toastError: "Erro",
   toastWarning: "Aviso",
-  toastInfo: "Informação"
+  toastInfo: "Informação",
+  // Semantic Search & Vectorization
+  semanticSearchTab: "Busca Semântica",
+  semanticSearchPlaceholder: "Pesquise por conceitos, falas ou temas nos vídeos...",
+  semanticSearchButton: "Buscar",
+  semanticSearchSearching: "Buscando...",
+  semanticSearchResults: "Resultados da Busca Semântica",
+  semanticSearchEmpty: "Nenhum resultado encontrado para a sua busca.",
+  semanticSearchHelp: "Experimente buscar por ideias ou perguntas em linguagem natural.",
+  semanticSearchMinScore: "Similaridade mínima",
+  semanticSearchJumpToVideo: "Pular para o trecho",
+  semanticSearchSpeaker: "Falante",
+  semanticSearchDuration: "Trecho",
+  vectorizeButton: "Vetorizar",
+  vectorizing: "Vetorizando...",
+  vectorizedSuccess: "Vetorizado com sucesso",
+  vectorizedBadge: "Vetorizado",
 };
 
 export type TranslationKeys = keyof typeof pt;

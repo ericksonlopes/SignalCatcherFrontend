@@ -35,5 +35,15 @@ export const FASTAPI_ENDPOINTS: ApiEndpoint[] = [
     method: 'GET',
     path: '/api/diarization/list',
     description: 'Fetch paginated diarization tasks'
+  },
+  {
+    method: 'POST',
+    path: '/api/search/semantic',
+    description: 'Search video transcripts by meaning using pgvector embeddings and TEI'
+  },
+  {
+    method: 'GET',
+    path: '/api/vectorization/stats',
+    description: 'Retrieve vectorization metrics and TEI cluster health'
   }
 ];
