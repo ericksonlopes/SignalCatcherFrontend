@@ -21,6 +21,7 @@ import {
   Upload,
   UserCheck,
   Users,
+  X,
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../../api';
 import type {
@@ -72,6 +73,7 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
   const [diarizations, setDiarizations] = useState<DiarizationVideo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchProfile, setSearchProfile] = useState<string>('');
+  const [searchDiarizationText, setSearchDiarizationText] = useState<string>('');
 
   // Profile creation
   const [newProfileName, setNewProfileName] = useState<string>('');
@@ -94,6 +96,8 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
   const [selectedSpeakerLabel, setSelectedSpeakerLabel] = useState<string>('');
   const [targetSpeakerName, setTargetSpeakerName] = useState<string>('');
   const [selectedSegmentIndices, setSelectedSegmentIndices] = useState<number[]>([]);
+  const [segmentStartTime, setSegmentStartTime] = useState<string>('');
+  const [segmentEndTime, setSegmentEndTime] = useState<string>('');
   const [isEnrollingSegments, setIsEnrollingSegments] = useState<boolean>(false);
 
   // Audio Upload Form
@@ -197,6 +201,59 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
     }
   }, [speakerSegments]);
 
+  // Filtered diarizations for search
+  const filteredDiarizations = useMemo(() => {
+    const q = searchDiarizationText.trim().toLowerCase();
+    if (!q) return diarizations;
+    return diarizations.filter(
+      (d) =>
+        d.title.toLowerCase().includes(q) ||
+        (d.channelName || '').toLowerCase().includes(q) ||
+        d.id.toLowerCase().includes(q)
+    );
+  }, [diarizations, searchDiarizationText]);
+
+  // Debounced remote diarization search if user is querying
+  useEffect(() => {
+    const q = searchDiarizationText.trim();
+    if (!q) return;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiFetch(
+          `${API_BASE_URL}/api/diarization/list?page=1&limit=50&step=COMPLETED&search=${encodeURIComponent(q)}`
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { items?: DiarizationVideo[] };
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            setDiarizations((prev) => {
+              const existingIds = new Set(prev.map((d) => d.id));
+              const newItems = data.items!.filter((item) => !existingIds.has(item.id));
+              return newItems.length > 0 ? [...prev, ...newItems] : prev;
+            });
+          }
+        }
+      } catch {
+        // Silently keep local items
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchDiarizationText]);
+
+  // Keep selection synced when searching
+  useEffect(() => {
+    if (!searchDiarizationText.trim() || filteredDiarizations.length === 0) return;
+    const firstId = filteredDiarizations[0].id;
+    if (!filteredDiarizations.some((d) => d.id === clipVideoId)) {
+      setClipVideoId(firstId);
+    }
+    if (!filteredDiarizations.some((d) => d.id === selectedDiarizationId)) {
+      setSelectedDiarizationId(firstId);
+    }
+    if (!filteredDiarizations.some((d) => d.id === identifyDiarizationId)) {
+      setIdentifyDiarizationId(firstId);
+    }
+  }, [filteredDiarizations, searchDiarizationText, clipVideoId, selectedDiarizationId, identifyDiarizationId]);
+
   const filteredProfiles = useMemo(() => {
     const q = searchProfile.trim().toLowerCase();
     if (!q) return profiles;
@@ -207,13 +264,47 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
     );
   }, [profiles, searchProfile]);
 
-  // Computed clip duration
+  // Computed clip duration for Mode 1
   const clipStartSec = useMemo(() => parseTimeStringToSeconds(clipStartTime), [clipStartTime]);
   const clipEndSec = useMemo(() => parseTimeStringToSeconds(clipEndTime), [clipEndTime]);
   const clipDurationSec = useMemo(
     () => Math.max(0, clipEndSec - clipStartSec),
     [clipStartSec, clipEndSec]
   );
+
+  // Computed time for Mode 2 (Speech Turns)
+  const segStartSec = useMemo(() => parseTimeStringToSeconds(segmentStartTime), [segmentStartTime]);
+  const segEndSec = useMemo(() => parseTimeStringToSeconds(segmentEndTime), [segmentEndTime]);
+  const segDurationSec = useMemo(
+    () => Math.max(0, Math.round((segEndSec - segStartSec) * 10) / 10),
+    [segStartSec, segEndSec]
+  );
+
+  // Sync segment start and end time when selection changes
+  useEffect(() => {
+    if (speakerSegments.length === 0 || selectedSegmentIndices.length === 0) {
+      setSegmentStartTime('');
+      setSegmentEndTime('');
+      return;
+    }
+    const selectedSegs = selectedSegmentIndices
+      .map((i) => speakerSegments[i])
+      .filter(Boolean);
+    if (selectedSegs.length > 0) {
+      const minStart = Math.min(...selectedSegs.map((s) => Number(s.start || 0)));
+      const maxEnd = Math.max(...selectedSegs.map((s) => Number(s.end || 0)));
+      setSegmentStartTime(formatTime(minStart));
+      setSegmentEndTime(formatTime(maxEnd));
+    }
+  }, [speakerSegments, selectedSegmentIndices]);
+
+  function handleSetTurnTime(start: number, end: number, index?: number) {
+    setSegmentStartTime(formatTime(start));
+    setSegmentEndTime(formatTime(end));
+    if (index !== undefined && !selectedSegmentIndices.includes(index)) {
+      setSelectedSegmentIndices([index]);
+    }
+  }
 
   async function handleCreateProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -306,25 +397,31 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
     }
     setIsEnrollingSegments(true);
     try {
+      const payload: Record<string, unknown> = {
+        diarization_id: selectedDiarizationId,
+        speaker_label: selectedSpeakerLabel,
+        speaker_name: targetSpeakerName.trim(),
+        selected_segment_indices: selectedSegmentIndices,
+        apply_to_diarization: true,
+      };
+      if (segDurationSec >= 1 && segStartSec >= 0 && segEndSec > segStartSec) {
+        payload.start_time = segStartSec;
+        payload.end_time = segEndSec;
+      }
       const res = await apiFetch(`${API_BASE_URL}/api/voice-recognition/enroll/from-diarization`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          diarization_id: selectedDiarizationId,
-          speaker_label: selectedSpeakerLabel,
-          speaker_name: targetSpeakerName.trim(),
-          selected_segment_indices: selectedSegmentIndices,
-          apply_to_diarization: true,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { detail?: string };
         throw new Error(err.detail || `HTTP ${res.status}`);
       }
+      const timeRangeText = segDurationSec >= 1 ? ` [${segmentStartTime} - ${segmentEndTime}]` : '';
       onAddLog(
         'VoiceRecognition',
         'success',
-        `Modelo treinado para ${targetSpeakerName.trim()} com ${selectedSegmentIndices.length} falas selecionadas.`
+        `Modelo treinado para ${targetSpeakerName.trim()} com ${selectedSegmentIndices.length} falas selecionadas${timeRangeText}. Arquivo salvo em D:/voice_training/`
       );
       await fetchAllData();
     } catch (err) {
@@ -470,6 +567,44 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
               </div>
             </div>
 
+            {/* Diarization Search Bar */}
+            <div className="space-y-1.5 pb-1">
+              <div className="relative flex items-center">
+                <Search className="absolute left-2.5 h-3.5 w-3.5 text-zinc-500" />
+                <input
+                  type="text"
+                  value={searchDiarizationText}
+                  onChange={(e) => setSearchDiarizationText(e.target.value)}
+                  placeholder={t('voiceSearchDiarizationPlaceholder')}
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-950 pl-8 pr-7 py-1.5 text-xs text-zinc-200 outline-none focus:border-indigo-500"
+                />
+                {searchDiarizationText && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchDiarizationText('')}
+                    title={t('voiceSearchDiarizationClear')}
+                    className="absolute right-2 text-zinc-500 hover:text-zinc-300"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {searchDiarizationText && (
+                <div className="flex items-center justify-between text-[11px] text-zinc-400 px-1">
+                  <span>
+                    {filteredDiarizations.length} {t('voiceSearchDiarizationCount')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchDiarizationText('')}
+                    className="text-indigo-400 hover:underline"
+                  >
+                    {t('voiceSearchDiarizationClear')}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Mode Selector Tabs */}
             <div className="flex rounded-lg border border-zinc-800 bg-zinc-950 p-1">
               <button
@@ -510,11 +645,17 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                     onChange={(e) => setClipVideoId(e.target.value)}
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 focus:border-indigo-500 outline-none"
                   >
-                    {diarizations.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.title} ({d.channelName})
+                    {filteredDiarizations.length === 0 ? (
+                      <option value="" disabled>
+                        {t('voiceNoDiarizationsFoundForSearch')}
                       </option>
-                    ))}
+                    ) : (
+                      filteredDiarizations.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.title} ({d.channelName})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -637,11 +778,17 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                     onChange={(e) => setSelectedDiarizationId(e.target.value)}
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 outline-none"
                   >
-                    {diarizations.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.title} ({d.channelName})
+                    {filteredDiarizations.length === 0 ? (
+                      <option value="" disabled>
+                        {t('voiceNoDiarizationsFoundForSearch')}
                       </option>
-                    ))}
+                    ) : (
+                      filteredDiarizations.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.title} ({d.channelName})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -713,12 +860,77 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                               {seg.text || '...'}
                             </span>
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetTurnTime(Number(seg.start), Number(seg.end), idx);
+                            }}
+                            title={t('voiceTrainUseThisTurnTime')}
+                            className="shrink-0 p-1 rounded text-zinc-500 hover:text-indigo-400 hover:bg-zinc-800 transition"
+                          >
+                            <Clock className="h-3 w-3" />
+                          </button>
                         </div>
                       );
                     })}
                   </div>
                   <div className="text-[11px] text-zinc-400 mt-1">
                     {selectedSegmentIndices.length} {t('voiceTrainSelectedTurns')}
+                  </div>
+                </div>
+
+                {/* Custom Time Range for Speech Turns */}
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-400 font-medium">
+                      {t('voiceTrainCustomClipRangeTitle')}
+                    </span>
+                    <span
+                      className={`font-mono font-semibold text-[11px] ${
+                        segDurationSec >= 3 ? 'text-emerald-400' : 'text-amber-400'
+                      }`}
+                    >
+                      {segDurationSec}s ({formatTime(segDurationSec)})
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-0.5">
+                        {t('voiceTrainStartTime')}
+                      </label>
+                      <div className="relative flex items-center">
+                        <Clock className="absolute left-2 h-3 w-3 text-zinc-500" />
+                        <input
+                          type="text"
+                          value={segmentStartTime}
+                          onChange={(e) => setSegmentStartTime(e.target.value)}
+                          placeholder="00:15"
+                          className="w-full rounded-md border border-zinc-700 bg-zinc-900 pl-7 pr-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-0.5">
+                        {t('voiceTrainEndTime')}
+                      </label>
+                      <div className="relative flex items-center">
+                        <Clock className="absolute left-2 h-3 w-3 text-zinc-500" />
+                        <input
+                          type="text"
+                          value={segmentEndTime}
+                          onChange={(e) => setSegmentEndTime(e.target.value)}
+                          placeholder="00:45"
+                          className="w-full rounded-md border border-zinc-700 bg-zinc-900 pl-7 pr-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+                    <Folder className="h-3 w-3 text-cyan-400" />
+                    <span>{t('voiceTrainFolderNotice')}</span>
                   </div>
                 </div>
 
@@ -821,11 +1033,17 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                   onChange={(e) => setIdentifyDiarizationId(e.target.value)}
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 outline-none"
                 >
-                  {diarizations.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.title} ({d.channelName})
+                  {filteredDiarizations.length === 0 ? (
+                    <option value="" disabled>
+                      {t('voiceNoDiarizationsFoundForSearch')}
                     </option>
-                  ))}
+                  ) : (
+                    filteredDiarizations.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.title} ({d.channelName})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 

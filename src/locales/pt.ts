@@ -387,6 +387,12 @@ export const pt = {
   voiceTrainDeselectAll: "Desmarcar Todas",
   voiceTrainSelectedTurns: "falas selecionadas",
   voiceTrainWithSegmentsBtn: "Treinar Modelo com Falas Selecionadas",
+  voiceSearchDiarizationPlaceholder: "Pesquisar vídeos diarizados (título, canal ou ID)...",
+  voiceSearchDiarizationCount: "vídeo(s) diarizado(s) encontrado(s)",
+  voiceSearchDiarizationClear: "Limpar busca",
+  voiceNoDiarizationsFoundForSearch: "Nenhum vídeo diarizado encontrado para a busca.",
+  voiceTrainCustomClipRangeTitle: "Ajustar Minutagem do Recorte (MM:SS ou s)",
+  voiceTrainUseThisTurnTime: "Usar tempo desta fala",
 };
 
 export type TranslationKeys = keyof typeof pt;

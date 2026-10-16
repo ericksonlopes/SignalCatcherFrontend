@@ -674,7 +674,7 @@ async function startServer() {
   });
 
   app.post("/api/voice-recognition/enroll/from-diarization", (req, res) => {
-    const { diarization_id, speaker_label, speaker_name, apply_to_diarization } = req.body || {};
+    const { diarization_id, speaker_label, speaker_name, apply_to_diarization, start_time, end_time } = req.body || {};
     const cleanName = String(speaker_name || "Locutor").trim();
     let profile = mockSpeakerProfiles.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
     if (!profile) {
@@ -690,15 +690,18 @@ async function startServer() {
       };
       mockSpeakerProfiles.unshift(profile);
     }
+    const startTimeVal = typeof start_time === "number" ? start_time : 0.0;
+    const endTimeVal = typeof end_time === "number" ? end_time : 18.0;
+    const durVal = Math.max(0.1, endTimeVal - startTimeVal);
     const sample = {
       id: `smp-${Date.now()}`,
       speaker_id: profile.id,
       source_type: "DIARIZATION_SEGMENT",
       source_id: String(diarization_id || ""),
       speaker_label: String(speaker_label || "SPEAKER_00"),
-      start_time: 0.0,
-      end_time: 18.0,
-      duration_seconds: 18.0,
+      start_time: startTimeVal,
+      end_time: endTimeVal,
+      duration_seconds: durVal,
       metadata: {},
       created_at: new Date().toISOString()
     };

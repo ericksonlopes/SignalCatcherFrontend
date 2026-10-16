@@ -388,5 +388,11 @@ export const en: Record<TranslationKeys, string> = {
   voiceTrainDeselectAll: "Deselect All",
   voiceTrainSelectedTurns: "turns selected",
   voiceTrainWithSegmentsBtn: "Train Model with Selected Turns",
+  voiceSearchDiarizationPlaceholder: "Search diarized videos (title, channel, or ID)...",
+  voiceSearchDiarizationCount: "diarized video(s) found",
+  voiceSearchDiarizationClear: "Clear search",
+  voiceNoDiarizationsFoundForSearch: "No diarized videos found for this search.",
+  voiceTrainCustomClipRangeTitle: "Adjust Clip Time Range (MM:SS or s)",
+  voiceTrainUseThisTurnTime: "Use this turn's time",
 };
 
