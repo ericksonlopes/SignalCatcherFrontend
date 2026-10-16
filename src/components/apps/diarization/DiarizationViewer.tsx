@@ -1,9 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Download, Edit3, FileText, Search, Users, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Download,
+  Edit3,
+  FileText,
+  Fingerprint,
+  Loader2,
+  Search,
+  Users,
+  X,
+} from 'lucide-react';
+import { API_BASE_URL, apiFetch } from '../../../api';
 import type { DiarizationVideo } from '../DiarizationApp';
-import type { LanguageMode } from '../../../types';
+import type { IdentifyDiarizationResponse, LanguageMode } from '../../../types';
 import { getTranslation } from '../../../locales';
-import { buildTranscript, formatTime, speakerStats } from './transcript';
+import { buildTranscript, formatTime, speakerStats, type TranscriptResult } from './transcript';
 
 interface DiarizationViewerProps {
   video: DiarizationVideo;
@@ -16,7 +29,12 @@ const input = 'min-h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 py-
 
 export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, language = 'en', onClose }) => {
   const { t } = getTranslation(language);
-  const segments = useMemo(() => buildTranscript(video.result_json), [video.result_json]);
+  const [liveResultJson, setLiveResultJson] = useState<TranscriptResult | null | undefined>(video.result_json);
+  useEffect(() => {
+    setLiveResultJson(video.result_json);
+  }, [video.result_json, video.id]);
+
+  const segments = useMemo(() => buildTranscript(liveResultJson), [liveResultJson]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [query, setQuery] = useState('');
   const [speakerFilter, setSpeakerFilter] = useState('');
@@ -24,27 +42,130 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [enrollOnSave, setEnrollOnSave] = useState(true);
+  const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
+  const [isIdentifying, setIsIdentifying] = useState(false);
   const [notice, setNotice] = useState('');
   const headingRef = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { headingRef.current?.focus(); }, []);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
   const speakers = useMemo(() => {
-    const ids = [...new Set([...(Array.isArray(video.result_json?.speakers) ? video.result_json.speakers : []), ...segments.map(segment => segment.speakerId)])];
-    return ids.map((id, index) => ({
-      id, name: names[id] || (id === 'UNKNOWN' ? t('speakerUnknown') : t('speakerLabel') + ' ' + (index + 1)),
-      color: colors[index % colors.length], ...speakerStats(segments, id),
-    }));
-  }, [video.result_json, segments, names, language]);
+    const ids = [
+      ...new Set([
+        ...(Array.isArray(liveResultJson?.speakers) ? liveResultJson.speakers : []),
+        ...segments.map(segment => segment.speakerId),
+      ]),
+    ];
+    return ids.map((id, index) => {
+      let defaultLabel = id;
+      if (id.startsWith('SPEAKER_')) {
+        defaultLabel = t('speakerLabel') + ' ' + (index + 1);
+      } else if (id === 'UNKNOWN') {
+        defaultLabel = t('speakerUnknown');
+      }
+      return {
+        id,
+        name: names[id] || defaultLabel,
+        color: colors[index % colors.length],
+        ...speakerStats(segments, id),
+      };
+    });
+  }, [liveResultJson, segments, names, language, t]);
+
   const totalSpeech = speakers.reduce((sum, speaker) => sum + speaker.seconds, 0);
-  const visible = segments.filter(segment => (!speakerFilter || segment.speakerId === speakerFilter) && segment.text.toLocaleLowerCase(language).includes(query.trim().toLocaleLowerCase(language)));
+  const visible = segments.filter(
+    segment =>
+      (!speakerFilter || segment.speakerId === speakerFilter) &&
+      segment.text.toLocaleLowerCase(language).includes(query.trim().toLocaleLowerCase(language)),
+  );
   const endTime = segments.reduce((max, segment) => Math.max(max, segment.end), 0);
 
   function toggleSegment(id: string) {
-    setExpanded(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+    setExpanded(previous => {
+      const next = new Set(previous);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }
-  function saveName() {
-    if (editing && editName.trim()) setNames(previous => ({ ...previous, [editing]: editName.trim() }));
-    setEditing(null);
+
+  async function saveName() {
+    if (!editing || !editName.trim()) {
+      setEditing(null);
+      return;
+    }
+    const targetSpeaker = editing;
+    const newName = editName.trim();
+    setNames(previous => ({ ...previous, [targetSpeaker]: newName }));
+    setIsSavingSpeaker(true);
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/voice-recognition/diarization/${video.id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          speaker_label: targetSpeaker,
+          speaker_name: newName,
+          enroll_voice: enrollOnSave,
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.result_json) {
+          setLiveResultJson(data.result_json);
+        }
+        setNotice(`${newName} (${enrollOnSave ? 'pgvector' : 'saved'})`);
+      }
+    } catch {
+      // Keep local name override if backend is offline
+    } finally {
+      setIsSavingSpeaker(false);
+      setEditing(null);
+    }
   }
+
+  async function identifyVoices() {
+    if (isIdentifying) return;
+    setIsIdentifying(true);
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/voice-recognition/diarization/${video.id}/identify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ similarity_threshold: 0.65, auto_apply: true }),
+      });
+      if (response.ok) {
+        const data: IdentifyDiarizationResponse = await response.json();
+        const newNames: Record<string, string> = {};
+        for (const match of data.matches) {
+          if (match.identified && match.matched_speaker_name) {
+            newNames[match.original_speaker_label] = match.matched_speaker_name;
+            newNames[match.current_speaker_label] = match.matched_speaker_name;
+          }
+        }
+        if (Object.keys(newNames).length > 0) {
+          setNames(prev => ({ ...prev, ...newNames }));
+        }
+        setNotice(`${t('voiceIdentifySuccess')}: ${data.identified_count}/${data.total_speakers}`);
+      }
+    } catch {
+      // Ignore network errors silently in viewer
+    } finally {
+      setIsIdentifying(false);
+    }
+  }
+
+  function handleEditKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      void saveName();
+    } else if (event.key === 'Escape') {
+      setEditing(null);
+    }
+  }
+
   function exportTranscript() {
     const text = [video.title, video.channelName, '', ...segments.map(segment => {
       const speaker = speakers.find(item => item.id === segment.speakerId);
@@ -60,7 +181,11 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setNotice(t('diarizationExported'));
   }
-  function clearFilters() { setQuery(''); setSpeakerFilter(''); }
+
+  function clearFilters() {
+    setQuery('');
+    setSpeakerFilter('');
+  }
 
   return (
     <section aria-label={t('diarizationTranscript')} className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-zinc-950">
@@ -68,15 +193,25 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
         <div className="flex items-start gap-3">
           <button onClick={onClose} aria-label={t('diarizationBack')} title={t('diarizationBack')} className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><ArrowLeft className="h-4 w-4" /><span className="hidden xl:inline">{t('diarizationBack')}</span></button>
           <div className="min-w-0 flex-1">
-        <h2 ref={headingRef} tabIndex={-1} title={video.title} className="line-clamp-2 text-base font-semibold leading-snug text-zinc-100 outline-none lg:text-lg">{video.title}</h2>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
-          <span>{video.channelName}</span><span className="inline-flex items-center gap-1 text-emerald-400"><Check className="h-3.5 w-3.5" />{t('diarizationCompletedStatus')}</span>
-          <span className="font-mono">{formatTime(endTime)}</span><span>{speakers.length} {t('speakersTitle').toLocaleLowerCase(language)}</span><span>{segments.length} {t('diarizationTurns')}</span>
-        </div>
+            <h2 ref={headingRef} tabIndex={-1} title={video.title} className="line-clamp-2 text-base font-semibold leading-snug text-zinc-100 outline-none lg:text-lg">{video.title}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+              <span>{video.channelName}</span><span className="inline-flex items-center gap-1 text-emerald-400"><Check className="h-3.5 w-3.5" />{t('diarizationCompletedStatus')}</span>
+              <span className="font-mono">{formatTime(endTime)}</span><span>{speakers.length} {t('speakersTitle').toLocaleLowerCase(language)}</span><span>{segments.length} {t('diarizationTurns')}</span>
+            </div>
           </div>
+          <button
+            onClick={() => void identifyVoices()}
+            disabled={!segments.length || isIdentifying}
+            aria-label={t('voiceIdentifyBtn')}
+            title={t('voiceIdentifyBtn')}
+            className={'flex shrink-0 items-center gap-2 border-indigo-500/40 bg-indigo-950/30 text-indigo-300 hover:bg-indigo-900/40 ' + control}
+          >
+            {isIdentifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
+            <span className="hidden sm:inline">{isIdentifying ? t('voiceIdentifying') : t('voiceIdentifyBtn')}</span>
+          </button>
           <button onClick={exportTranscript} aria-label={t('diarizationExport')} title={t('diarizationExport')} disabled={!segments.length} className={'flex shrink-0 items-center gap-2 ' + control}><Download className="h-4 w-4" /><span className="hidden sm:inline">{t('diarizationExport')}</span></button>
         </div>
-        <span className="sr-only" role="status">{notice}</span>
+        <output className="sr-only">{notice}</output>
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-2 lg:px-6">
@@ -99,9 +234,16 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
                   <button aria-pressed={speakerFilter === speaker.id} onClick={() => setSpeakerFilter(speakerFilter === speaker.id ? '' : speaker.id)} className="min-h-10 min-w-0 flex-1 break-words text-left text-sm font-medium text-zinc-200">{speaker.name}</button>
                   <button aria-label={t('diarizationRename') + ': ' + speaker.name} onClick={() => { setEditing(speaker.id); setEditName(speaker.name); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800"><Edit3 className="h-4 w-4" /></button>
                 </div>
-                {editing === speaker.id && <div className="my-2 flex flex-wrap gap-1">
-                  <input aria-label={t('diarizationRename')} value={editName} onChange={event => setEditName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') saveName(); if (event.key === 'Escape') setEditing(null); }} autoFocus className={input + ' px-2'} />
-                  <button aria-label={t('diarizationSave')} onClick={saveName} disabled={!editName.trim()} className={control}><Check className="h-4 w-4" /></button><button aria-label={t('diarizationCancel')} onClick={() => setEditing(null)} className={control}><X className="h-4 w-4" /></button>
+                {editing === speaker.id && <div className="my-2 space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    <input aria-label={t('diarizationRename')} value={editName} onChange={event => setEditName(event.target.value)} onKeyDown={handleEditKeyDown} className={input + ' px-2'} />
+                    <button aria-label={t('diarizationSave')} onClick={() => void saveName()} disabled={!editName.trim() || isSavingSpeaker} className={control}>{isSavingSpeaker ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}</button>
+                    <button aria-label={t('diarizationCancel')} onClick={() => setEditing(null)} className={control}><X className="h-4 w-4" /></button>
+                  </div>
+                  <label className="flex items-center gap-2 text-[11px] text-zinc-400 cursor-pointer">
+                    <input type="checkbox" checked={enrollOnSave} onChange={e => setEnrollOnSave(e.target.checked)} className="rounded border-zinc-700 bg-zinc-900 text-indigo-500" />
+                    <span>{t('voiceEnrollOnSave')}</span>
+                  </label>
                 </div>}
                 <div className="mt-1 flex justify-between gap-2 text-xs text-zinc-400"><span>{t('diarizationSpeechTime')}</span><span className="font-mono">{formatTime(speaker.seconds)} · {share}%</span></div>
                 <div className="my-2 h-1 overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full ' + speaker.color} style={{ width: share + '%' }} /></div>
@@ -110,7 +252,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
             })}</div>
           </aside>}
           <div className="min-w-0 flex-1 xl:overflow-y-auto"><div className="mx-auto max-w-4xl p-4 lg:p-6">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400"><span role="status">{visible.length} / {segments.length} {t('diarizationVisibleTurns')}</span>{(query || speakerFilter) && <button onClick={clearFilters} className="min-h-10 rounded-lg px-2 text-indigo-400 hover:bg-zinc-900">{t('diarizationClearFilters')}</button>}</div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400"><output>{visible.length} / {segments.length} {t('diarizationVisibleTurns')}</output>{(query || speakerFilter) && <button onClick={clearFilters} className="min-h-10 rounded-lg px-2 text-indigo-400 hover:bg-zinc-900">{t('diarizationClearFilters')}</button>}</div>
             {visible.length ? <div className="space-y-3">{visible.map(segment => {
               const speaker = speakers.find(item => item.id === segment.speakerId);
               const isExpanded = expanded.has(segment.id);

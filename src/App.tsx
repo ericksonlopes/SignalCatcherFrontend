@@ -3,13 +3,14 @@ import {readWorkspace, saveWorkspace} from './navigationStorage';
 import {API_BASE_URL, apiFetch} from './api';
 import {createLogId} from './logId';
 import React, {useEffect, useRef, useState} from 'react';
-import {Mic, Radio, Sparkles} from 'lucide-react';
+import {Fingerprint, Mic, Radio, Sparkles} from 'lucide-react';
 import {Header} from './components/Header';
 import {CommandPalette} from './components/CommandPalette';
 import {NotificationDrawer} from './components/NotificationDrawer';
 import {SignalCatcherApp} from './components/apps/SignalCatcherApp';
 import {DiarizationApp} from './components/apps/DiarizationApp';
 import {SemanticSearchApp} from './components/apps/SemanticSearchApp';
+import {VoiceRecognitionApp} from './components/apps/VoiceRecognitionApp';
 import {ToastContainer, ToastProvider, useToast} from './components/toast';
 
 import {
@@ -237,12 +238,13 @@ function SignalCatcherHub() {
       case 'signalcatcher': return <Radio className="w-4 h-4" />;
       case 'diarization': return <Mic className="w-4 h-4" />;
       case 'search': return <Sparkles className="w-4 h-4" />;
+      case 'voice_recognition': return <Fingerprint className="w-4 h-4" />;
       default: return <Radio className="w-4 h-4" />;
     }
   };
 
   return (
-    <div data-theme={theme} className={`${(activeTab.appId === 'diarization' || activeTab.appId === 'search') ? 'h-dvh overflow-hidden' : 'min-h-screen'} flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
+    <div data-theme={theme} className={`${(activeTab.appId === 'diarization' || activeTab.appId === 'search' || activeTab.appId === 'voice_recognition') ? 'h-dvh overflow-hidden' : 'min-h-screen'} flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
       {/* Top Header */}
       <Header
         theme={theme}
@@ -272,6 +274,7 @@ function SignalCatcherHub() {
           {[
             { id: 'signalcatcher' as const, name: 'SignalCatcher' },
             { id: 'diarization' as const, name: language === 'pt' ? 'Diarização' : 'Diarization' },
+            { id: 'voice_recognition' as const, name: language === 'pt' ? 'Reconhecimento de Voz' : 'Voice Recognition' },
           ].map((app) => {
             const isAppActive = activeTab.appId === app.id;
             const existingTab = tabs.find((t) => t.appId === app.id);
@@ -312,7 +315,7 @@ function SignalCatcherHub() {
         </aside>
 
         {/* Workspace Active Tab View */}
-        <main className={`flex-1 min-w-0 min-h-0 relative bg-[#09090b] ${activeTab.appId === 'diarization' ? 'flex overflow-hidden' : 'overflow-y-auto p-2 sm:p-4 md:p-6'}`}>
+        <main className={`flex-1 min-w-0 min-h-0 relative bg-[#09090b] ${(activeTab.appId === 'diarization' || activeTab.appId === 'voice_recognition') ? 'flex overflow-hidden' : 'overflow-y-auto p-2 sm:p-4 md:p-6'}`}>
           {activeTab.appId === 'signalcatcher' && (
             <SignalCatcherApp
               language={language}
@@ -354,6 +357,13 @@ function SignalCatcherHub() {
 
           {activeTab.appId === 'search' && (
             <SemanticSearchApp
+              language={language}
+              onAddLog={addLog}
+            />
+          )}
+
+          {activeTab.appId === 'voice_recognition' && (
+            <VoiceRecognitionApp
               language={language}
               onAddLog={addLog}
             />

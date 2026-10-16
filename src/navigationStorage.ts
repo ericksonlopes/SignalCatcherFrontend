@@ -4,7 +4,12 @@ const WORKSPACE_KEY = 'signalcatcher_workspace_v1';
 const SECTION_KEY = 'signalcatcher_section_v1';
 const DEFAULT_TAB: AppTab = {id: 'tab-1', appId: 'signalcatcher', title: 'SignalCatcher Ingestor', icon: 'radio', isPinned: true};
 function isAppId(value: unknown): value is AppId {
-    return value === 'signalcatcher' || value === 'diarization';
+    return (
+        value === 'signalcatcher' ||
+        value === 'diarization' ||
+        value === 'search' ||
+        value === 'voice_recognition'
+    );
 }
 export type CaptureSection = 'captures' | 'saved_channels' | 'sources' | 'tracking';
 

@@ -339,6 +339,31 @@ export const pt = {
   vectorizing: "Vetorizando...",
   vectorizedSuccess: "Vetorizado com sucesso",
   vectorizedBadge: "Vetorizado",
+
+  // Voice Recognition & Speaker Identification
+  voiceRecognitionTab: "Reconhecimento de Voz",
+  voiceRecognitionSubtitle: "Identificação biométrica de locutores via pgvector",
+  voiceProfilesTitle: "Perfis de Voz Cadastrados",
+  voiceNewProfile: "Novo Perfil",
+  voiceProfileNamePlaceholder: "Nome da pessoa (ex: João Silva)",
+  voiceProfileDescPlaceholder: "Cargo, canal ou descrição (opcional)",
+  voiceCreateProfileBtn: "Criar Perfil",
+  voiceNoProfiles: "Nenhum perfil de voz cadastrado ainda.",
+  voiceSamplesCount: "amostras de voz",
+  voiceEnrollFromDiarizationTitle: "Cadastrar Voz a partir de Diarização",
+  voiceEnrollSelectVideo: "Selecione um vídeo/áudio diarizado",
+  voiceEnrollSelectSpeaker: "Selecione o locutor na transcrição",
+  voiceEnrollTargetProfile: "Associar ao perfil (ou digite novo nome)",
+  voiceEnrollBtn: "Cadastrar Amostra & Renomear",
+  voiceEnrolling: "Extraindo embedding...",
+  voiceEnrollAudioUpload: "Ou envie uma amostra de áudio (.wav, .mp3)",
+  voiceIdentifyBtn: "Identificar Locutores",
+  voiceIdentifying: "Identificando vozes...",
+  voiceIdentifySuccess: "Reconhecimento de voz concluído",
+  voiceIdentifyThreshold: "Limiar de similaridade",
+  voiceEnrollOnSave: "Cadastrar voz no banco (pgvector) ao salvar nome",
+  voiceMatchedBadge: "Voz Identificada",
+  voiceDeleteProfile: "Excluir perfil",
 };
 
 export type TranslationKeys = keyof typeof pt;

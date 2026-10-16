@@ -1,4 +1,4 @@
-export type AppId = 'signalcatcher' | 'diarization' | 'search';
+export type AppId = 'signalcatcher' | 'diarization' | 'search' | 'voice_recognition';
 
 export interface AppTab {
   id: string; // Unique tab instance ID
@@ -7,7 +7,61 @@ export interface AppTab {
   icon: string;
   isPinned?: boolean;
   activeSubTab?: string;
-  customData?: any;
+  customData?: unknown;
+}
+
+export interface VoiceSample {
+  id: string;
+  speaker_id: string;
+  source_type: string;
+  source_id?: string | null;
+  speaker_label?: string | null;
+  start_time?: number | null;
+  end_time?: number | null;
+  duration_seconds?: number | null;
+  metadata?: Record<string, unknown>;
+  created_at?: string | null;
+}
+
+export interface SpeakerProfile {
+  id: string;
+  name: string;
+  description?: string | null;
+  avatar_url?: string | null;
+  samples_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  samples?: VoiceSample[] | null;
+}
+
+export interface VoiceRecognitionStats {
+  total_profiles: number;
+  total_samples: number;
+  embedding_dimension: number;
+  default_similarity_threshold: number;
+  worker_healthy: boolean;
+}
+
+export interface SpeakerMatch {
+  original_speaker_label: string;
+  current_speaker_label: string;
+  matched_speaker_id?: string | null;
+  matched_speaker_name?: string | null;
+  matched_sample_id?: string | null;
+  similarity_score: number;
+  segments_count: number;
+  speech_duration_seconds: number;
+  identified: boolean;
+  applied: boolean;
+}
+
+export interface IdentifyDiarizationResponse {
+  diarization_id: string;
+  entity_id?: string | null;
+  total_speakers: number;
+  identified_count: number;
+  auto_applied: boolean;
+  matches: SpeakerMatch[];
 }
 
 export interface SemanticSearchResult {

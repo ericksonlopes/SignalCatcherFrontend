@@ -140,6 +140,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 <Sparkles className="w-4 h-4 text-cyan-400" />
                 <span className="truncate font-medium">Busca Semântica</span>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectApp('voice_recognition', 'Reconhecimento de Voz');
+                  onClose();
+                }}
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-800/60 hover:bg-emerald-950/60 border border-slate-700/60 hover:border-emerald-500/50 text-slate-200 transition-all text-left"
+              >
+                <Mic className="w-4 h-4 text-emerald-400" />
+                <span className="truncate font-medium">Reconhecimento de Voz</span>
+              </button>
             </div>
           </div>
 

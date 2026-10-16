@@ -1,6 +1,22 @@
 export interface TranscriptResult {
   speakers?: string[];
-  segments?: { speaker?: string; start: number; end: number; text?: string }[];
+  segments?: {
+    speaker?: string;
+    original_speaker?: string;
+    speaker_id?: string;
+    start: number;
+    end: number;
+    text?: string;
+  }[];
+  speaker_mappings?: Record<
+    string,
+    {
+      original_speaker: string;
+      speaker_id?: string | null;
+      speaker_name: string;
+      similarity_score: number;
+    }
+  >;
 }
 
 export interface TranscriptSegment {
@@ -22,9 +38,9 @@ export function buildTranscript(result?: TranscriptResult | null): TranscriptSeg
       start: Math.max(0, segment.start), end: Math.max(0, segment.start, segment.end),
       text: (segment.text || '').trim(),
     };
-    const last = merged[merged.length - 1];
+    const last = merged.at(-1);
     // Keep pauses and overlapping speech visible instead of merging every same-speaker turn.
-    if (last && last.speakerId === phrase.speakerId && phrase.start >= last.end && phrase.start - last.end <= 2) {
+    if (last?.speakerId === phrase.speakerId && phrase.start >= last.end && phrase.start - last.end <= 2) {
       last.end = phrase.end;
       last.text = `${last.text} ${phrase.text}`.trim();
       last.phrases.push(phrase);

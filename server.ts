@@ -577,6 +577,276 @@ async function startServer() {
     ]);
   });
 
+  // Voice Recognition mock state and endpoints
+  const mockSpeakerProfiles: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    avatar_url: string | null;
+    samples_count: number;
+    created_at: string;
+    updated_at: string;
+    samples: Array<{
+      id: string;
+      speaker_id: string;
+      source_type: string;
+      source_id: string | null;
+      speaker_label: string | null;
+      start_time: number | null;
+      end_time: number | null;
+      duration_seconds: number | null;
+      metadata: Record<string, unknown>;
+      created_at: string;
+    }>;
+  }> = [
+    {
+      id: "spk-mock-1",
+      name: "Carlos Eduardo",
+      description: "Host Principal",
+      avatar_url: null,
+      samples_count: 2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      samples: [
+        {
+          id: "smp-mock-1",
+          speaker_id: "spk-mock-1",
+          source_type: "DIARIZATION_SEGMENT",
+          source_id: "diar-1",
+          speaker_label: "SPEAKER_00",
+          start_time: 0.0,
+          end_time: 24.5,
+          duration_seconds: 24.5,
+          metadata: {},
+          created_at: new Date().toISOString()
+        }
+      ]
+    }
+  ];
+
+  app.get("/api/voice-recognition/stats", (_req, res) => {
+    const totalSamples = mockSpeakerProfiles.reduce((acc, p) => acc + p.samples_count, 0);
+    return res.json({
+      total_profiles: mockSpeakerProfiles.length,
+      total_samples: totalSamples,
+      embedding_dimension: 256,
+      default_similarity_threshold: 0.65,
+      worker_healthy: true
+    });
+  });
+
+  app.get("/api/voice-recognition/profiles", (req, res) => {
+    const search = typeof req.query.search === "string" ? req.query.search.toLowerCase() : "";
+    const list = search
+      ? mockSpeakerProfiles.filter(p => p.name.toLowerCase().includes(search))
+      : mockSpeakerProfiles;
+    return res.json(list);
+  });
+
+  app.post("/api/voice-recognition/profiles", (req, res) => {
+    const { name, description, avatar_url } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ detail: "Speaker name cannot be empty." });
+    }
+    const existing = mockSpeakerProfiles.find(
+      p => p.name.toLowerCase() === String(name).trim().toLowerCase()
+    );
+    if (existing) return res.status(201).json(existing);
+    const created = {
+      id: `spk-${Date.now()}`,
+      name: String(name).trim(),
+      description: description ? String(description) : null,
+      avatar_url: avatar_url ? String(avatar_url) : null,
+      samples_count: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      samples: []
+    };
+    mockSpeakerProfiles.unshift(created);
+    return res.status(201).json(created);
+  });
+
+  app.delete("/api/voice-recognition/profiles/:speakerId", (req, res) => {
+    const idx = mockSpeakerProfiles.findIndex(p => p.id === req.params.speakerId);
+    if (idx === -1) return res.status(404).json({ detail: "Speaker profile not found." });
+    mockSpeakerProfiles.splice(idx, 1);
+    return res.json({ deleted: true, speaker_id: req.params.speakerId });
+  });
+
+  app.post("/api/voice-recognition/enroll/from-diarization", (req, res) => {
+    const { diarization_id, speaker_label, speaker_name, apply_to_diarization } = req.body || {};
+    const cleanName = String(speaker_name || "Locutor").trim();
+    let profile = mockSpeakerProfiles.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
+    if (!profile) {
+      profile = {
+        id: `spk-${Date.now()}`,
+        name: cleanName,
+        description: null,
+        avatar_url: null,
+        samples_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        samples: []
+      };
+      mockSpeakerProfiles.unshift(profile);
+    }
+    const sample = {
+      id: `smp-${Date.now()}`,
+      speaker_id: profile.id,
+      source_type: "DIARIZATION_SEGMENT",
+      source_id: String(diarization_id || ""),
+      speaker_label: String(speaker_label || "SPEAKER_00"),
+      start_time: 0.0,
+      end_time: 18.0,
+      duration_seconds: 18.0,
+      metadata: {},
+      created_at: new Date().toISOString()
+    };
+    profile.samples.unshift(sample);
+    profile.samples_count += 1;
+
+    const diar = mockDiarizations.find(d => d.id === diarization_id);
+    if (apply_to_diarization !== false && diar?.result_json?.segments) {
+      for (const seg of diar.result_json.segments) {
+        if (seg.speaker === speaker_label) {
+          seg.speaker = cleanName;
+        }
+      }
+      diar.result_json.speakers = Array.from(
+        new Set(diar.result_json.segments.map((s: { speaker: string }) => s.speaker))
+      );
+    }
+
+    return res.json({
+      speaker_id: profile.id,
+      speaker_name: profile.name,
+      sample_id: sample.id,
+      source_type: "DIARIZATION_SEGMENT",
+      source_id: diarization_id,
+      speaker_label,
+      segments_used: 3,
+      speech_duration_seconds: 18.0,
+      applied_to_diarization: apply_to_diarization !== false,
+      samples_count: profile.samples_count
+    });
+  });
+
+  app.post("/api/voice-recognition/enroll/audio", (req, res) => {
+    const { filename, speaker_name } = req.body || {};
+    const cleanName = String(speaker_name || "Locutor").trim();
+    let profile = mockSpeakerProfiles.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
+    if (!profile) {
+      profile = {
+        id: `spk-${Date.now()}`,
+        name: cleanName,
+        description: null,
+        avatar_url: null,
+        samples_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        samples: []
+      };
+      mockSpeakerProfiles.unshift(profile);
+    }
+    const sample = {
+      id: `smp-${Date.now()}`,
+      speaker_id: profile.id,
+      source_type: "AUDIO_UPLOAD",
+      source_id: String(filename || "sample.wav"),
+      speaker_label: "UPLOAD",
+      start_time: null,
+      end_time: null,
+      duration_seconds: null,
+      metadata: { filename },
+      created_at: new Date().toISOString()
+    };
+    profile.samples.unshift(sample);
+    profile.samples_count += 1;
+    return res.json({
+      speaker_id: profile.id,
+      speaker_name: profile.name,
+      sample_id: sample.id,
+      source_type: "AUDIO_UPLOAD",
+      source_id: filename,
+      speaker_label: "UPLOAD",
+      segments_used: 1,
+      speech_duration_seconds: 0.0,
+      applied_to_diarization: false,
+      samples_count: profile.samples_count
+    });
+  });
+
+  app.post("/api/voice-recognition/diarization/:id/identify", (req, res) => {
+    const { id } = req.params;
+    const diar = mockDiarizations.find(d => d.id === id || d.entity_id === id);
+    const firstProfile = mockSpeakerProfiles[0];
+    const matches = [
+      {
+        original_speaker_label: "SPEAKER_00",
+        current_speaker_label: firstProfile ? firstProfile.name : "SPEAKER_00",
+        matched_speaker_id: firstProfile ? firstProfile.id : null,
+        matched_speaker_name: firstProfile ? firstProfile.name : null,
+        matched_sample_id: firstProfile?.samples[0]?.id || null,
+        similarity_score: firstProfile ? 0.89 : 0.0,
+        segments_count: 4,
+        speech_duration_seconds: 28.5,
+        identified: Boolean(firstProfile),
+        applied: Boolean(firstProfile)
+      },
+      {
+        original_speaker_label: "SPEAKER_01",
+        current_speaker_label: "SPEAKER_01",
+        matched_speaker_id: null,
+        matched_speaker_name: null,
+        matched_sample_id: null,
+        similarity_score: 0.41,
+        segments_count: 3,
+        speech_duration_seconds: 19.0,
+        identified: false,
+        applied: false
+      }
+    ];
+    if (firstProfile && diar?.result_json?.segments) {
+      for (const seg of diar.result_json.segments) {
+        if (seg.speaker === "SPEAKER_00") {
+          seg.speaker = firstProfile.name;
+        }
+      }
+    }
+    return res.json({
+      diarization_id: id,
+      entity_id: diar?.entity_id || null,
+      total_speakers: 2,
+      identified_count: firstProfile ? 1 : 0,
+      auto_applied: Boolean(firstProfile),
+      matches
+    });
+  });
+
+  app.post("/api/voice-recognition/diarization/:id/assign", (req, res) => {
+    const { id } = req.params;
+    const { speaker_label, speaker_name, enroll_voice } = req.body || {};
+    const cleanName = String(speaker_name || "").trim();
+    const diar = mockDiarizations.find(d => d.id === id || d.entity_id === id);
+    if (diar?.result_json?.segments && cleanName) {
+      for (const seg of diar.result_json.segments) {
+        if (seg.speaker === speaker_label) {
+          seg.speaker = cleanName;
+        }
+      }
+      diar.result_json.speakers = Array.from(
+        new Set(diar.result_json.segments.map((s: { speaker: string }) => s.speaker))
+      );
+    }
+    return res.json({
+      diarization_id: id,
+      speaker_label,
+      speaker_name: cleanName,
+      enrolled: Boolean(enroll_voice),
+      result_json: diar?.result_json || null
+    });
+  });
+
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
