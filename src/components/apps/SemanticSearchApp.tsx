@@ -27,6 +27,16 @@ interface SemanticSearchAppProps {
 
 type SourceFilter = 'ALL' | 'YOUTUBE_TRANSCRIPT' | 'DOCUMENT' | 'WEBSITE';
 
+function getScoreBadgeColorClass(scoreNumber: number): string {
+  if (scoreNumber >= 80) {
+    return 'bg-emerald-950/80 text-emerald-300 border-emerald-800/50';
+  }
+  if (scoreNumber >= 60) {
+    return 'bg-amber-950/80 text-amber-300 border-amber-800/50';
+  }
+  return 'bg-zinc-800/80 text-zinc-300 border-zinc-700/50';
+}
+
 export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<SemanticSearchAppProps>) {
   const { t } = getTranslation(language);
 
@@ -410,13 +420,9 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
                             </span>
                           )}
                           <span
-                            className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-mono border ${
-                              scoreNumber >= 80
-                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/50'
-                                : scoreNumber >= 60
-                                ? 'bg-amber-950/80 text-amber-300 border-amber-800/50'
-                                : 'bg-zinc-800/80 text-zinc-300 border-zinc-700/50'
-                            }`}
+                            className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-mono border ${getScoreBadgeColorClass(
+                              scoreNumber
+                            )}`}
                           >
                             {scorePercent}% match
                           </span>

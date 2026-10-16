@@ -99,7 +99,7 @@ function DiarizationStatus({ video, t }: { readonly video: DiarizationVideo; rea
       {measurable && (
         <progress
           aria-label={`${t('diarizationStageProgress')}: ${t(steps[stepUpper]?.label || 'diarizationStatus')}`}
-          value={percent !== null ? percent : undefined}
+          value={percent ?? undefined}
           max={100}
           className={`h-1.5 w-32 max-w-full overflow-hidden rounded-full bg-zinc-800 ${getProgressBarColorClass(stepUpper)} ${percent === null ? 'animate-pulse motion-reduce:animate-none' : ''}`}
         />

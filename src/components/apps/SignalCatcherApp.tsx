@@ -29,6 +29,9 @@ import { PipelineTrackingView } from './PipelineTrackingView';
 import { canDiarizeVideo, canDeleteVideo, isDiarizationInProgress } from './videoActions';
 export { canDiarizeVideo, canDeleteVideo, isDiarizationInProgress };
 
+export type ModalIngestionMode = 'content' | 'sources' | 'playlist';
+export type LogLevel = 'info' | 'success' | 'warning' | 'error';
+
 
 function parseTimeString(duration: string): number | string {
   if (!duration.includes(':')) {
@@ -124,7 +127,7 @@ interface SignalCatcherAppProps {
 
 
 
-  onAddLog: (sourceApp: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
+  onAddLog: (sourceApp: string, level: LogLevel, message: string) => void;
   hasMoreVideos?: boolean;
   isLoadingMoreVideos?: boolean;
   videoLoadError?: boolean;
@@ -302,7 +305,7 @@ const DiarizationButton: React.FC<DiarizationButtonProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     if (state === 'showCancel') {
-      void onCancel(e, video);
+      onCancel(e, video);
     } else if (state === 'default' || state === 'error') {
       onClick(e, video);
     }
@@ -544,8 +547,8 @@ const VideoCard: React.FC<VideoCardProps> = ({
 
 interface IngestionModalProps {
   readonly isOpen: boolean;
-  readonly modalMode: 'content' | 'sources' | 'playlist';
-  readonly onModalModeChange: (mode: 'content' | 'sources' | 'playlist') => void;
+  readonly modalMode: ModalIngestionMode;
+  readonly onModalModeChange: (mode: ModalIngestionMode) => void;
   readonly onClose: () => void;
   readonly manualUrl: string;
   readonly onManualUrlChange: (url: string) => void;
@@ -1110,7 +1113,7 @@ function VideoDeleteModal({
           </button>
           <button
             onClick={(e) => {
-              void onConfirm(e, video);
+              onConfirm(e, video);
               onClose();
             }}
             disabled={isDeleting}
@@ -1499,7 +1502,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
   // Modal State
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'content' | 'playlist' | 'sources'>('content');
+  const [modalMode, setModalMode] = useState<ModalIngestionMode>('content');
   const [selectedVideo, setSelectedVideo] = useState<CapturedVideo | null>(null);
 
   // Form State for API Routes
@@ -1940,7 +1943,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         totalMonitoredCount={totalMonitoredCount}
         sourcesCount={sources.length}
         isRetryingGlobal={isRetryingGlobal}
-        onGlobalRetry={() => void handleGlobalRetry()}
+        onGlobalRetry={() => {
+          handleGlobalRetry();
+        }}
         onNewIngestion={() => {
           setModalMode('content');
           setIsIngestionModalOpen(true);
@@ -2008,9 +2013,15 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         saveInPlaylistFolder={saveInPlaylistFolder}
         onSaveInPlaylistFolderChange={setSaveInPlaylistFolder}
         isProcessing={isProcessingManual}
-        onSubmitContent={(e) => void handleIngestContent(e)}
-        onSubmitPlaylist={(e) => void handleIngestPlaylist(e)}
-        onSubmitSource={(e) => void handleRegisterSource(e)}
+        onSubmitContent={(e) => {
+          handleIngestContent(e);
+        }}
+        onSubmitPlaylist={(e) => {
+          handleIngestPlaylist(e);
+        }}
+        onSubmitSource={(e) => {
+          handleRegisterSource(e);
+        }}
         t={t}
       />
 
@@ -2032,7 +2043,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         video={videoToDelete}
         isDeleting={videoToDelete ? deletingVideoIds.has(videoToDelete.id) : false}
         onClose={() => setVideoToDelete(null)}
-        onConfirm={(e, vid) => void handleIndividualDelete(e, vid)}
+        onConfirm={(e, vid) => {
+          handleIndividualDelete(e, vid);
+        }}
         t={t}
       />
 
@@ -2044,7 +2057,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         onStartNowChange={setDiarizationStartNow}
         isDiarizing={isDiarizing}
         onClose={() => setDiarizationModalVideo(null)}
-        onConfirm={() => void confirmDiarization()}
+        onConfirm={() => {
+          confirmDiarization();
+        }}
         t={t}
       />
     </div>

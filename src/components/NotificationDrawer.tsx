@@ -16,7 +16,7 @@ type FilterLevel = 'all' | 'error' | 'warning' | 'info' | 'success';
 
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({isOpen, onClose, logs, onClearLogs, language = 'pt'}) => {
     const {t} = getTranslation(language);
-    const panel = useRef<HTMLElement>(null);
+    const panel = useRef<HTMLDialogElement>(null);
     const close = useRef(onClose);
     close.current = onClose;
     const [filter, setFilter] = useState<FilterLevel>('all');
@@ -63,8 +63,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({isOpen, o
 
     return <div className="fixed inset-0 z-[130] flex justify-end">
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" onClick={onClose} aria-hidden="true" />
-        <aside role="dialog" aria-modal="true" ref={panel} tabIndex={-1} aria-labelledby="notifications-heading"
-            className="relative z-10 flex w-full max-w-md flex-col bg-zinc-950 text-zinc-100 border-l border-zinc-800 shadow-2xl font-sans m-0 p-0 h-full">
+        <dialog open aria-modal="true" ref={panel} tabIndex={-1} aria-labelledby="notifications-heading"
+            className="relative z-10 flex w-full max-w-md max-h-none flex-col bg-zinc-950 text-zinc-100 border-0 border-l border-zinc-800 shadow-2xl font-sans m-0 p-0 h-full">
             <header className="flex items-center gap-2 border-b border-zinc-800 p-4 shrink-0">
                 <Bell aria-hidden="true" className="size-4 text-indigo-400 shrink-0" />
                 <h2 id="notifications-heading" className="text-sm font-semibold flex-1 min-w-0">{t('notificationsTitle')}</h2>
@@ -104,6 +104,6 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({isOpen, o
                     })}</ul>}
             </div>
             <footer className="border-t border-zinc-800 px-4 py-3 text-xs text-zinc-400 shrink-0">{t('notificationSession')} · {visible.length}/{logs.length}</footer>
-        </aside>
+        </dialog>
     </div>;
 };
