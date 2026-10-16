@@ -10,6 +10,7 @@ import {
   Loader2,
   Search,
   Sparkles,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
@@ -90,9 +91,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
     ];
     return ids.map((id, index) => {
       let defaultLabel = id;
-      if (id.startsWith('SPEAKER_')) {
-        defaultLabel = t('speakerLabel') + ' ' + (index + 1);
-      } else if (id === 'UNKNOWN') {
+      if (id === 'UNKNOWN') {
         defaultLabel = t('speakerUnknown');
       }
       return {
@@ -150,6 +149,29 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
         }
         setNotice(`${newName} (${enrollOnSave ? t('voiceEnrolledNotice') : 'salvo'})`);
         if (enrollOnSave) {
+          setSpeakerMatches(prev => ({
+            ...prev,
+            [targetSpeaker]: {
+              original_speaker_label: targetSpeaker,
+              current_speaker_label: newName,
+              matched_speaker_name: newName,
+              identified: true,
+              similarity_score: 1.0,
+              applied: true,
+              segments_count: 0,
+              speech_duration_seconds: 0,
+            },
+            [newName]: {
+              original_speaker_label: targetSpeaker,
+              current_speaker_label: newName,
+              matched_speaker_name: newName,
+              identified: true,
+              similarity_score: 1.0,
+              applied: true,
+              segments_count: 0,
+              speech_duration_seconds: 0,
+            },
+          }));
           apiFetch(`${API_BASE_URL}/api/voice-recognition/profiles`)
             .then(res => res.ok ? res.json() : [])
             .then(profiles => {
@@ -213,7 +235,11 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
         if (Object.keys(newNames).length > 0) {
           setNames(prev => ({ ...prev, ...newNames }));
         }
-        setNotice(`${t('voiceIdentifySuccess')}: ${data.identified_count}/${data.total_speakers}`);
+        setNotice(
+          data.identified_count > 0
+            ? `${t('voiceIdentifySuccess')}: ${data.identified_count}/${data.total_speakers}`
+            : 'Nenhuma voz correspondente reconhecida nos perfis cadastrados'
+        );
       }
     } catch {
       // Ignore network errors silently in viewer
@@ -337,7 +363,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
                 <div className="flex items-center gap-2">
                   <span className={'h-2.5 w-2.5 shrink-0 rounded-full ' + speaker.color} />
                   <button aria-pressed={speakerFilter === speaker.id} onClick={() => setSpeakerFilter(speakerFilter === speaker.id ? '' : speaker.id)} className="min-h-10 min-w-0 flex-1 break-words text-left text-sm font-medium text-zinc-200">{speaker.name}</button>
-                  <button aria-label={t('diarizationRename') + ': ' + speaker.name} onClick={() => { setEditing(speaker.id); setEditName(speaker.name); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><Edit3 className="h-4 w-4" /></button>
+                  <button aria-label={t('diarizationRename') + ': ' + speaker.name} onClick={() => { setEditing(speaker.id); setEditName(names[speaker.id] || (speaker.id.startsWith('SPEAKER_') ? '' : speaker.name)); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><Edit3 className="h-4 w-4" /></button>
                 </div>
 
                 {/* Biometric Voice Match Badge */}
@@ -350,43 +376,93 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
                   </div>
                 )}
 
+                {/* Direct action to enroll/create a new recognized voice profile from this speaker */}
+                {!isMatchIdentified && editing !== speaker.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing(speaker.id);
+                      setEditName(names[speaker.id] || (speaker.id.startsWith('SPEAKER_') ? '' : speaker.id));
+                      setEnrollOnSave(true);
+                    }}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-950/30 px-2.5 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-900/40 hover:text-indigo-200 transition"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>{t('voiceCreateNewProfileForSpeaker')}</span>
+                  </button>
+                )}
+
                 {/* Inline Editing & Voice Profile Assignment */}
-                {editing === speaker.id && <div className="my-2 space-y-2 p-2.5 rounded-lg bg-zinc-900 border border-zinc-700/60 text-xs">
-                  <div className="flex flex-wrap gap-1">
-                    <input aria-label={t('diarizationRename')} value={editName} onChange={event => setEditName(event.target.value)} onKeyDown={handleEditKeyDown} placeholder="Nome do locutor" className={input + ' px-2 text-xs'} />
-                    <button aria-label={t('diarizationSave')} onClick={() => void saveName()} disabled={!editName.trim() || isSavingSpeaker} className={control}>{isSavingSpeaker ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}</button>
-                    <button aria-label={t('diarizationCancel')} onClick={() => setEditing(null)} className={control}><X className="h-4 w-4" /></button>
-                  </div>
-
-                  {/* Dropdown with existing enrolled profiles */}
-                  {existingProfiles.length > 0 && (
-                    <div className="space-y-1 pt-1">
-                      <label className="text-[10px] text-zinc-400">{t('voiceSelectExistingProfile')}:</label>
-                      <select
-                        onChange={e => {
-                          if (e.target.value) {
-                            setEditName(e.target.value);
-                            setEnrollOnSave(false);
-                          }
-                        }}
-                        defaultValue=""
-                        className="w-full text-xs rounded-lg border border-zinc-700 bg-zinc-950 py-1.5 px-2 text-zinc-300 outline-none"
-                      >
-                        <option value="" disabled>{t('voiceSelectExistingProfile')}...</option>
-                        {existingProfiles.map(p => (
-                          <option key={p.id} value={p.name}>
-                            {p.name} ({p.samples_count} {p.samples_count === 1 ? 'amostra' : 'amostras'})
-                          </option>
-                        ))}
-                      </select>
+                {editing === speaker.id && (
+                  <div className="my-2 space-y-2 p-2.5 rounded-lg bg-zinc-900 border border-indigo-500/40 text-xs">
+                    <div className="flex items-center justify-between font-medium text-zinc-300 text-[11px]">
+                      <span>{enrollOnSave ? t('voiceCreateNewProfileForSpeaker') : t('diarizationRename')}</span>
+                      <span className="text-zinc-500 font-mono text-[10px]">{speaker.id}</span>
                     </div>
-                  )}
 
-                  <label className="flex items-center gap-2 text-[11px] text-zinc-400 cursor-pointer pt-1">
-                    <input type="checkbox" checked={enrollOnSave} onChange={e => setEnrollOnSave(e.target.checked)} className="rounded border-zinc-700 bg-zinc-900 text-indigo-500" />
-                    <span>{t('voiceEnrollOnSave')}</span>
-                  </label>
-                </div>}
+                    <div className="flex gap-1.5">
+                      <input
+                        autoFocus
+                        aria-label={t('diarizationRename')}
+                        value={editName}
+                        onChange={event => setEditName(event.target.value)}
+                        onKeyDown={handleEditKeyDown}
+                        placeholder={t('voiceProfileNamePlaceholder')}
+                        className={input + ' px-2.5 text-xs'}
+                      />
+                      <button
+                        aria-label={t('diarizationSave')}
+                        onClick={() => void saveName()}
+                        disabled={!editName.trim() || isSavingSpeaker}
+                        className="flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-40"
+                      >
+                        {isSavingSpeaker ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        <span>{enrollOnSave ? t('btnExecute') : t('diarizationSave')}</span>
+                      </button>
+                      <button
+                        aria-label={t('diarizationCancel')}
+                        onClick={() => setEditing(null)}
+                        className={control + ' px-2'}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Dropdown with existing enrolled profiles */}
+                    {existingProfiles.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        <label className="text-[10px] text-zinc-400">{t('voiceSelectExistingProfile')}:</label>
+                        <select
+                          onChange={e => {
+                            if (e.target.value) {
+                              setEditName(e.target.value);
+                              setEnrollOnSave(false);
+                            }
+                          }}
+                          defaultValue=""
+                          className="w-full text-xs rounded-lg border border-zinc-700 bg-zinc-950 py-1.5 px-2 text-zinc-300 outline-none"
+                        >
+                          <option value="" disabled>{t('voiceSelectExistingProfile')}...</option>
+                          {existingProfiles.map(p => (
+                            <option key={p.id} value={p.name}>
+                              {p.name} ({p.samples_count} {p.samples_count === 1 ? 'amostra' : 'amostras'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <label className="flex items-center gap-2 text-[11px] text-zinc-400 cursor-pointer pt-1">
+                      <input
+                        type="checkbox"
+                        checked={enrollOnSave}
+                        onChange={e => setEnrollOnSave(e.target.checked)}
+                        className="rounded border-zinc-700 bg-zinc-900 text-indigo-500"
+                      />
+                      <span>{t('voiceEnrollOnSave')}</span>
+                    </label>
+                  </div>
+                )}
 
                 <div className="mt-2 flex justify-between gap-2 text-xs text-zinc-400"><span>{t('diarizationSpeechTime')}</span><span className="font-mono">{formatTime(speaker.seconds)} · {share}%</span></div>
                 <div className="my-1.5 h-1 overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full ' + speaker.color} style={{ width: share + '%' }} /></div>

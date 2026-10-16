@@ -387,19 +387,31 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                 <label className="block text-xs text-zinc-400 mb-1">
                   {t('voiceEnrollTargetProfile')}
                 </label>
+                {/* Select from enrolled voice profiles */}
+                <select
+                  value={profiles.some((p) => p.name === targetSpeakerName) ? targetSpeakerName : ''}
+                  onChange={(e) => setTargetSpeakerName(e.target.value)}
+                  className="w-full mb-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 focus:border-indigo-500 outline-none"
+                >
+                  <option value="">
+                    {profiles.length > 0
+                      ? `${t('voiceSelectExistingProfileOption')} (${profiles.length})`
+                      : t('voiceNoProfiles')}
+                  </option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name} ({p.samples_count} {p.samples_count === 1 ? 'amostra' : 'amostras'})
+                    </option>
+                  ))}
+                </select>
+
                 <input
                   type="text"
-                  list="existing-speaker-profiles"
                   value={targetSpeakerName}
                   onChange={(e) => setTargetSpeakerName(e.target.value)}
-                  placeholder={t('voiceProfileNamePlaceholder')}
+                  placeholder={t('voiceOrTypeNewName')}
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 focus:border-indigo-500 outline-none"
                 />
-                <datalist id="existing-speaker-profiles">
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.name} />
-                  ))}
-                </datalist>
               </div>
 
               <button
@@ -429,13 +441,26 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
             {/* Upload audio sample alternative */}
             <div className="border-t border-zinc-800/80 pt-3 space-y-2">
               <div className="text-xs text-zinc-400">{t('voiceEnrollAudioUpload')}</div>
+              {profiles.length > 0 && (
+                <select
+                  value={profiles.some((p) => p.name === uploadSpeakerName) ? uploadSpeakerName : ''}
+                  onChange={(e) => setUploadSpeakerName(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 outline-none"
+                >
+                  <option value="">{`${t('voiceSelectExistingProfileOption')} (${profiles.length})`}</option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <div className="flex gap-2">
                 <input
                   type="text"
-                  list="existing-speaker-profiles"
                   value={uploadSpeakerName}
                   onChange={(e) => setUploadSpeakerName(e.target.value)}
-                  placeholder={t('voiceProfileNamePlaceholder')}
+                  placeholder={t('voiceOrTypeNewName')}
                   className="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 outline-none"
                 />
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800">
