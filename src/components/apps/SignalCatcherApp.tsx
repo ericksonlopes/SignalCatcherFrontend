@@ -542,6 +542,907 @@ const VideoCard: React.FC<VideoCardProps> = ({
   );
 };
 
+interface IngestionModalProps {
+  readonly isOpen: boolean;
+  readonly modalMode: 'content' | 'sources' | 'playlist';
+  readonly onModalModeChange: (mode: 'content' | 'sources' | 'playlist') => void;
+  readonly onClose: () => void;
+  readonly manualUrl: string;
+  readonly onManualUrlChange: (url: string) => void;
+  readonly newSourceUrl: string;
+  readonly onNewSourceUrlChange: (url: string) => void;
+  readonly saveInPlaylistFolder: boolean;
+  readonly onSaveInPlaylistFolderChange: (save: boolean) => void;
+  readonly isProcessing: boolean;
+  readonly onSubmitContent: (e: React.FormEvent) => void;
+  readonly onSubmitPlaylist: (e: React.FormEvent) => void;
+  readonly onSubmitSource: (e: React.FormEvent) => void;
+  readonly t: (key: any) => string;
+}
+
+function IngestionModal({
+  isOpen,
+  modalMode,
+  onModalModeChange,
+  onClose,
+  manualUrl,
+  onManualUrlChange,
+  newSourceUrl,
+  onNewSourceUrlChange,
+  saveInPlaylistFolder,
+  onSaveInPlaylistFolderChange,
+  isProcessing,
+  onSubmitContent,
+  onSubmitPlaylist,
+  onSubmitSource,
+  t,
+}: Readonly<IngestionModalProps>) {
+  if (!isOpen) return null;
+
+  return (
+    <dialog
+      open
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 border-0 m-0 max-w-none max-h-none w-full h-full"
+    >
+      <button
+        type="button"
+        aria-label={t('cancel') || 'Fechar'}
+        className="fixed inset-0 bg-transparent border-0 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative z-10 w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/60">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-100">{t('modalIngestionTitle')}</h3>
+              <p className="text-xs text-zinc-400 font-mono mt-0.5">{t('modalIngestionSub')}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 p-2 gap-1.5 bg-zinc-950/80 border-b border-zinc-800 text-xs font-mono">
+          <button
+            type="button"
+            onClick={() => onModalModeChange('content')}
+            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
+              modalMode === 'content'
+                ? 'bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-bold shadow-sm'
+                : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Video className="w-3.5 h-3.5 mb-1 text-indigo-400" />
+            <span>{t('tabVideoRoute')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onModalModeChange('sources')}
+            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
+              modalMode === 'sources'
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 font-bold shadow-sm'
+                : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5 mb-1 text-emerald-400" />
+            <span>{t('tabCanalRoute')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onModalModeChange('playlist')}
+            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
+              modalMode === 'playlist'
+                ? 'bg-purple-500/15 border-purple-500/50 text-purple-300 font-bold shadow-sm'
+                : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <ListVideo className="w-3.5 h-3.5 mb-1 text-purple-400" />
+            <span>{t('tabPlaylistRoute')}</span>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 font-mono text-xs">
+          {modalMode === 'content' && (
+            <form onSubmit={onSubmitContent} className="space-y-4">
+              <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-200 text-xs">
+                <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descVideoRoute')}</p>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
+                  {t('fieldUrlVideo')} *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={manualUrl}
+                  onChange={(e) => onManualUrlChange(e.target.value)}
+                  placeholder={t('fieldUrlVideoPlaceholder')}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/60 font-sans"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold font-sans"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-50 transition-all hover:scale-[1.02] font-sans"
+                >
+                  {isProcessing ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>{t('ingestingLoader')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>{t('btnSubmitEndpoint')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {modalMode === 'playlist' && (
+            <form onSubmit={onSubmitPlaylist} className="space-y-4">
+              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-200 text-xs">
+                <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descPlaylistRoute')}</p>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
+                  {t('fieldUrlPlaylist')} *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={manualUrl}
+                  onChange={(e) => onManualUrlChange(e.target.value)}
+                  placeholder={t('fieldUrlPlaylistPlaceholder')}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-purple-500/60 font-sans"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer font-sans select-none text-xs text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={saveInPlaylistFolder}
+                  onChange={() => onSaveInPlaylistFolderChange(!saveInPlaylistFolder)}
+                  className="rounded border-zinc-700 bg-zinc-950 text-purple-500 focus:ring-0 focus:ring-offset-0"
+                />
+                <span>{t('saveInPlaylistFolderLabel')}</span>
+              </label>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold font-sans"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 disabled:opacity-50 transition-all hover:scale-[1.02] font-sans"
+                >
+                  {isProcessing ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>{t('ingestingLoader')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <ListVideo className="w-3.5 h-3.5" />
+                      <span>{t('btnSubmitEndpoint')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {modalMode === 'sources' && (
+            <form onSubmit={onSubmitSource} className="space-y-4">
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs">
+                <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descCanalRoute')}</p>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
+                  {t('fieldUrlCanal')} *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={newSourceUrl}
+                  onChange={(e) => onNewSourceUrlChange(e.target.value)}
+                  placeholder={t('fieldUrlCanalPlaceholder')}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/60 font-sans"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold font-sans"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 disabled:opacity-50 transition-all hover:scale-[1.02] font-sans"
+                >
+                  {isProcessing ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>{t('ingestingLoader')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>{t('btnSubmitEndpoint')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+interface VideoDetailModalProps {
+  readonly video: CapturedVideo | null;
+  readonly isDeleting: boolean;
+  readonly language: LanguageMode;
+  readonly dateLocale: string;
+  readonly onClose: () => void;
+  readonly onDeleteClick: (video: CapturedVideo) => void;
+  readonly onDiarizeClick: (e: React.MouseEvent, video: CapturedVideo) => void;
+  readonly t: (key: any) => string;
+}
+
+function VideoDetailFooter({
+  video,
+  isDeleting,
+  onClose,
+  onDeleteClick,
+  onDiarizeClick,
+  t,
+}: {
+  readonly video: CapturedVideo;
+  readonly isDeleting: boolean;
+  readonly onClose: () => void;
+  readonly onDeleteClick: (video: CapturedVideo) => void;
+  readonly onDiarizeClick: (e: React.MouseEvent, video: CapturedVideo) => void;
+  readonly t: (key: any) => string;
+}) {
+  const canDelete = canDeleteVideo(video);
+  const canDiarize = canDiarizeVideo(video);
+  const isDiarProgress = isDiarizationInProgress(video.diarizationStatus);
+
+  return (
+    <div className="p-4 border-t border-zinc-800/80 flex items-center justify-between bg-zinc-950">
+      <div className="flex items-center gap-2">
+        {canDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteClick(video);
+            }}
+            disabled={isDeleting || video.deletionRequested}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 text-xs font-bold transition-all disabled:opacity-50"
+          >
+            <Trash className={`w-4 h-4 ${isDeleting ? 'animate-pulse' : ''}`} />
+            <span>{video.deletionRequested ? t('deletionPending') : t('btnConfirmDelete')}</span>
+          </button>
+        )}
+        {canDiarize && (
+          isDiarProgress ? (
+            <span className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-300 text-xs font-bold flex items-center gap-1.5 border border-amber-500/20 cursor-default">
+              <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+              {video.diarizationProgress != null ? `${t('diarizing')} ${video.diarizationProgress}%` : t('diarizing')}
+            </span>
+          ) : (
+            <button
+              onClick={(e) => onDiarizeClick(e, video)}
+              className="px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold shadow-sm shadow-purple-500/10 transition-colors flex items-center gap-1.5 border border-purple-500/20"
+            >
+              <ListMusic className="w-3.5 h-3.5" />
+              {video.isDiarized || video.diarizationStatus === 'COMPLETED' ? 'Refazer Diarização' : 'Diarização'}
+            </button>
+          )
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onClose}
+          className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs font-bold transition-all"
+        >
+          {t('closeDetails')}
+        </button>
+        <a
+          href={video.videoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 hover:scale-[1.02] hover:shadow-indigo-600/40"
+        >
+          <span>{t('watchOnYouTube')}</span>
+          <ExternalLink className="w-4 h-4" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function VideoDetailBody({
+  video,
+  language,
+  dateLocale,
+  t,
+}: {
+  readonly video: CapturedVideo;
+  readonly language: LanguageMode;
+  readonly dateLocale: string;
+  readonly t: (key: any) => string;
+}) {
+  const modalDiarBadge = canDiarizeVideo(video)
+    ? getDiarizationBadgeInfo(video.isDiarized, video.diarizationStatus, video.diarizationProgress, t)
+    : null;
+
+  return (
+    <div className="p-5 overflow-y-auto scrollbar-none flex flex-col gap-6">
+      <div className="flex flex-col sm:flex-row gap-5 items-start">
+        <div className="w-full sm:w-56 shrink-0 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 relative shadow-md aspect-video">
+          {video.thumbnail ? (
+            <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-zinc-900">
+              <YoutubeIcon className="w-16 h-16 text-zinc-700 opacity-50" />
+            </div>
+          )}
+          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700/50">
+            {formatDuration(video.duration)}
+          </span>
+        </div>
+        <div className="flex flex-col gap-3">
+          <h3 className="text-lg font-bold text-zinc-100 leading-tight">{video.title}</h3>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-semibold text-zinc-400 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-xs uppercase font-bold border border-indigo-500/30">
+                {video.sourceName.charAt(0)}
+              </span>
+              {video.sourceName}
+            </span>
+            <span className={`px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 ${video.deletionRequested ? 'text-amber-400' : getStatusColor(video.status)} text-xs uppercase font-mono font-bold tracking-wider shadow-sm`}>
+              {video.deletionRequested ? t('deletionPending') : video.status.replaceAll('_', ' ')}
+            </span>
+            {modalDiarBadge && (
+              <span className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${modalDiarBadge.className}`}>
+                {modalDiarBadge.icon}
+                <span>{modalDiarBadge.label}</span>
+              </span>
+            )}
+            {video.publishedAt && (
+              <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5 ml-2 bg-zinc-900/50 px-2 py-1 rounded-md border border-zinc-800/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+                {t('publishedAt')}: {new Date(video.publishedAt).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US')}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <h4 className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+          <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+          {t('fullDescription')}
+        </h4>
+        <div className="text-sm text-zinc-300 bg-zinc-900/60 p-5 rounded-xl border border-zinc-800/80 whitespace-pre-wrap font-sans leading-relaxed shadow-inner">
+          {video.description || video.summary || t('noDescriptionAvailable')}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <h4 className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+          <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+          {t('tagsLabel')} ({video.tags.length})
+        </h4>
+        <div className="flex flex-wrap gap-2 bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50">
+          {video.tags.length > 0 ? video.tags.map(tItem => (
+            <span key={tItem} className="text-xs font-mono px-3 py-1.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800 shadow-sm hover:border-indigo-500/50 hover:text-indigo-300 transition-colors cursor-default">
+              #{tItem}
+            </span>
+          )) : (
+            <span className="text-xs text-zinc-500 font-mono">{t('noTags')}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4 bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50">
+        <div className="flex flex-col gap-1 w-full">
+          <span className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
+            <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+            {t('createdAt')}
+          </span>
+          <span className="text-sm text-zinc-300 font-mono ml-3">
+            {video.createdAt ? new Date(video.createdAt).toLocaleString(dateLocale) : '-'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoDetailModal({
+  video,
+  isDeleting,
+  language,
+  dateLocale,
+  onClose,
+  onDeleteClick,
+  onDiarizeClick,
+  t,
+}: Readonly<VideoDetailModalProps>) {
+  if (!video) return null;
+
+  return (
+    <dialog
+      open
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm border-0 m-0 max-w-none max-h-none w-full h-full"
+    >
+      <button
+        type="button"
+        aria-label={t('cancel') || 'Fechar'}
+        className="fixed inset-0 bg-transparent border-0 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative z-10 bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/30">
+          <div className="flex items-center gap-3">
+            <Video className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-sm font-bold text-zinc-100 font-mono uppercase">{t('videoDetails')}</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <VideoDetailBody video={video} language={language} dateLocale={dateLocale} t={t} />
+
+        <VideoDetailFooter
+          video={video}
+          isDeleting={isDeleting}
+          onClose={onClose}
+          onDeleteClick={onDeleteClick}
+          onDiarizeClick={onDiarizeClick}
+          t={t}
+        />
+      </div>
+    </dialog>
+  );
+}
+
+interface VideoDeleteModalProps {
+  readonly video: CapturedVideo | null;
+  readonly isDeleting: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: (e: React.MouseEvent, video: CapturedVideo) => void;
+  readonly t: (key: any) => string;
+}
+
+function VideoDeleteModal({
+  video,
+  isDeleting,
+  onClose,
+  onConfirm,
+  t,
+}: Readonly<VideoDeleteModalProps>) {
+  if (!video) return null;
+
+  return (
+    <dialog
+      open
+      aria-modal="true"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 border-0 m-0 max-w-none max-h-none w-full h-full"
+    >
+      <button
+        type="button"
+        aria-label={t('btnCancelDelete')}
+        className="fixed inset-0 bg-transparent border-0 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative z-10 bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
+          <h3 className="text-zinc-100 font-bold flex items-center gap-2">
+            <Trash className="w-5 h-5 text-red-400" />
+            {t('titleConfirmDelete')}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <p className="text-sm text-zinc-400 mb-4">{t('descConfirmDelete')}</p>
+          <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+            <p className="text-sm text-zinc-200 font-bold line-clamp-1">{video.title}</p>
+            <p className="text-xs text-zinc-500 mt-1">{video.sourceName}</p>
+          </div>
+        </div>
+
+        <div className="p-4 bg-zinc-900/30 border-t border-zinc-800/80 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700/80 transition-colors"
+          >
+            {t('btnCancelDelete')}
+          </button>
+          <button
+            onClick={(e) => {
+              void onConfirm(e, video);
+              onClose();
+            }}
+            disabled={isDeleting}
+            className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-md shadow-red-500/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            {isDeleting ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash className="w-4 h-4" />
+            )}
+            {t('btnConfirmDelete')}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+interface DiarizationConfigModalProps {
+  readonly video: CapturedVideo | null;
+  readonly language: string;
+  readonly onLanguageChange: (lang: string) => void;
+  readonly startNow: boolean;
+  readonly onStartNowChange: (startNow: boolean) => void;
+  readonly isDiarizing: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: () => void;
+  readonly t: (key: any) => string;
+}
+
+function DiarizationConfigModal({
+  video,
+  language,
+  onLanguageChange,
+  startNow,
+  onStartNowChange,
+  isDiarizing,
+  onClose,
+  onConfirm,
+  t,
+}: Readonly<DiarizationConfigModalProps>) {
+  if (!video) return null;
+
+  return (
+    <dialog
+      open
+      aria-modal="true"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 border-0 m-0 max-w-none max-h-none w-full h-full"
+    >
+      <button
+        type="button"
+        aria-label={t('cancel') || 'Fechar'}
+        className="fixed inset-0 bg-transparent border-0 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative z-10 bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
+          <h3 className="text-zinc-100 font-bold flex items-center gap-2">
+            <ListMusic className="w-5 h-5 text-purple-400" />
+            Configurar Diarização
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <p className="text-sm text-zinc-400 mb-4">{t('diarizationModalSubtitle')}</p>
+
+          <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 mb-4">
+            <p className="text-sm text-zinc-200 font-bold line-clamp-1">{video.title}</p>
+            <p className="text-xs text-zinc-500 mt-1">{video.sourceName}</p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              {t('diarizationModalLangLabel')}
+            </label>
+            <input
+              type="text"
+              value={language}
+              onChange={(e) => onLanguageChange(e.target.value)}
+              placeholder="en, pt, es, etc."
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+            />
+            <p className="text-xs text-zinc-500 mt-1">{t('diarizationModalLangDesc')}</p>
+            <label className="mt-3 flex items-start gap-3 rounded-lg border border-zinc-700 p-3 text-sm text-zinc-200">
+              <input
+                type="checkbox"
+                checked={startNow}
+                onChange={(event) => onStartNowChange(event.target.checked)}
+                disabled={isDiarizing}
+                className="mt-1 accent-purple-500"
+              />
+              <span>
+                {t('diarizationStartNow')}
+                <span className="mt-1 block text-xs leading-relaxed text-zinc-400">{t('diarizationStartNowHint')}</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="p-4 bg-zinc-900/30 border-t border-zinc-800/80 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700/80 transition-colors"
+          >
+            {t('cancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDiarizing}
+            className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold shadow-md shadow-purple-500/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            {isDiarizing ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <ListMusic className="w-4 h-4" />
+            )}
+            {t('confirmDiarizationBtn')}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+interface SignalCatcherNavProps {
+  readonly subTab: string;
+  readonly onSelectSubTab: (tab: CaptureSection) => void;
+  readonly totalStatusCount?: number;
+  readonly capturesCount: number;
+  readonly totalSavedCount?: number;
+  readonly savedChannelsCount: number;
+  readonly totalMonitoredCount?: number;
+  readonly sourcesCount: number;
+  readonly isRetryingGlobal: boolean;
+  readonly onGlobalRetry: () => void;
+  readonly onNewIngestion: () => void;
+  readonly t: (key: any) => string;
+}
+
+function SignalCatcherNav({
+  subTab,
+  onSelectSubTab,
+  totalStatusCount,
+  capturesCount,
+  totalSavedCount,
+  savedChannelsCount,
+  totalMonitoredCount,
+  sourcesCount,
+  isRetryingGlobal,
+  onGlobalRetry,
+  onNewIngestion,
+  t,
+}: Readonly<SignalCatcherNavProps>) {
+  return (
+    <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+      <div className="flex items-center gap-2 text-xs overflow-x-auto pb-1 [&>button]:shrink-0">
+        <button
+          onClick={() => onSelectSubTab('captures')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+            subTab === 'captures'
+              ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
+              : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Video className="w-3.5 h-3.5 text-indigo-400" />
+          <span>{t('capturedFeeds')} ({totalStatusCount || capturesCount})</span>
+        </button>
+
+        <button
+          onClick={() => onSelectSubTab('saved_channels')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+            subTab === 'saved_channels'
+              ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
+              : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <YoutubeIcon className="w-3.5 h-3.5 text-red-500" />
+          <span>{t('savedChannels')} ({totalSavedCount || savedChannelsCount})</span>
+        </button>
+
+        <button
+          onClick={() => onSelectSubTab('sources')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+            subTab === 'sources'
+              ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
+              : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5 text-cyan-400" />
+          <span>{t('monitoredSources')} ({totalMonitoredCount || sourcesCount})</span>
+        </button>
+
+        <button
+          onClick={() => onSelectSubTab('tracking')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+            subTab === 'tracking'
+              ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
+              : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5 text-fuchsia-400" />
+          <span>{t('tabTracking' as any) || 'Tracking'}</span>
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {subTab === 'captures' && (
+          <button
+            onClick={onGlobalRetry}
+            disabled={isRetryingGlobal}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-medium text-xs transition-all shadow-sm disabled:opacity-50"
+            title={t('titleReprocessFailures')}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRetryingGlobal ? 'animate-spin text-indigo-400' : 'text-zinc-400'}`} />
+            <span className="hidden sm:inline">{t('btnReprocessFailures')}</span>
+          </button>
+        )}
+        <button
+          onClick={onNewIngestion}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-md shadow-indigo-600/20 hover:scale-[1.02] active:scale-95"
+        >
+          <Plus className="w-4 h-4" />
+          <span>{t('btnNewIngestionOrSource')}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface CapturesFeedViewProps {
+  readonly query: string;
+  readonly onSearchChange: (val: string) => void;
+  readonly stepFilter?: string;
+  readonly onStepFilterChange?: (step: string) => void;
+  readonly totalStatusCount?: number;
+  readonly statusCounts: Record<string, number>;
+  readonly channelFilter?: string;
+  readonly onChannelFilterChange?: (channel: string) => void;
+  readonly channelOptions: [string, string][];
+  readonly renderCapturesGrid: () => React.ReactNode;
+  readonly renderLoadMoreStatus: () => React.ReactNode;
+  readonly loadMoreSentinel: React.RefObject<HTMLDivElement | null>;
+  readonly t: (key: any) => string;
+}
+
+function CapturesFeedView({
+  query,
+  onSearchChange,
+  stepFilter,
+  onStepFilterChange,
+  totalStatusCount,
+  statusCounts,
+  channelFilter,
+  onChannelFilterChange,
+  channelOptions,
+  renderCapturesGrid,
+  renderLoadMoreStatus,
+  loadMoreSentinel,
+  t,
+}: Readonly<CapturesFeedViewProps>) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-900/80 p-3.5 rounded-2xl border border-zinc-800 shadow-sm">
+        <div className="relative flex-1 w-full">
+          <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={t('filterPlaceholder')}
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 font-mono"
+          />
+        </div>
+        {onStepFilterChange && (
+          <select
+            value={stepFilter}
+            onChange={(e) => onStepFilterChange(e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
+          >
+            <option value="">Todos os Status ({totalStatusCount})</option>
+            <option value="STARTED">STARTED ({statusCounts['STARTED'] || 0})</option>
+            <option value="PENDING_METADATA_EXTRACTION">PENDING_METADATA_EXTRACTION ({statusCounts['PENDING_METADATA_EXTRACTION'] || 0})</option>
+            <option value="EXTRACTING_METADATA">EXTRACTING_METADATA ({statusCounts['EXTRACTING_METADATA'] || 0})</option>
+            <option value="METADATA_EXTRACTED">METADATA_EXTRACTED ({statusCounts['METADATA_EXTRACTED'] || 0})</option>
+            <option value="PENDING_DOWNLOAD">PENDING_DOWNLOAD ({statusCounts['PENDING_DOWNLOAD'] || 0})</option>
+            <option value="DOWNLOADING">DOWNLOADING ({statusCounts['DOWNLOADING'] || 0})</option>
+            <option value="DOWNLOADED">DOWNLOADED ({statusCounts['DOWNLOADED'] || 0})</option>
+            <option value="COMPLETED">COMPLETED ({statusCounts['COMPLETED'] || 0})</option>
+            <option value="ERROR">ERROR ({statusCounts['ERROR'] || 0})</option>
+            <option value="MEMBERS_ONLY">MEMBERS_ONLY ({statusCounts['MEMBERS_ONLY'] || 0})</option>
+            <option value="AGE_RESTRICTED">AGE_RESTRICTED ({statusCounts['AGE_RESTRICTED'] || 0})</option>
+            <option value="PRIVATE_VIDEO">PRIVATE_VIDEO ({statusCounts['PRIVATE_VIDEO'] || 0})</option>
+            <option value="COPYRIGHT_REMOVED">COPYRIGHT_REMOVED ({statusCounts['COPYRIGHT_REMOVED'] || 0})</option>
+            <option value="ACCOUNT_TERMINATED">ACCOUNT_TERMINATED ({statusCounts['ACCOUNT_TERMINATED'] || 0})</option>
+            <option value="VIDEO_REMOVED">VIDEO_REMOVED ({statusCounts['VIDEO_REMOVED'] || 0})</option>
+            <option value="COURT_ORDER">COURT_ORDER ({statusCounts['COURT_ORDER'] || 0})</option>
+            <option value="REPROCESSING">REPROCESSING ({statusCounts['REPROCESSING'] || 0})</option>
+            <option value="DELETED">DELETED ({statusCounts['DELETED'] || 0})</option>
+          </select>
+        )}
+
+        {onChannelFilterChange && (
+          <select
+            value={channelFilter}
+            onChange={(e) => onChannelFilterChange(e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
+          >
+            <option value="">Todos os Canais</option>
+            {channelOptions.map(([externalId, displayName]) => (
+              <option key={externalId} value={externalId}>
+                {displayName}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {renderCapturesGrid()}
+
+      <div ref={loadMoreSentinel} className="flex flex-col items-center justify-center gap-2 py-5 text-xs text-zinc-400" aria-live="polite">
+        {renderLoadMoreStatus()}
+      </div>
+    </div>
+  );
+}
+
 export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   language = 'en',
   sources,
@@ -1029,83 +1930,23 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         </div>
       </div>
 
-      {/* Sub-Navigation Bar */}
-      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
-        <div className="flex items-center gap-2 text-xs overflow-x-auto pb-1 [&>button]:shrink-0">
-          <button
-            onClick={() => setSubTab('captures')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
-              subTab === 'captures'
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
-                : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Video className="w-3.5 h-3.5 text-indigo-400" />
-            <span>{t('capturedFeeds')} ({totalStatusCount || captures.length})</span>
-          </button>
-
-          <button
-            onClick={() => setSubTab('saved_channels')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
-              subTab === 'saved_channels'
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
-                : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <YoutubeIcon className="w-3.5 h-3.5 text-red-500" />
-            <span>{t('savedChannels')} ({totalSavedCount || savedChannels.length})</span>
-          </button>
-
-          <button
-            onClick={() => setSubTab('sources')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
-              subTab === 'sources'
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
-                : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Radio className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{t('monitoredSources')} ({totalMonitoredCount || sources.length})</span>
-          </button>
-
-          <button
-            onClick={() => setSubTab('tracking')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
-              subTab === 'tracking'
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
-                : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5 text-fuchsia-400" />
-            <span>{t('tabTracking' as any) || 'Tracking'}</span>
-          </button>
-        </div>
-
-        {/* Action Trigger Buttons */}
-        <div className="flex items-center gap-2">
-          {subTab === 'captures' && (
-            <button
-              onClick={handleGlobalRetry}
-              disabled={isRetryingGlobal}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-medium text-xs transition-all shadow-sm disabled:opacity-50"
-              title={t('titleReprocessFailures')}
-            >
-              <RefreshCw className={`w-4 h-4 ${isRetryingGlobal ? 'animate-spin text-indigo-400' : 'text-zinc-400'}`} />
-              <span className="hidden sm:inline">{t('btnReprocessFailures')}</span>
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setModalMode('content');
-              setIsIngestionModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-md shadow-indigo-600/20 hover:scale-[1.02] active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('btnNewIngestionOrSource')}</span>
-          </button>
-        </div>
-      </div>
+      <SignalCatcherNav
+        subTab={subTab}
+        onSelectSubTab={setSubTab}
+        totalStatusCount={totalStatusCount}
+        capturesCount={captures.length}
+        totalSavedCount={totalSavedCount}
+        savedChannelsCount={savedChannels.length}
+        totalMonitoredCount={totalMonitoredCount}
+        sourcesCount={sources.length}
+        isRetryingGlobal={isRetryingGlobal}
+        onGlobalRetry={() => void handleGlobalRetry()}
+        onNewIngestion={() => {
+          setModalMode('content');
+          setIsIngestionModalOpen(true);
+        }}
+        t={t}
+      />
 
       {/* TRACKING PIPELINE VIEW */}
       {subTab === 'tracking' && (
@@ -1119,661 +1960,93 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
 
       {/* SUB-TAB 1: CAPTURED VIDEOS FEED */}
       {subTab === 'captures' && (
-        <div className="space-y-4">
-          {/* Search & Tag Filter Bar - Bento Card */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-900/80 p-3.5 rounded-2xl border border-zinc-800 shadow-sm">
-            <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder={t('filterPlaceholder')}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 font-mono"
-              />
-            </div>
-            {onStepFilterChange && (
-              <select
-                value={stepFilter}
-                onChange={(e) => {
-                  onStepFilterChange(e.target.value);
-                }}
-                className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
-              >
-                <option value="">Todos os Status ({totalStatusCount})</option>
-                <option value="STARTED">STARTED ({statusCounts['STARTED'] || 0})</option>
-                <option value="PENDING_METADATA_EXTRACTION">PENDING_METADATA_EXTRACTION ({statusCounts['PENDING_METADATA_EXTRACTION'] || 0})</option>
-                <option value="EXTRACTING_METADATA">EXTRACTING_METADATA ({statusCounts['EXTRACTING_METADATA'] || 0})</option>
-                <option value="METADATA_EXTRACTED">METADATA_EXTRACTED ({statusCounts['METADATA_EXTRACTED'] || 0})</option>
-                <option value="PENDING_DOWNLOAD">PENDING_DOWNLOAD ({statusCounts['PENDING_DOWNLOAD'] || 0})</option>
-                <option value="DOWNLOADING">DOWNLOADING ({statusCounts['DOWNLOADING'] || 0})</option>
-                <option value="DOWNLOADED">DOWNLOADED ({statusCounts['DOWNLOADED'] || 0})</option>
-                <option value="COMPLETED">COMPLETED ({statusCounts['COMPLETED'] || 0})</option>
-                <option value="ERROR">ERROR ({statusCounts['ERROR'] || 0})</option>
-                <option value="MEMBERS_ONLY">MEMBERS_ONLY ({statusCounts['MEMBERS_ONLY'] || 0})</option>
-                <option value="AGE_RESTRICTED">AGE_RESTRICTED ({statusCounts['AGE_RESTRICTED'] || 0})</option>
-                <option value="PRIVATE_VIDEO">PRIVATE_VIDEO ({statusCounts['PRIVATE_VIDEO'] || 0})</option>
-                <option value="COPYRIGHT_REMOVED">COPYRIGHT_REMOVED ({statusCounts['COPYRIGHT_REMOVED'] || 0})</option>
-                <option value="ACCOUNT_TERMINATED">ACCOUNT_TERMINATED ({statusCounts['ACCOUNT_TERMINATED'] || 0})</option>
-                <option value="VIDEO_REMOVED">VIDEO_REMOVED ({statusCounts['VIDEO_REMOVED'] || 0})</option>
-                <option value="COURT_ORDER">COURT_ORDER ({statusCounts['COURT_ORDER'] || 0})</option>
-                <option value="REPROCESSING">REPROCESSING ({statusCounts['REPROCESSING'] || 0})</option>
-                <option value="DELETED">DELETED ({statusCounts['DELETED'] || 0})</option>
-              </select>
-            )}
-
-            {onChannelFilterChange && (
-              <select
-                value={channelFilter}
-                onChange={(e) => {
-                  onChannelFilterChange(e.target.value);
-                }}
-                className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50 font-mono min-w-[160px]"
-              >
-                <option value="">Todos os Canais</option>
-                {channelOptions.map(([externalId, displayName]) => (
-                  <option key={externalId} value={externalId}>
-                    {displayName}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-
-          {/* Videos Bento Grid */}
-          {renderCapturesGrid()}
-
-          <div ref={loadMoreSentinel} className="flex flex-col items-center justify-center gap-2 py-5 text-xs text-zinc-400" aria-live="polite">
-            {renderLoadMoreStatus()}
-          </div>
-        </div>
+        <CapturesFeedView
+          query={query}
+          onSearchChange={handleSearchChange}
+          stepFilter={stepFilter}
+          onStepFilterChange={onStepFilterChange}
+          totalStatusCount={totalStatusCount}
+          statusCounts={statusCounts}
+          channelFilter={channelFilter}
+          onChannelFilterChange={onChannelFilterChange}
+          channelOptions={channelOptions}
+          renderCapturesGrid={renderCapturesGrid}
+          renderLoadMoreStatus={renderLoadMoreStatus}
+          loadMoreSentinel={loadMoreSentinel}
+          t={t}
+        />
       )}
 
-      {subTab === 'saved_channels' && <SavedChannels
-        channels={savedChannels || []}
+      {subTab === 'saved_channels' && (
+        <SavedChannels
+          channels={savedChannels || []}
+          language={language === 'pt' ? 'pt' : 'en'}
+        />
+      )}
+
+      {subTab === 'sources' && (
+        <MonitoredChannels
+          sources={sources}
+          language={language === 'pt' ? 'pt' : 'en'}
+          onToggle={handleToggleSourceStatus}
+          onAdd={() => {
+            setModalMode('sources');
+            setIsIngestionModalOpen(true);
+          }}
+        />
+      )}
+
+      <IngestionModal
+        isOpen={isIngestionModalOpen}
+        modalMode={modalMode}
+        onModalModeChange={setModalMode}
+        onClose={() => setIsIngestionModalOpen(false)}
+        manualUrl={manualUrl}
+        onManualUrlChange={setManualUrl}
+        newSourceUrl={newSourceUrl}
+        onNewSourceUrlChange={setNewSourceUrl}
+        saveInPlaylistFolder={saveInPlaylistFolder}
+        onSaveInPlaylistFolderChange={setSaveInPlaylistFolder}
+        isProcessing={isProcessingManual}
+        onSubmitContent={(e) => void handleIngestContent(e)}
+        onSubmitPlaylist={(e) => void handleIngestPlaylist(e)}
+        onSubmitSource={(e) => void handleRegisterSource(e)}
+        t={t}
+      />
+
+      <VideoDetailModal
+        video={selectedVideo}
+        isDeleting={selectedVideo ? deletingVideoIds.has(selectedVideo.id) : false}
         language={language === 'pt' ? 'pt' : 'en'}
-      />}
+        dateLocale={dateLocale}
+        onClose={() => setSelectedVideo(null)}
+        onDeleteClick={(vid) => {
+          setSelectedVideo(null);
+          setVideoToDelete(vid);
+        }}
+        onDiarizeClick={handleDiarizationClick}
+        t={t}
+      />
 
-      {subTab === 'sources' && <MonitoredChannels
-        sources={sources}
-        language={language === 'pt' ? 'pt' : 'en'}
-        onToggle={handleToggleSourceStatus}
-        onAdd={() => {setModalMode('sources'); setIsIngestionModalOpen(true);}}
-      />}
+      <VideoDeleteModal
+        video={videoToDelete}
+        isDeleting={videoToDelete ? deletingVideoIds.has(videoToDelete.id) : false}
+        onClose={() => setVideoToDelete(null)}
+        onConfirm={(e, vid) => void handleIndividualDelete(e, vid)}
+        t={t}
+      />
 
-      {/* INGESTION & SOURCE CREATION MODAL */}
-      {isIngestionModalOpen && (
-        <dialog
-          open
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 border-0 m-0 max-w-none max-h-none w-full h-full"
-        >
-          <button
-            type="button"
-            aria-label={t('cancel') || 'Fechar'}
-            className="fixed inset-0 bg-transparent border-0 cursor-default"
-            onClick={() => setIsIngestionModalOpen(false)}
-          />
-          <div className="relative z-10 w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/60">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-zinc-100">{t('modalIngestionTitle')}</h3>
-                  <p className="text-xs text-zinc-400 font-mono mt-0.5">{t('modalIngestionSub')}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsIngestionModalOpen(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Tabs Selector (3 API Routes: /video, /playlist, /canal or /channel) */}
-            <div className="grid grid-cols-3 p-2 gap-1.5 bg-zinc-950/80 border-b border-zinc-800 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setModalMode('content')}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
-                  modalMode === 'content'
-                    ? 'bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-bold shadow-sm'
-                    : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
-              >
-                <Video className="w-3.5 h-3.5 mb-1 text-indigo-400" />
-                <span>{t('tabVideoRoute')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModalMode('sources')}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
-                  modalMode === 'sources'
-                    ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 font-bold shadow-sm'
-                    : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
-              >
-                <Radio className="w-3.5 h-3.5 mb-1 text-emerald-400" />
-                <span>{t('tabCanalRoute')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModalMode('playlist')}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border transition-all ${
-                  modalMode === 'playlist'
-                    ? 'bg-purple-500/15 border-purple-500/50 text-purple-300 font-bold shadow-sm'
-                    : 'bg-transparent border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
-              >
-                <ListVideo className="w-3.5 h-3.5 mb-1 text-purple-400" />
-                <span>{t('tabPlaylistRoute')}</span>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 space-y-4 font-mono text-xs">
-              {/* TAB 1: /video */}
-              {modalMode === 'content' && (
-                <form onSubmit={handleIngestContent} className="space-y-4">
-                  <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-200 text-xs">
-                    <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descVideoRoute')}</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
-                      {t('fieldUrlVideo')} *
-                    </label>
-                    <input
-                      type="url"
-                      required
-                      value={manualUrl}
-                      onChange={(e) => setManualUrl(e.target.value)}
-                      placeholder={t('fieldUrlVideoPlaceholder')}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/60 font-sans"
-                    />
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsIngestionModalOpen(false)}
-                      className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold font-sans"
-                    >
-                      {t('cancel')}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isProcessingManual}
-                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-50 transition-all hover:scale-[1.02] font-sans"
-                    >
-                      {isProcessingManual ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>{t('ingestingLoader')}</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>{t('btnSubmitEndpoint')}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* TAB 2: /playlist */}
-              {modalMode === 'playlist' && (
-                <form onSubmit={handleIngestPlaylist} className="space-y-4">
-                  <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-200 text-xs">
-                    <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descPlaylistRoute')}</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
-                      {t('fieldUrlPlaylist')} *
-                    </label>
-                    <input
-                      type="url"
-                      required
-                      value={manualUrl}
-                      onChange={(e) => setManualUrl(e.target.value)}
-                      placeholder={t('fieldUrlPlaylistPlaceholder')}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-purple-500/60 font-sans"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <div>
-                      <span className="block text-xs font-bold text-zinc-200 font-sans">
-                        {t('fieldSaveInPlaylistFolder')}
-                      </span>
-                      <span className="block text-xs text-zinc-500 font-sans">
-                        {t('fieldSaveInPlaylistFolderDesc')}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSaveInPlaylistFolder(!saveInPlaylistFolder)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        saveInPlaylistFolder ? 'bg-purple-600' : 'bg-zinc-800'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          saveInPlaylistFolder ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsIngestionModalOpen(false)}
-                      className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold font-sans"
-                    >
-                      {t('cancel')}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isProcessingManual}
-                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 disabled:opacity-50 transition-all hover:scale-[1.02] font-sans"
-                    >
-                      {isProcessingManual ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>{t('ingestingLoader')}</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>{t('btnSubmitEndpoint')}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* TAB 3: /canal */}
-              {modalMode === 'sources' && (
-                <form onSubmit={handleRegisterSource} className="space-y-4">
-                  <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs">
-                    <p className="text-xs text-zinc-300 font-sans leading-relaxed">{t('descSourcesRoute')}</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 text-xs uppercase tracking-wider mb-1">
-                      {t('fieldUrlCanal')} *
-                    </label>
-                    <input
-                      type="url"
-                      required
-                      value={newSourceUrl}
-                      onChange={(e) => setNewSourceUrl(e.target.value)}
-                      placeholder={t('fieldUrlSourcePlaceholder')}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/60 font-sans"
-                    />
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsIngestionModalOpen(false)}
-                      className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold font-sans"
-                    >
-                      {t('cancel')}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isProcessingManual}
-                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-zinc-950 font-bold text-xs shadow-md shadow-emerald-600/20 disabled:opacity-50 transition-all hover:scale-[1.02] font-sans"
-                    >
-                      {isProcessingManual ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>{t('ingestingLoader')}</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>{t('btnSubmitEndpoint')}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </dialog>
-      )}
-
-      {/* Video Details Modal */}
-      {selectedVideo && (
-        <dialog
-          open
-          aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm border-0 m-0 max-w-none max-h-none w-full h-full"
-        >
-          <button
-            type="button"
-            aria-label={t('cancel') || 'Fechar'}
-            className="fixed inset-0 bg-transparent border-0 cursor-default"
-            onClick={() => setSelectedVideo(null)}
-          />
-          <div className="relative z-10 bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/30">
-              <div className="flex items-center gap-3">
-                <Video className="w-5 h-5 text-indigo-400" />
-                <h2 className="text-sm font-bold text-zinc-100 font-mono uppercase">{t('videoDetails')}</h2>
-              </div>
-              <button
-                onClick={() => setSelectedVideo(null)}
-                className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 overflow-y-auto scrollbar-none flex flex-col gap-6">
-              <div className="flex flex-col sm:flex-row gap-5 items-start">
-                <div className="w-full sm:w-56 shrink-0 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 relative shadow-md aspect-video">
-                  {selectedVideo.thumbnail ? (
-                    <img src={selectedVideo.thumbnail} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-                      <YoutubeIcon className="w-16 h-16 text-zinc-700 opacity-50" />
-                    </div>
-                  )}
-                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700/50">{formatDuration(selectedVideo.duration)}</span>
-                </div>
-                <div className="flex flex-col gap-3">
-                  <h3 className="text-lg font-bold text-zinc-100 leading-tight">{selectedVideo.title}</h3>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm font-semibold text-zinc-400 flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-xs uppercase font-bold border border-indigo-500/30">
-                        {selectedVideo.sourceName.charAt(0)}
-                      </span>
-                      {selectedVideo.sourceName}
-                    </span>
-                    <span className={`px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 ${selectedVideo.deletionRequested ? 'text-amber-400' : getStatusColor(selectedVideo.status)} text-xs uppercase font-mono font-bold tracking-wider shadow-sm`}>
-                      {selectedVideo.deletionRequested ? t('deletionPending') : selectedVideo.status.replaceAll('_', ' ')}
-                    </span>
-                    {(() => {
-                    if (!canDiarizeVideo(selectedVideo)) return null;
-                    const modalDiarBadge = getDiarizationBadgeInfo(selectedVideo.isDiarized, selectedVideo.diarizationStatus, selectedVideo.diarizationProgress, t);
-                    if (!modalDiarBadge) return null;
-                    return (
-                      <span className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${modalDiarBadge.className}`}>
-                        {modalDiarBadge.icon}
-                        <span>{modalDiarBadge.label}</span>
-                      </span>
-                    );
-                  })()}
-                    {selectedVideo.publishedAt && (
-                      <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5 ml-2 bg-zinc-900/50 px-2 py-1 rounded-md border border-zinc-800/50">
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
-                        {t('publishedAt')}: {new Date(selectedVideo.publishedAt).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2.5">
-                <h4 className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
-                  <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
-                  {t('fullDescription')}
-                </h4>
-                <div className="text-sm text-zinc-300 bg-zinc-900/60 p-5 rounded-xl border border-zinc-800/80 whitespace-pre-wrap font-sans leading-relaxed shadow-inner">
-                  {selectedVideo.description || selectedVideo.summary || t('noDescriptionAvailable')}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2.5">
-                <h4 className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
-                  <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
-                  {t('tagsLabel')} ({selectedVideo.tags.length})
-                </h4>
-                <div className="flex flex-wrap gap-2 bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50">
-                  {selectedVideo.tags.length > 0 ? selectedVideo.tags.map(tItem => (
-                    <span key={tItem} className="text-xs font-mono px-3 py-1.5 rounded-full bg-zinc-950 text-indigo-400 border border-zinc-800 shadow-sm hover:border-indigo-500/50 hover:text-indigo-300 transition-colors cursor-default">
-                      #{tItem}
-                    </span>
-                  )) : (
-                    <span className="text-xs text-zinc-500 font-mono">{t('noTags')}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Timestamps */}
-              <div className="flex flex-col sm:flex-row gap-4 bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/50">
-                <div className="flex flex-col gap-1 w-full">
-                  <span className="text-xs font-bold text-zinc-500 uppercase font-mono tracking-widest flex items-center gap-2">
-                    <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
-                    {t('createdAt')}
-                  </span>
-                  <span className="text-sm text-zinc-300 font-mono ml-3">
-                    {selectedVideo.createdAt ? new Date(selectedVideo.createdAt).toLocaleString(dateLocale) : '-'}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-zinc-800/80 flex items-center justify-between bg-zinc-950">
-              <div className="flex items-center gap-2">
-                {canDeleteVideo(selectedVideo) && (
-                  <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedVideo(null);
-                    setVideoToDelete(selectedVideo);
-                  }}
-                  disabled={deletingVideoIds.has(selectedVideo.id) || selectedVideo.deletionRequested}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 text-xs font-bold transition-all disabled:opacity-50"
-                >
-                  <Trash className={`w-4 h-4 ${deletingVideoIds.has(selectedVideo.id) ? 'animate-pulse' : ''}`} />
-                  <span>{selectedVideo.deletionRequested ? t('deletionPending') : t('btnConfirmDelete')}</span>
-                </button>
-                )}
-                {canDiarizeVideo(selectedVideo) && (
-                  isDiarizationInProgress(selectedVideo.diarizationStatus) ? (
-                    <span className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-300 text-xs font-bold flex items-center gap-1.5 border border-amber-500/20 cursor-default">
-                      <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                      {selectedVideo.diarizationProgress != null ? `${t('diarizing')} ${selectedVideo.diarizationProgress}%` : t('diarizing')}
-                    </span>
-                  ) : (
-                    <button
-                      onClick={(e) => handleDiarizationClick(e, selectedVideo)}
-                      className="px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold shadow-sm shadow-purple-500/10 transition-colors flex items-center gap-1.5 border border-purple-500/20"
-                    >
-                      <ListMusic className="w-3.5 h-3.5" />
-                      {selectedVideo.isDiarized || selectedVideo.diarizationStatus === 'COMPLETED' ? 'Refazer Diarização' : 'Diarização'}
-                    </button>
-                  )
-                )}
-
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setSelectedVideo(null)}
-                  className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs font-bold transition-all"
-                >
-                  {t('closeDetails')}
-                </button>
-                <a
-                  href={selectedVideo.videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 hover:scale-[1.02] hover:shadow-indigo-600/40"
-                >
-                  <span>{t('watchOnYouTube')}</span>
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
-          </div>
-        </dialog>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {videoToDelete && (
-        <dialog
-          open
-          aria-modal="true"
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 border-0 m-0 max-w-none max-h-none w-full h-full"
-        >
-          <button
-            type="button"
-            aria-label={t('btnCancelDelete')}
-            className="fixed inset-0 bg-transparent border-0 cursor-default"
-            onClick={() => setVideoToDelete(null)}
-          />
-          <div className="relative z-10 bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
-              <h3 className="text-zinc-100 font-bold flex items-center gap-2">
-                <Trash className="w-5 h-5 text-red-400" />
-                {t('titleConfirmDelete')}
-              </h3>
-              <button
-                onClick={() => setVideoToDelete(null)}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <p className="text-sm text-zinc-400 mb-4">
-                {t('descConfirmDelete')}
-              </p>
-              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                <p className="text-sm text-zinc-200 font-bold line-clamp-1">{videoToDelete.title}</p>
-                <p className="text-xs text-zinc-500 mt-1">{videoToDelete.sourceName}</p>
-              </div>
-            </div>
-
-            <div className="p-4 bg-zinc-900/30 border-t border-zinc-800/80 flex justify-end gap-3">
-              <button
-                onClick={() => setVideoToDelete(null)}
-                className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700/80 transition-colors"
-              >
-                {t('btnCancelDelete')}
-              </button>
-              <button
-                onClick={(e) => {
-                  handleIndividualDelete(e, videoToDelete);
-                  setVideoToDelete(null);
-                }}
-                disabled={deletingVideoIds.has(videoToDelete.id)}
-                className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-md shadow-red-500/20 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                {deletingVideoIds.has(videoToDelete.id) ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash className="w-4 h-4" />
-                )}
-                {t('btnConfirmDelete')}
-              </button>
-            </div>
-          </div>
-        </dialog>
-      )}
-
-      {/* Diarization Config Modal */}
-      {diarizationModalVideo && (
-        <dialog
-          open
-          aria-modal="true"
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 border-0 m-0 max-w-none max-h-none w-full h-full"
-        >
-          <button
-            type="button"
-            aria-label={t('cancel') || 'Fechar'}
-            className="fixed inset-0 bg-transparent border-0 cursor-default"
-            onClick={() => setDiarizationModalVideo(null)}
-          />
-          <div className="relative z-10 bg-[#09090b] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800/80 bg-zinc-900/50">
-              <h3 className="text-zinc-100 font-bold flex items-center gap-2">
-                <ListMusic className="w-5 h-5 text-purple-400" />
-                Configurar Diarização
-              </h3>
-              <button
-                onClick={() => setDiarizationModalVideo(null)}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <p className="text-sm text-zinc-400 mb-4">
-                {t('diarizationModalSubtitle')}
-              </p>
-
-              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 mb-4">
-                <p className="text-sm text-zinc-200 font-bold line-clamp-1">{diarizationModalVideo.title}</p>
-                <p className="text-xs text-zinc-500 mt-1">{diarizationModalVideo.sourceName}</p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                  {t('diarizationModalLangLabel')}
-                </label>
-                <input
-                  type="text"
-                  value={diarizationLanguage}
-                  onChange={(e) => setDiarizationLanguage(e.target.value)}
-                  placeholder="en, pt, es, etc."
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                />
-                <p className="text-xs text-zinc-500 mt-1">
-                  {t('diarizationModalLangDesc')}
-                </p>
-                <label className="mt-3 flex items-start gap-3 rounded-lg border border-zinc-700 p-3 text-sm text-zinc-200">
-                  <input type="checkbox" checked={diarizationStartNow} onChange={event => setDiarizationStartNow(event.target.checked)} disabled={isDiarizing} className="mt-1 accent-purple-500" />
-                  <span>{t('diarizationStartNow')}<span className="mt-1 block text-xs leading-relaxed text-zinc-400">{t('diarizationStartNowHint')}</span></span>
-                </label>
-              </div>
-            </div>
-
-            <div className="p-4 bg-zinc-900/30 border-t border-zinc-800/80 flex justify-end gap-3">
-              <button
-                onClick={() => setDiarizationModalVideo(null)}
-                className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700/80 transition-colors"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                onClick={confirmDiarization}
-                disabled={isDiarizing}
-                className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold shadow-md shadow-purple-500/20 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                {isDiarizing ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ListMusic className="w-4 h-4" />
-                )}
-                {t('confirmDiarizationBtn')}
-              </button>
-            </div>
-          </div>
-        </dialog>
-      )}
+      <DiarizationConfigModal
+        video={diarizationModalVideo}
+        language={diarizationLanguage}
+        onLanguageChange={setDiarizationLanguage}
+        startNow={diarizationStartNow}
+        onStartNowChange={setDiarizationStartNow}
+        isDiarizing={isDiarizing}
+        onClose={() => setDiarizationModalVideo(null)}
+        onConfirm={() => void confirmDiarization()}
+        t={t}
+      />
     </div>
   );
 };

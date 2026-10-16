@@ -1,5 +1,5 @@
 import React, {useMemo, useState} from 'react';
-import {ExternalLink, Search, Video, X, Youtube} from 'lucide-react';
+import {ExternalLink, Search, Video, X} from 'lucide-react';
 import {ContentSource, LanguageMode} from '../../types';
 import {getTranslation} from '../../locales';
 
@@ -51,7 +51,7 @@ export const SavedChannels: React.FC<{channels: ContentSource[]; language: Langu
                     </li>;
                 })}
             </ul> : <div className="px-4 py-12 text-center">
-                <Youtube className="size-6 mx-auto mb-3 text-zinc-500" />
+                <Video className="size-6 mx-auto mb-3 text-zinc-500" />
                 <p className="text-sm font-medium text-zinc-200">{t(channels.length ? 'monitoredNoResults' : 'savedChannelsEmpty')}</p>
                 {query && <button onClick={() => setQuery('')} className="mt-4 text-xs text-indigo-400 hover:underline">{t('monitoredClearFilters')}</button>}
             </div>}

@@ -55,6 +55,210 @@ function durationLabel(duration: string) {
   return formatTime(Number(duration));
 }
 
+function getBadgeIcon(normalized: string) {
+  if (normalized === 'COMPLETED' || normalized === 'DIARIZED') return Check;
+  if (normalized === 'ERROR') return AlertCircle;
+  if (normalized === 'PENDING' || normalized === 'STARTED') return Mic;
+  return Loader2;
+}
+
+function DiarizationBadge({ step, t }: { readonly step: string; readonly t: (key: any) => string }) {
+  const normalized = step.toUpperCase();
+  const config = steps[normalized];
+  const Icon = getBadgeIcon(normalized);
+  const colorClass = config?.color || 'text-zinc-300 bg-zinc-800';
+  return (
+    <span className={'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ' + colorClass}>
+      <Icon className="h-3.5 w-3.5" />
+      {config ? t(config.label) : step}
+    </span>
+  );
+}
+
+function getProgressBarColorClass(step: string): string {
+  if (step === 'TRANSCRIPTION') return 'accent-amber-400 [&::-webkit-progress-value]:bg-amber-400 [&::-moz-progress-bar]:bg-amber-400';
+  if (step === 'ALIGNMENT') return 'accent-blue-400 [&::-webkit-progress-value]:bg-blue-400 [&::-moz-progress-bar]:bg-blue-400';
+  return 'accent-purple-400 [&::-webkit-progress-value]:bg-purple-400 [&::-moz-progress-bar]:bg-purple-400';
+}
+
+function DiarizationStatus({ video, t }: { readonly video: DiarizationVideo; readonly t: (key: any) => string }) {
+  const stepUpper = video.step.toUpperCase();
+  const measurable = ['TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION'].includes(stepUpper);
+  const percent = measurable && typeof video.progress_percent === 'number' && Number.isFinite(video.progress_percent)
+    ? Math.max(0, Math.min(100, Math.floor(video.progress_percent))) : null;
+
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <DiarizationBadge step={video.step} t={t} />
+        {percent !== null && <span className="text-xs tabular-nums text-zinc-300">{percent}%</span>}
+      </div>
+      {stepUpper === 'PENDING' && (video.queue_priority ?? 0) > 0 && (
+        <p className="text-xs text-indigo-400">{t('diarizationNextInQueue')}</p>
+      )}
+      {measurable && (
+        <progress
+          aria-label={`${t('diarizationStageProgress')}: ${t(steps[stepUpper]?.label || 'diarizationStatus')}`}
+          value={percent !== null ? percent : undefined}
+          max={100}
+          className={`h-1.5 w-32 max-w-full overflow-hidden rounded-full bg-zinc-800 ${getProgressBarColorClass(stepUpper)} ${percent === null ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+        />
+      )}
+      {measurable && percent === null && (
+        <p className="text-xs text-zinc-500">{t('diarizationProgressWaiting')}</p>
+      )}
+    </div>
+  );
+}
+
+interface DiarizationCardProps {
+  readonly video: DiarizationVideo;
+  readonly isSelected: boolean;
+  readonly hasSelectedVideo: boolean;
+  readonly isReprocessing: boolean;
+  readonly startingId: string | null;
+  readonly onOpen: (video: DiarizationVideo, button: HTMLButtonElement) => void;
+  readonly onStartNow: (video: DiarizationVideo) => void;
+  readonly onReprocess: (video: DiarizationVideo) => void;
+  readonly t: (key: any) => string;
+}
+
+function DiarizationCard({
+  video,
+  isSelected,
+  hasSelectedVideo,
+  isReprocessing,
+  startingId,
+  onOpen,
+  onStartNow,
+  onReprocess,
+  t,
+}: Readonly<DiarizationCardProps>) {
+  const completed = video.step.toUpperCase() === 'COMPLETED';
+  const canStartNow = ['PENDING', 'ERROR', 'CANCELLED'].includes(video.step.toUpperCase());
+
+  return (
+    <article
+      className={'rounded-xl border p-3 transition-colors ' +
+        (isSelected
+          ? 'border-indigo-500/50 bg-indigo-500/5'
+          : 'border-zinc-800 bg-zinc-900/20 hover:border-zinc-700')}
+    >
+      <div className={hasSelectedVideo ? 'flex flex-col gap-3' : 'grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_180px] md:items-center md:gap-4'}>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="relative flex h-14 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-800">
+            <FileText className="h-5 w-5 text-zinc-400" />
+            {video.thumbnail && (
+              <img
+                src={video.thumbnail}
+                alt=""
+                loading="lazy"
+                onError={event => { event.currentTarget.style.display = 'none'; }}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+            <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 font-mono text-[11px] text-white">
+              {durationLabel(video.duration)}
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="line-clamp-2 break-words text-sm font-medium leading-5 text-zinc-200">
+              {completed ? (
+                <button
+                  aria-current={isSelected ? 'true' : undefined}
+                  onClick={event => onOpen(video, event.currentTarget)}
+                  className="min-h-10 text-left hover:text-indigo-400"
+                >
+                  {video.title}
+                </button>
+              ) : (
+                video.title
+              )}
+            </h2>
+            <p className="mt-1 truncate text-xs text-zinc-400">{video.channelName}</p>
+          </div>
+        </div>
+        <DiarizationStatus video={video} t={t} />
+        {completed ? (
+          <button
+            onClick={event => onOpen(video, event.currentTarget)}
+            className={button + ' justify-self-start'}
+          >
+            <FileText className="h-4 w-4" />
+            {t('diarizationOpen')}
+          </button>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {canStartNow && (
+              <button
+                onClick={() => onStartNow(video)}
+                disabled={startingId !== null || isReprocessing}
+                title={t('diarizationStartNowHint')}
+                className={button + ' border-indigo-500/40 text-indigo-300'}
+              >
+                {startingId === video.id && <Loader2 className="h-4 w-4 animate-spin" />}
+                {t('diarizationStartNow')}
+              </button>
+            )}
+            <button
+              onClick={() => onReprocess(video)}
+              disabled={isReprocessing || startingId !== null}
+              className={button}
+            >
+              <RefreshCw className={'h-4 w-4 ' + (isReprocessing ? 'animate-spin' : '')} />
+              {t(isReprocessing ? 'reprocessingDiarization' : 'btnReprocessDiarization')}
+            </button>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+interface DiarizationLoadMoreProps {
+  readonly isLoadingMore: boolean;
+  readonly loadError: boolean;
+  readonly hasMore: boolean;
+  readonly isFetching: boolean;
+  readonly onRetry: () => void;
+  readonly onLoadMore: () => void;
+  readonly t: (key: any) => string;
+}
+
+function DiarizationLoadMore({
+  isLoadingMore,
+  loadError,
+  hasMore,
+  isFetching,
+  onRetry,
+  onLoadMore,
+  t,
+}: Readonly<DiarizationLoadMoreProps>) {
+  if (isLoadingMore) {
+    return (
+      <output className="flex items-center gap-2 text-sm text-zinc-400">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        {t('diarizationLoadingMore')}
+      </output>
+    );
+  }
+  if (loadError) {
+    return (
+      <button onClick={onRetry} disabled={isFetching} className={button}>
+        {t('diarizationRetry')}
+      </button>
+    );
+  }
+  if (hasMore) {
+    return (
+      <button onClick={onLoadMore} disabled={isFetching} className={button}>
+        {t('diarizationLoadMore')}
+      </button>
+    );
+  }
+  return <output className="text-xs text-zinc-400">{t('diarizationEnd')}</output>;
+}
+
 export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en', onAddLog }) => {
   const { t } = getTranslation(language);
   const [selectedVideo, setSelectedVideo] = useState<DiarizationVideo | null>(null);
@@ -146,24 +350,72 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
     }
   }
   function closeViewer() { setSelectedVideo(null); requestAnimationFrame(() => openButtonRef.current?.focus()); }
-  function badge(step: string) {
-    const normalized = step.toUpperCase();
-    const config = steps[normalized];
-    const Icon = normalized === 'COMPLETED' || normalized === 'DIARIZED' ? Check : normalized === 'ERROR' ? AlertCircle : normalized === 'PENDING' || normalized === 'STARTED' ? Mic : Loader2;
-    return <span className={'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ' + (config?.color || 'text-zinc-300 bg-zinc-800')}><Icon className="h-3.5 w-3.5" />{config ? t(config.label) : step}</span>;
-  }
 
-  function status(video: DiarizationVideo) {
-    const measurable = ['TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION'].includes(video.step.toUpperCase());
-    const percent = measurable && typeof video.progress_percent === 'number' && Number.isFinite(video.progress_percent)
-      ? Math.max(0, Math.min(100, Math.floor(video.progress_percent))) : null;
-    return <div className="min-w-0 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">{badge(video.step)}{percent !== null && <span className="text-xs tabular-nums text-zinc-300">{percent}%</span>}</div>
-      {video.step.toUpperCase() === 'PENDING' && (video.queue_priority ?? 0) > 0 && <p className="text-xs text-indigo-400">{t('diarizationNextInQueue')}</p>}
-      {measurable && <div role="progressbar" aria-label={t('diarizationStageProgress') + ': ' + t(steps[video.step.toUpperCase()].label)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined} className="h-1.5 w-32 max-w-full overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full ' + (percent === null ? 'w-1/3 animate-pulse motion-reduce:animate-none ' : 'transition-[width] motion-reduce:transition-none ') + (video.step.toUpperCase() === 'TRANSCRIPTION' ? 'bg-amber-400' : video.step.toUpperCase() === 'ALIGNMENT' ? 'bg-blue-400' : 'bg-purple-400')} style={percent !== null ? { width: `${percent}%` } : undefined} /></div>}
-      {measurable && percent === null && <p className="text-xs text-zinc-500">{t('diarizationProgressWaiting')}</p>}
-    </div>;
-  }
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <output className="flex items-center justify-center gap-2 p-12 text-sm text-zinc-400">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          {t('diarizationLoading')}
+        </output>
+      );
+    }
+    if (!videos.length && !loadError) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+          <FileText className="mb-4 h-10 w-10 text-zinc-500" />
+          <h2 className="text-lg font-medium text-zinc-200">{t('noDiarizationsFound')}</h2>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">{t('diarizationEmptyHint')}</p>
+          {(searchQuery || stepFilter !== 'COMPLETED') && (
+            <button onClick={clearFilters} className={button + ' mt-5'}>
+              {t('diarizationClearFilters')}
+            </button>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="w-full space-y-2 px-4 pb-4 lg:px-6">
+        {!selectedVideo && (
+          <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1fr)_160px_180px] gap-4 px-4 py-2 text-xs font-medium text-zinc-400 md:grid">
+            <span>{t('diarizationContent')}</span>
+            <span>{t('diarizationStatus')}</span>
+            <span />
+          </div>
+        )}
+        {videos.map(video => (
+          <DiarizationCard
+            key={video.id}
+            video={video}
+            isSelected={selectedVideo?.id === video.id}
+            hasSelectedVideo={Boolean(selectedVideo)}
+            isReprocessing={reprocessingIds.has(video.id)}
+            startingId={startingId}
+            onOpen={(v, btn) => {
+              openButtonRef.current = btn;
+              setSelectedVideo(v);
+            }}
+            onStartNow={(v) => void startNow(v)}
+            onReprocess={(v) => void reprocess(v)}
+            t={t}
+          />
+        ))}
+        {!!videos.length && (
+          <div ref={sentinelRef} className="flex min-h-16 shrink-0 items-center justify-center py-4">
+            <DiarizationLoadMore
+              isLoadingMore={isLoadingMore}
+              loadError={loadError}
+              hasMore={hasMore}
+              isFetching={isFetching}
+              onRetry={retry}
+              onLoadMore={loadMore}
+              t={t}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden bg-zinc-950">
@@ -175,38 +427,19 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
           </div>
           <div className={'mt-5 flex gap-3 ' + (selectedVideo ? 'flex-col' : 'flex-col xl:flex-row xl:items-center')}>
             <label className="relative min-w-0 flex-1"><span className="sr-only">{t('searchDiarizationsPlaceholder')}</span><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-zinc-400" /><input type="search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder={t('searchDiarizationsPlaceholder')} className="min-h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30" /></label>
-            <div role="group" aria-label={t('diarizationStatus')} className="flex flex-wrap gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">{filters.map(filter => <button key={filter.value} aria-pressed={stepFilter === filter.value} onClick={() => setStepFilter(filter.value)} className={'min-h-10 flex-1 rounded-lg px-3 text-xs font-medium transition-colors ' + (stepFilter === filter.value ? 'bg-indigo-500/15 text-indigo-400' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200')}>{t(filter.label)}</button>)}</div>
+            <fieldset aria-label={t('diarizationStatus')} className="flex flex-wrap gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1 m-0">
+              {filters.map(filter => <button key={filter.value} aria-pressed={stepFilter === filter.value} onClick={() => setStepFilter(filter.value)} className={'min-h-10 flex-1 rounded-lg px-3 text-xs font-medium transition-colors ' + (stepFilter === filter.value ? 'bg-indigo-500/15 text-indigo-400' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200')}>{t(filter.label)}</button>)}
+            </fieldset>
           </div>
         </header>
         <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" aria-busy={isLoading || isLoadingMore}>
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-zinc-400 lg:px-6"><span role="status">{videos.length} / {totalItems} {t('diarizationResults')} · {t(stepFilter === 'ALL' ? 'diarizationProcessingFirst' : 'diarizationLatest')}</span><span className={selectedVideo ? 'hidden' : 'inline-flex items-center gap-1.5'}><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{t('diarizationAutoUpdate')}</span></div>
-          {notice && <div role="status" className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300"><p className="flex-1">{notice}</p><button aria-label={t('diarizationCancel')} onClick={() => setNotice('')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-zinc-800"><X className="h-4 w-4" /></button></div>}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-zinc-400 lg:px-6">
+            <output className="inline">{videos.length} / {totalItems} {t('diarizationResults')} · {t(stepFilter === 'ALL' ? 'diarizationProcessingFirst' : 'diarizationLatest')}</output>
+            <span className={selectedVideo ? 'hidden' : 'inline-flex items-center gap-1.5'}><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{t('diarizationAutoUpdate')}</span>
+          </div>
+          {notice && <output className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300"><p className="flex-1">{notice}</p><button aria-label={t('diarizationCancel')} onClick={() => setNotice('')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-zinc-800"><X className="h-4 w-4" /></button></output>}
           {loadError && <div role="alert" className="mx-4 mb-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400"><div className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{t('loadDiarizationsError')}</div><button onClick={retry} disabled={isFetching} className={button + ' mt-3'}>{t('diarizationRetry')}</button></div>}
-          {isLoading ? <div role="status" className="flex items-center justify-center gap-2 p-12 text-sm text-zinc-400"><Loader2 className="h-5 w-5 animate-spin" />{t('diarizationLoading')}</div> : !videos.length && !loadError ? <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center"><FileText className="mb-4 h-10 w-10 text-zinc-500" /><h2 className="text-lg font-medium text-zinc-200">{t('noDiarizationsFound')}</h2><p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">{t('diarizationEmptyHint')}</p>{(searchQuery || stepFilter !== 'COMPLETED') && <button onClick={clearFilters} className={button + ' mt-5'}>{t('diarizationClearFilters')}</button>}</div> : <div className="w-full space-y-2 px-4 pb-4 lg:px-6">
-            {!selectedVideo && <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1fr)_160px_180px] gap-4 px-4 py-2 text-xs font-medium text-zinc-400 md:grid"><span>{t('diarizationContent')}</span><span>{t('diarizationStatus')}</span><span /></div>}
-            {videos.map(video => {
-              const completed = video.step.toUpperCase() === 'COMPLETED';
-              return <article key={video.id} className={'rounded-xl border p-3 transition-colors ' + (selectedVideo?.id === video.id ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-zinc-800 bg-zinc-900/20 hover:border-zinc-700')}>
-                <div className={selectedVideo ? 'flex flex-col gap-3' : 'grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_180px] md:items-center md:gap-4'}>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="relative flex h-14 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-800"><FileText className="h-5 w-5 text-zinc-400" />{video.thumbnail && <img src={video.thumbnail} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} className="absolute inset-0 h-full w-full object-cover" />}<span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 font-mono text-[11px] text-white">{durationLabel(video.duration)}</span></div>
-                    <div className="min-w-0 flex-1"><h2 className="line-clamp-2 break-words text-sm font-medium leading-5 text-zinc-200">{completed ? <button aria-current={selectedVideo?.id === video.id ? 'true' : undefined} onClick={event => { openButtonRef.current = event.currentTarget; setSelectedVideo(video); }} className="min-h-10 text-left hover:text-indigo-400">{video.title}</button> : video.title}</h2><p className="mt-1 truncate text-xs text-zinc-400">{video.channelName}</p></div>
-                  </div>
-                  {status(video)}
-                  {completed ? <button onClick={event => { openButtonRef.current = event.currentTarget; setSelectedVideo(video); }} className={button + ' justify-self-start'}><FileText className="h-4 w-4" />{t('diarizationOpen')}</button> : <div className="flex flex-wrap gap-2">
-                    {['PENDING', 'ERROR', 'CANCELLED'].includes(video.step.toUpperCase()) && <button onClick={() => void startNow(video)} disabled={startingId !== null || reprocessingIds.has(video.id)} title={t('diarizationStartNowHint')} className={button + ' border-indigo-500/40 text-indigo-300'}>{startingId === video.id && <Loader2 className="h-4 w-4 animate-spin" />}{t('diarizationStartNow')}</button>}
-                    <button onClick={() => void reprocess(video)} disabled={reprocessingIds.has(video.id) || startingId !== null} className={button}><RefreshCw className={'h-4 w-4 ' + (reprocessingIds.has(video.id) ? 'animate-spin' : '')} />{t(reprocessingIds.has(video.id) ? 'reprocessingDiarization' : 'btnReprocessDiarization')}</button>
-                  </div>}
-                </div>
-              </article>;
-            })}
-            {!!videos.length && <div ref={sentinelRef} className="flex min-h-16 shrink-0 items-center justify-center py-4">
-              {isLoadingMore ? <span role="status" className="flex items-center gap-2 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />{t('diarizationLoadingMore')}</span> :
-                loadError ? <button onClick={retry} disabled={isFetching} className={button}>{t('diarizationRetry')}</button> :
-                  hasMore ? <button onClick={loadMore} disabled={isFetching} className={button}>{t('diarizationLoadMore')}</button> :
-                    <span role="status" className="text-xs text-zinc-400">{t('diarizationEnd')}</span>}
-            </div>}
-          </div>}
+          {renderContent()}
         </div>
       </section>
       {selectedVideo && <DiarizationViewer key={selectedVideo.id} video={selectedVideo} language={language} onClose={closeViewer} />}

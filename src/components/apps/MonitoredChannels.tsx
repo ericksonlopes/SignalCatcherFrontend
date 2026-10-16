@@ -19,6 +19,45 @@ function channelAddress(source: ContentSource): string {
     } catch {return source.channelId || source.url;}
 }
 
+function getNormalizedStatus(status: ContentSource['status']): 'active' | 'error' | 'paused' {
+    if (status === 'active') return 'active';
+    if (status === 'error') return 'error';
+    return 'paused';
+}
+
+function getFilterTranslationKey(filterValue: ChannelFilter) {
+    switch (filterValue) {
+        case 'all': return 'monitoredAll';
+        case 'active': return 'monitoredActive';
+        case 'error': return 'monitoredError';
+        case 'paused': return 'monitoredPaused';
+    }
+}
+
+function getStatusBadgeClass(isActive: boolean, isError: boolean): string {
+    if (isActive) return 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400';
+    if (isError) return 'border-rose-500/20 bg-rose-500/5 text-rose-400';
+    return 'border-amber-500/20 bg-amber-500/5 text-amber-400';
+}
+
+function getStatusTextKey(isActive: boolean, isError: boolean) {
+    if (isActive) return 'monitoredActive';
+    if (isError) return 'monitoredError';
+    return 'monitoredPaused';
+}
+
+function renderActionIcon(busy: boolean, isActive: boolean) {
+    if (busy) return <Loader2 className="size-3.5 animate-spin" />;
+    if (isActive) return <Pause className="size-3.5" />;
+    return <Play className="size-3.5" />;
+}
+
+function getActionLabelKey(busy: boolean, isActive: boolean) {
+    if (busy) return 'monitoredUpdating';
+    if (isActive) return 'monitoredPause';
+    return 'monitoredResume';
+}
+
 export const MonitoredChannels: React.FC<MonitoredChannelsProps> = ({sources, language, onToggle, onAdd}) => {
     const {t} = getTranslation(language);
     const [query, setQuery] = useState('');
@@ -29,7 +68,7 @@ export const MonitoredChannels: React.FC<MonitoredChannelsProps> = ({sources, la
     const counts: Record<ChannelFilter, number> = {all: sources.length, active, error: errors, paused: sources.length - active - errors};
     const needle = query.trim().toLocaleLowerCase();
     const visible = sources.filter(source => {
-        const status = source.status === 'active' ? 'active' : source.status === 'error' ? 'error' : 'paused';
+        const status = getNormalizedStatus(source.status);
         return (filter === 'all' || filter === status) &&
             `${source.name} ${source.channelId} ${source.url}`.toLocaleLowerCase().includes(needle);
     });
@@ -63,7 +102,7 @@ export const MonitoredChannels: React.FC<MonitoredChannelsProps> = ({sources, la
                 <div className="flex gap-1.5 overflow-x-auto pb-1 lg:pb-0">
                     {(['all', 'active', 'paused', 'error'] as const).map(value => <button key={value} onClick={() => setFilter(value)} aria-pressed={filter === value}
                         className={`flex items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs ${filter === value ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' : 'border-transparent text-zinc-400 hover:bg-zinc-800'}`}>
-                        {t(value === 'all' ? 'monitoredAll' : value === 'active' ? 'monitoredActive' : value === 'error' ? 'monitoredError' : 'monitoredPaused')}
+                        {t(getFilterTranslationKey(value))}
                         <span className="tabular-nums text-[11px] rounded-md bg-zinc-800 px-1.5 py-0.5">{counts[value]}</span>
                     </button>)}
                 </div>
@@ -81,13 +120,13 @@ export const MonitoredChannels: React.FC<MonitoredChannelsProps> = ({sources, la
                             <span className="truncate">{channelAddress(source)}</span><ExternalLink className="size-3 shrink-0" />
                         </a>
                     </div>
-                    <span className={`col-start-3 row-start-1 justify-self-end inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${isActive ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400' : isError ? 'border-rose-500/20 bg-rose-500/5 text-rose-400' : 'border-amber-500/20 bg-amber-500/5 text-amber-400'}`}>
-                        <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{t(isActive ? 'monitoredActive' : isError ? 'monitoredError' : 'monitoredPaused')}
+                    <span className={`col-start-3 row-start-1 justify-self-end inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${getStatusBadgeClass(isActive, isError)}`}>
+                        <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{t(getStatusTextKey(isActive, isError))}
                     </span>
                     <button disabled={busy} onClick={() => void toggle(source.id)} aria-label={`${t(isActive ? 'monitoredPause' : 'monitoredResume')}: ${source.name}`}
                         className="col-start-3 row-start-2 inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-wait justify-self-end">
-                        {busy ? <Loader2 className="size-3.5 animate-spin" /> : isActive ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-                        {t(busy ? 'monitoredUpdating' : isActive ? 'monitoredPause' : 'monitoredResume')}
+                        {renderActionIcon(busy, isActive)}
+                        {t(getActionLabelKey(busy, isActive))}
                     </button>
                 </li>;
             })}</ul> : <div className="px-4 py-12 text-center">

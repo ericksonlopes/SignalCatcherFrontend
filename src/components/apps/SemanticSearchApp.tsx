@@ -20,13 +20,13 @@ import { getTranslation } from '../../locales';
 import type { LanguageMode, SemanticSearchResult, VectorizationStats } from '../../types';
 
 interface SemanticSearchAppProps {
-  language?: LanguageMode;
-  onAddLog: (app: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
+  readonly language?: LanguageMode;
+  readonly onAddLog: (app: string, level: 'info' | 'success' | 'warning' | 'error', message: string) => void;
 }
 
 type SourceFilter = 'ALL' | 'YOUTUBE_TRANSCRIPT' | 'DOCUMENT' | 'WEBSITE';
 
-export function SemanticSearchApp({ language = 'pt', onAddLog }: SemanticSearchAppProps) {
+export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<SemanticSearchAppProps>) {
   const { t } = getTranslation(language);
 
   const [query, setQuery] = useState('');
@@ -270,7 +270,7 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: SemanticSearchA
               max="0.9"
               step="0.05"
               value={minSimilarity}
-              onChange={(e) => setMinSimilarity(parseFloat(e.target.value))}
+              onChange={(e) => setMinSimilarity(Number.parseFloat(e.target.value))}
               className="w-32 accent-cyan-400 cursor-pointer"
             />
             <span className="font-mono text-cyan-400 font-medium">
