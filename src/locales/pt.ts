@@ -36,6 +36,8 @@ export const pt = {
     notificationFilterAll: "Todas",
     notificationFilterErrors: "Erros",
     notificationFilterWarnings: "Avisos",
+    notificationFilterInfo: "Info",
+    notificationFilterSuccess: "Sucessos",
     notificationDismiss: "Dispensar notificação",
     notificationSearch: "Buscar nas notificações",
 

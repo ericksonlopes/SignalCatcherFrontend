@@ -37,6 +37,8 @@ export const en: Record<TranslationKeys, string> = {
     notificationFilterAll: "All",
     notificationFilterErrors: "Errors",
     notificationFilterWarnings: "Warnings",
+    notificationFilterInfo: "Info",
+    notificationFilterSuccess: "Success",
     notificationDismiss: "Dismiss notification",
     notificationSearch: "Search notifications",
 

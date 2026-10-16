@@ -275,6 +275,7 @@ function SignalCatcherHub() {
             { id: 'signalcatcher' as const, name: 'SignalCatcher' },
             { id: 'diarization' as const, name: language === 'pt' ? 'Diarização' : 'Diarization' },
             { id: 'voice_recognition' as const, name: language === 'pt' ? 'Reconhecimento de Voz' : 'Voice Recognition' },
+            { id: 'search' as const, name: language === 'pt' ? 'Vetorização & Busca' : 'Vectorization & Search' },
           ].map((app) => {
             const isAppActive = activeTab.appId === app.id;
             const existingTab = tabs.find((t) => t.appId === app.id);
@@ -315,7 +316,7 @@ function SignalCatcherHub() {
         </aside>
 
         {/* Workspace Active Tab View */}
-        <main className={`flex-1 min-w-0 min-h-0 relative bg-[#09090b] ${(activeTab.appId === 'diarization' || activeTab.appId === 'voice_recognition') ? 'flex overflow-hidden' : 'overflow-y-auto p-2 sm:p-4 md:p-6'}`}>
+        <main className={`flex-1 min-w-0 min-h-0 relative bg-[#09090b] ${(activeTab.appId === 'diarization' || activeTab.appId === 'voice_recognition' || activeTab.appId === 'search') ? 'flex overflow-hidden' : 'overflow-y-auto p-2 sm:p-4 md:p-6'}`}>
           {activeTab.appId === 'signalcatcher' && (
             <SignalCatcherApp
               language={language}

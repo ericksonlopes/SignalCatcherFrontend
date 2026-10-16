@@ -9,6 +9,7 @@ import {
   Fingerprint,
   Loader2,
   Search,
+  Sparkles,
   Users,
   X,
 } from 'lucide-react';
@@ -43,6 +44,24 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [enrollOnSave, setEnrollOnSave] = useState(true);
+  const [isVectorizing, setIsVectorizing] = useState(false);
+  const [isVectorized, setIsVectorized] = useState<boolean | null>(null);
+  const [chunksCount, setChunksCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch(`${API_BASE_URL}/api/vectorization/status/${video.id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!active || !data) return;
+        setIsVectorized(Boolean(data.indexed));
+        if (typeof data.chunks_count === 'number') {
+          setChunksCount(data.chunks_count);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [video.id]);
   const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [notice, setNotice] = useState('');
@@ -128,6 +147,33 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
     }
   }
 
+  async function vectorizeTranscript(isAutoAfterVoice = false) {
+    if (isVectorizing) return;
+    setIsVectorizing(true);
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/vectorization/diarization/${video.id}?overwrite=true`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setIsVectorized(true);
+        if (typeof data.chunks_count === 'number') {
+          setChunksCount(data.chunks_count);
+        }
+        const successMsg = isAutoAfterVoice
+          ? (language === 'pt'
+              ? `Vozes identificadas e vetorizado com sucesso! (${data.chunks_count ?? ''} chunks com nomes reais)`
+              : `Voices identified and successfully vectorized! (${data.chunks_count ?? ''} chunks)`)
+          : `${t('vectorizedSuccess')} (${data.chunks_count ?? ''} chunks)`;
+        setNotice(successMsg);
+      }
+    } catch {
+      // Ignore network errors silently
+    } finally {
+      setIsVectorizing(false);
+    }
+  }
+
   async function identifyVoices() {
     if (isIdentifying) return;
     setIsIdentifying(true);
@@ -149,7 +195,10 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
         if (Object.keys(newNames).length > 0) {
           setNames(prev => ({ ...prev, ...newNames }));
         }
-        setNotice(`${t('voiceIdentifySuccess')}: ${data.identified_count}/${data.total_speakers}`);
+        setNotice(`${t('voiceIdentifySuccess')}: ${data.identified_count}/${data.total_speakers}. ${language === 'pt' ? 'Vetorizando transcrição...' : 'Vectorizing transcript...'}`);
+
+        // A vetorização é executada automaticamente logo após o reconhecimento da voz
+        await vectorizeTranscript(true);
       }
     } catch {
       // Ignore network errors silently in viewer
@@ -201,13 +250,37 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
           </div>
           <button
             onClick={() => void identifyVoices()}
-            disabled={!segments.length || isIdentifying}
+            disabled={!segments.length || isIdentifying || isVectorizing}
             aria-label={t('voiceIdentifyBtn')}
             title={t('voiceIdentifyBtn')}
             className={'flex shrink-0 items-center gap-2 border-indigo-500/40 bg-indigo-950/30 text-indigo-300 hover:bg-indigo-900/40 ' + control}
           >
             {isIdentifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
             <span className="hidden sm:inline">{isIdentifying ? t('voiceIdentifying') : t('voiceIdentifyBtn')}</span>
+          </button>
+          <button
+            onClick={() => void vectorizeTranscript(false)}
+            disabled={!segments.length || isVectorizing || isIdentifying}
+            aria-label={t('vectorizeButton')}
+            title={language === 'pt' ? 'Gera embeddings vetoriais no pgvector para busca' : 'Generate vector embeddings in pgvector for search'}
+            className={`flex shrink-0 items-center gap-2 ${
+              isVectorized
+                ? 'border-cyan-500/40 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/40'
+                : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white'
+            } ${control}`}
+          >
+            {isVectorizing ? (
+              <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+            ) : (
+              <Sparkles className={`h-4 w-4 ${isVectorized ? 'text-cyan-400' : 'text-zinc-400'}`} />
+            )}
+            <span className="hidden sm:inline">
+              {isVectorizing
+                ? t('vectorizing')
+                : isVectorized
+                ? `${t('vectorizedBadge')} (${chunksCount ?? ''})`
+                : t('vectorizeButton')}
+            </span>
           </button>
           <button onClick={exportTranscript} aria-label={t('diarizationExport')} title={t('diarizationExport')} disabled={!segments.length} className={'flex shrink-0 items-center gap-2 ' + control}><Download className="h-4 w-4" /><span className="hidden sm:inline">{t('diarizationExport')}</span></button>
         </div>
