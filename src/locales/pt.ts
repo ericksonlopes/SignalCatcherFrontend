@@ -373,6 +373,20 @@ export const pt = {
   voiceMatchPercent: "match biométrico",
   voiceIdentifySingle: "Identificar Voz",
   voiceEnrolledNotice: "Voz cadastrada no pgvector",
+  voiceTrainTabTitle: "Treinamento de Voz por Trecho de Vídeo",
+  voiceTrainByClip: "Recorte por Minutagem",
+  voiceTrainBySegments: "Seleção de Falas da Transcrição",
+  voiceTrainStartTime: "Início do Trecho (MM:SS ou s)",
+  voiceTrainEndTime: "Fim do Trecho (MM:SS ou s)",
+  voiceTrainClipDuration: "Duração do Trecho",
+  voiceTrainLabelPlaceholder: "Rótulo do recorte (ex: Entrevista - Trecho 1)",
+  voiceTrainBtn: "Treinar Modelo com este Trecho",
+  voiceTrainFolderNotice: "Cortes de áudio salvos em D:/voice_training",
+  voiceTrainSelectSegmentsHint: "Marque as falas limpas do locutor para treinar o modelo:",
+  voiceTrainSelectAll: "Selecionar Todas",
+  voiceTrainDeselectAll: "Desmarcar Todas",
+  voiceTrainSelectedTurns: "falas selecionadas",
+  voiceTrainWithSegmentsBtn: "Treinar Modelo com Falas Selecionadas",
 };
 
 export type TranslationKeys = keyof typeof pt;

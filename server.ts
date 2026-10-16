@@ -731,6 +731,57 @@ async function startServer() {
     });
   });
 
+  app.post("/api/voice-recognition/enroll/video-clip", (req, res) => {
+    const { video_id, speaker_name, start_time, end_time, label } = req.body || {};
+    const cleanName = String(speaker_name || "Locutor").trim();
+    const startSec = Number(start_time || 0);
+    const endSec = Number(end_time || startSec + 10);
+    const duration = Math.max(1, endSec - startSec);
+
+    let profile = mockSpeakerProfiles.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
+    if (!profile) {
+      profile = {
+        id: `spk-${Date.now()}`,
+        name: cleanName,
+        description: null,
+        avatar_url: null,
+        samples_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        samples: []
+      };
+      mockSpeakerProfiles.unshift(profile);
+    }
+    const clipLabel = label || `CLIP_${Math.round(startSec)}s_${Math.round(endSec)}s`;
+    const sample = {
+      id: `smp-${Date.now()}`,
+      speaker_id: profile.id,
+      source_type: "YOUTUBE_CLIP",
+      source_id: String(video_id || ""),
+      speaker_label: clipLabel,
+      start_time: startSec,
+      end_time: endSec,
+      duration_seconds: duration,
+      metadata: { clip: true, start_time: startSec, end_time: endSec },
+      created_at: new Date().toISOString()
+    };
+    profile.samples.unshift(sample);
+    profile.samples_count += 1;
+
+    return res.json({
+      speaker_id: profile.id,
+      speaker_name: profile.name,
+      sample_id: sample.id,
+      source_type: "YOUTUBE_CLIP",
+      source_id: video_id,
+      speaker_label: clipLabel,
+      segments_used: 1,
+      speech_duration_seconds: duration,
+      applied_to_diarization: false,
+      samples_count: profile.samples_count
+    });
+  });
+
   app.post("/api/voice-recognition/enroll/audio", (req, res) => {
     const { filename, speaker_name } = req.body || {};
     const cleanName = String(speaker_name || "Locutor").trim();
