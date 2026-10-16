@@ -367,5 +367,9 @@ export const en: Record<TranslationKeys, string> = {
   voiceEnrollOnSave: "Enroll voice in database (pgvector) when saving name",
   voiceMatchedBadge: "Voice Matched",
   voiceDeleteProfile: "Delete profile",
+  voiceSelectExistingProfile: "Or select an existing profile",
+  voiceMatchPercent: "biometric match",
+  voiceIdentifySingle: "Identify Voice",
+  voiceEnrolledNotice: "Voice enrolled in pgvector",
 };
 

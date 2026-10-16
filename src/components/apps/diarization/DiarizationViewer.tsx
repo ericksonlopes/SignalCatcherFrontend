@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../../../api';
 import type { DiarizationVideo } from '../DiarizationApp';
-import type { IdentifyDiarizationResponse, LanguageMode } from '../../../types';
+import type { IdentifyDiarizationResponse, LanguageMode, SpeakerMatch, SpeakerProfile } from '../../../types';
 import { getTranslation } from '../../../locales';
 import { buildTranscript, formatTime, speakerStats, type TranscriptResult } from './transcript';
 
@@ -44,9 +44,20 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [enrollOnSave, setEnrollOnSave] = useState(true);
+  const [existingProfiles, setExistingProfiles] = useState<SpeakerProfile[]>([]);
+  const [speakerMatches, setSpeakerMatches] = useState<Record<string, SpeakerMatch>>({});
   const [isVectorizing, setIsVectorizing] = useState(false);
   const [isVectorized, setIsVectorized] = useState<boolean | null>(null);
   const [chunksCount, setChunksCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiFetch(`${API_BASE_URL}/api/voice-recognition/profiles`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        if (Array.isArray(data)) setExistingProfiles(data);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -137,7 +148,15 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
         if (data?.result_json) {
           setLiveResultJson(data.result_json);
         }
-        setNotice(`${newName} (${enrollOnSave ? 'pgvector' : 'saved'})`);
+        setNotice(`${newName} (${enrollOnSave ? t('voiceEnrolledNotice') : 'salvo'})`);
+        if (enrollOnSave) {
+          apiFetch(`${API_BASE_URL}/api/voice-recognition/profiles`)
+            .then(res => res.ok ? res.json() : [])
+            .then(profiles => {
+              if (Array.isArray(profiles)) setExistingProfiles(profiles);
+            })
+            .catch(() => {});
+        }
       }
     } catch {
       // Keep local name override if backend is offline
@@ -147,7 +166,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
     }
   }
 
-  async function vectorizeTranscript(isAutoAfterVoice = false) {
+  async function vectorizeTranscript() {
     if (isVectorizing) return;
     setIsVectorizing(true);
     try {
@@ -160,12 +179,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
         if (typeof data.chunks_count === 'number') {
           setChunksCount(data.chunks_count);
         }
-        const successMsg = isAutoAfterVoice
-          ? (language === 'pt'
-              ? `Vozes identificadas e vetorizado com sucesso! (${data.chunks_count ?? ''} chunks com nomes reais)`
-              : `Voices identified and successfully vectorized! (${data.chunks_count ?? ''} chunks)`)
-          : `${t('vectorizedSuccess')} (${data.chunks_count ?? ''} chunks)`;
-        setNotice(successMsg);
+        setNotice(`${t('vectorizedSuccess')} (${data.chunks_count ?? ''} chunks)`);
       }
     } catch {
       // Ignore network errors silently
@@ -186,19 +200,20 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
       if (response.ok) {
         const data: IdentifyDiarizationResponse = await response.json();
         const newNames: Record<string, string> = {};
+        const matchMap: Record<string, SpeakerMatch> = {};
         for (const match of data.matches) {
+          matchMap[match.original_speaker_label] = match;
+          matchMap[match.current_speaker_label] = match;
           if (match.identified && match.matched_speaker_name) {
             newNames[match.original_speaker_label] = match.matched_speaker_name;
             newNames[match.current_speaker_label] = match.matched_speaker_name;
           }
         }
+        setSpeakerMatches(prev => ({ ...prev, ...matchMap }));
         if (Object.keys(newNames).length > 0) {
           setNames(prev => ({ ...prev, ...newNames }));
         }
-        setNotice(`${t('voiceIdentifySuccess')}: ${data.identified_count}/${data.total_speakers}. ${language === 'pt' ? 'Vetorizando transcrição...' : 'Vectorizing transcript...'}`);
-
-        // A vetorização é executada automaticamente logo após o reconhecimento da voz
-        await vectorizeTranscript(true);
+        setNotice(`${t('voiceIdentifySuccess')}: ${data.identified_count}/${data.total_speakers}`);
       }
     } catch {
       // Ignore network errors silently in viewer
@@ -259,7 +274,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
             <span className="hidden sm:inline">{isIdentifying ? t('voiceIdentifying') : t('voiceIdentifyBtn')}</span>
           </button>
           <button
-            onClick={() => void vectorizeTranscript(false)}
+            onClick={() => void vectorizeTranscript()}
             disabled={!segments.length || isVectorizing || isIdentifying}
             aria-label={t('vectorizeButton')}
             title={language === 'pt' ? 'Gera embeddings vetoriais no pgvector para busca' : 'Generate vector embeddings in pgvector for search'}
@@ -296,31 +311,86 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
           <button aria-expanded={showSpeakers} aria-controls="diarization-speakers" onClick={() => setShowSpeakers(!showSpeakers)} className={'flex shrink-0 items-center gap-2 ' + control}><Users className="h-4 w-4" />{t(showSpeakers ? 'diarizationHideSpeakers' : 'diarizationShowSpeakers')}</button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden">
-          {showSpeakers && <aside id="diarization-speakers" aria-label={t('speakersTitle')} className="order-first shrink-0 border-b border-zinc-800 bg-zinc-900/30 p-4 xl:order-last xl:w-64 xl:overflow-y-auto xl:border-b-0 xl:border-l 2xl:w-72">
-            <h3 className="font-semibold text-zinc-200">{t('speakersTitle')} <span className="ml-1 text-zinc-400">{speakers.length}</span></h3>
-            <p className="mt-2 text-xs leading-relaxed text-zinc-400">{t('diarizationSpeakerHint')}</p>
+          {showSpeakers && <aside id="diarization-speakers" aria-label={t('speakersTitle')} className="order-first shrink-0 border-b border-zinc-800 bg-zinc-900/30 p-4 xl:order-last xl:w-72 xl:overflow-y-auto xl:border-b-0 xl:border-l 2xl:w-80">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-zinc-200">{t('speakersTitle')} <span className="ml-1 text-zinc-400 font-mono text-xs">({speakers.length})</span></h3>
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">{t('diarizationSpeakerHint')}</p>
+
+            {/* Quick Biometric Identification trigger */}
+            <button
+              type="button"
+              onClick={() => void identifyVoices()}
+              disabled={!segments.length || isIdentifying || isVectorizing}
+              className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-indigo-500/40 bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 text-xs font-medium transition disabled:opacity-50"
+            >
+              {isIdentifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Fingerprint className="h-3.5 w-3.5 text-indigo-400" />}
+              <span>{isIdentifying ? t('voiceIdentifying') : t('voiceIdentifyBtn')}</span>
+            </button>
+
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">{speakers.map(speaker => {
               const share = totalSpeech ? Math.round(speaker.seconds / totalSpeech * 100) : 0;
+              const match = speakerMatches[speaker.id] || speakerMatches[speaker.name];
+              const isMatchIdentified = Boolean(match?.identified);
+
               return <div key={speaker.id} className={'rounded-xl border p-3 ' + (speakerFilter === speaker.id ? 'border-indigo-500/60 bg-indigo-500/5' : 'border-zinc-800 bg-zinc-950')}>
                 <div className="flex items-center gap-2">
                   <span className={'h-2.5 w-2.5 shrink-0 rounded-full ' + speaker.color} />
                   <button aria-pressed={speakerFilter === speaker.id} onClick={() => setSpeakerFilter(speakerFilter === speaker.id ? '' : speaker.id)} className="min-h-10 min-w-0 flex-1 break-words text-left text-sm font-medium text-zinc-200">{speaker.name}</button>
-                  <button aria-label={t('diarizationRename') + ': ' + speaker.name} onClick={() => { setEditing(speaker.id); setEditName(speaker.name); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800"><Edit3 className="h-4 w-4" /></button>
+                  <button aria-label={t('diarizationRename') + ': ' + speaker.name} onClick={() => { setEditing(speaker.id); setEditName(speaker.name); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><Edit3 className="h-4 w-4" /></button>
                 </div>
-                {editing === speaker.id && <div className="my-2 space-y-2">
+
+                {/* Biometric Voice Match Badge */}
+                {isMatchIdentified && (
+                  <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-300 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-md font-mono">
+                    <Fingerprint className="h-3 w-3 shrink-0 text-emerald-400" />
+                    <span className="truncate">
+                      {match?.matched_speaker_name} ({Math.round((match?.similarity_score ?? 0) * 100)}% {t('voiceMatchPercent')})
+                    </span>
+                  </div>
+                )}
+
+                {/* Inline Editing & Voice Profile Assignment */}
+                {editing === speaker.id && <div className="my-2 space-y-2 p-2.5 rounded-lg bg-zinc-900 border border-zinc-700/60 text-xs">
                   <div className="flex flex-wrap gap-1">
-                    <input aria-label={t('diarizationRename')} value={editName} onChange={event => setEditName(event.target.value)} onKeyDown={handleEditKeyDown} className={input + ' px-2'} />
+                    <input aria-label={t('diarizationRename')} value={editName} onChange={event => setEditName(event.target.value)} onKeyDown={handleEditKeyDown} placeholder="Nome do locutor" className={input + ' px-2 text-xs'} />
                     <button aria-label={t('diarizationSave')} onClick={() => void saveName()} disabled={!editName.trim() || isSavingSpeaker} className={control}>{isSavingSpeaker ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}</button>
                     <button aria-label={t('diarizationCancel')} onClick={() => setEditing(null)} className={control}><X className="h-4 w-4" /></button>
                   </div>
-                  <label className="flex items-center gap-2 text-[11px] text-zinc-400 cursor-pointer">
+
+                  {/* Dropdown with existing enrolled profiles */}
+                  {existingProfiles.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <label className="text-[10px] text-zinc-400">{t('voiceSelectExistingProfile')}:</label>
+                      <select
+                        onChange={e => {
+                          if (e.target.value) {
+                            setEditName(e.target.value);
+                            setEnrollOnSave(false);
+                          }
+                        }}
+                        defaultValue=""
+                        className="w-full text-xs rounded-lg border border-zinc-700 bg-zinc-950 py-1.5 px-2 text-zinc-300 outline-none"
+                      >
+                        <option value="" disabled>{t('voiceSelectExistingProfile')}...</option>
+                        {existingProfiles.map(p => (
+                          <option key={p.id} value={p.name}>
+                            {p.name} ({p.samples_count} {p.samples_count === 1 ? 'amostra' : 'amostras'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-2 text-[11px] text-zinc-400 cursor-pointer pt-1">
                     <input type="checkbox" checked={enrollOnSave} onChange={e => setEnrollOnSave(e.target.checked)} className="rounded border-zinc-700 bg-zinc-900 text-indigo-500" />
                     <span>{t('voiceEnrollOnSave')}</span>
                   </label>
                 </div>}
-                <div className="mt-1 flex justify-between gap-2 text-xs text-zinc-400"><span>{t('diarizationSpeechTime')}</span><span className="font-mono">{formatTime(speaker.seconds)} · {share}%</span></div>
-                <div className="my-2 h-1 overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full ' + speaker.color} style={{ width: share + '%' }} /></div>
-                <p className="text-xs text-zinc-400">{speaker.turns} {t('diarizationTurns')} · {speaker.id}</p>
+
+                <div className="mt-2 flex justify-between gap-2 text-xs text-zinc-400"><span>{t('diarizationSpeechTime')}</span><span className="font-mono">{formatTime(speaker.seconds)} · {share}%</span></div>
+                <div className="my-1.5 h-1 overflow-hidden rounded-full bg-zinc-800"><div className={'h-full rounded-full ' + speaker.color} style={{ width: share + '%' }} /></div>
+                <p className="text-[11px] text-zinc-500 font-mono">{speaker.turns} {t('diarizationTurns')} · {speaker.id}</p>
               </div>;
             })}</div>
           </aside>}

@@ -6,6 +6,7 @@ import {
   Database,
   ExternalLink,
   FileText,
+  Fingerprint,
   Globe,
   Layers,
   Loader2,
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../../api';
 import { getTranslation } from '../../locales';
-import type { LanguageMode, SemanticSearchResult, VectorizationStats } from '../../types';
+import type { LanguageMode, SemanticSearchResult, SpeakerProfile, VectorizationStats } from '../../types';
 
 interface SemanticSearchAppProps {
   readonly language?: LanguageMode;
@@ -32,13 +33,17 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
   const [query, setQuery] = useState('');
   const [minSimilarity, setMinSimilarity] = useState(0.4);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
+  const [speakerFilter, setSpeakerFilter] = useState<string>('');
+  const [speakerProfiles, setSpeakerProfiles] = useState<SpeakerProfile[]>([]);
   const [results, setResults] = useState<SemanticSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [stats, setStats] = useState<VectorizationStats | null>(null);
+  const [isCheckingStats, setIsCheckingStats] = useState(false);
   const [isBatchVectorizing, setIsBatchVectorizing] = useState(false);
 
   const fetchStats = useCallback(async () => {
+    setIsCheckingStats(true);
     try {
       const res = await apiFetch(`${API_BASE_URL}/api/vectorization/stats`);
       if (res.ok) {
@@ -47,11 +52,19 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
       }
     } catch (err) {
       console.error('Failed to load vectorization stats', err);
+    } finally {
+      setIsCheckingStats(false);
     }
   }, []);
 
   useEffect(() => {
     fetchStats();
+    apiFetch(`${API_BASE_URL}/api/voice-recognition/profiles`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        if (Array.isArray(data)) setSpeakerProfiles(data);
+      })
+      .catch(() => {});
   }, [fetchStats]);
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -66,9 +79,10 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: query.trim(),
-          limit: 12,
+          limit: 16,
           min_similarity: minSimilarity,
           source_type: sourceFilter === 'ALL' ? undefined : sourceFilter,
+          speaker: speakerFilter.trim() || undefined,
         }),
       });
 
@@ -168,6 +182,15 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
             >
               {stats?.tei_healthy ? 'Online' : 'Aguardando'}
             </span>
+            <button
+              type="button"
+              onClick={fetchStats}
+              disabled={isCheckingStats}
+              title="Testar conexão com TEI novamente"
+              className="ml-1 p-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"
+            >
+              <RefreshCw className={`w-3 h-3 ${isCheckingStats ? 'animate-spin' : ''}`} />
+            </button>
           </div>
 
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
@@ -202,6 +225,19 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
         </div>
       </div>
 
+      {/* TEI Connection Notice */}
+      {stats && !stats.tei_healthy && (
+        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/50 text-amber-300 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+          <div className="space-y-0.5">
+            <p className="font-semibold">Serviço de Embeddings (TEI) indisponível</p>
+            <p className="text-amber-400/80 leading-relaxed">
+              O backend não conseguiu se conectar ao HuggingFace TEI. Verifique se o container está ativo no Portainer e se o endereço em <code className="bg-amber-950/60 px-1 py-0.5 rounded font-mono">TEI_API_URL</code> (ex: <code className="bg-amber-950/60 px-1 py-0.5 rounded font-mono">http://eriberry.local:8090</code>) está acessível.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Search Input Bar */}
       <form onSubmit={handleSearch} className="space-y-4">
         <div className="relative flex items-center">
@@ -232,34 +268,56 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
           </button>
         </div>
 
-        {/* Source Filters and Threshold */}
+        {/* Source Filters, Speaker Selector and Threshold */}
         <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-zinc-400">
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-500 font-medium">Fonte:</span>
-            {[
-              { id: 'ALL', label: 'Todas as Fontes', icon: Layers },
-              { id: 'YOUTUBE_TRANSCRIPT', label: 'Vídeos', icon: Tv },
-              { id: 'DOCUMENT', label: 'Documentos', icon: FileText },
-              { id: 'WEBSITE', label: 'Sites Web', icon: Globe },
-            ].map((f) => {
-              const Icon = f.icon;
-              const active = sourceFilter === f.id;
-              return (
-                <button
-                  type="button"
-                  key={f.id}
-                  onClick={() => setSourceFilter(f.id as SourceFilter)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition ${
-                    active
-                      ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 font-semibold'
-                      : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                  }`}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-zinc-500 font-medium">Fonte:</span>
+              {[
+                { id: 'ALL', label: 'Todas as Fontes', icon: Layers },
+                { id: 'YOUTUBE_TRANSCRIPT', label: 'Vídeos', icon: Tv },
+                { id: 'DOCUMENT', label: 'Documentos', icon: FileText },
+                { id: 'WEBSITE', label: 'Sites Web', icon: Globe },
+              ].map((f) => {
+                const Icon = f.icon;
+                const active = sourceFilter === f.id;
+                return (
+                  <button
+                    type="button"
+                    key={f.id}
+                    onClick={() => setSourceFilter(f.id as SourceFilter)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition ${
+                      active
+                        ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 font-semibold'
+                        : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{f.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Filter by Speaker if voice recognition profiles exist */}
+            {speakerProfiles.length > 0 && (
+              <div className="flex items-center gap-1.5 pl-2 border-l border-zinc-800">
+                <Fingerprint className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-zinc-500 font-medium">Locutor:</span>
+                <select
+                  value={speakerFilter}
+                  onChange={(e) => setSpeakerFilter(e.target.value)}
+                  className="bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-lg px-2.5 py-1 text-xs outline-none focus:border-cyan-500 cursor-pointer"
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{f.label}</span>
-                </button>
-              );
-            })}
+                  <option value="">Todos os Locutores</option>
+                  {speakerProfiles.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -305,9 +363,11 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {results.map((result) => {
-                const scorePercent = (result.similarity_score * 100).toFixed(1);
+                const scoreNumber = result.similarity_score * 100;
+                const scorePercent = scoreNumber.toFixed(1);
                 const displayTitle = result.title || result.video_title || 'Sem título';
                 const displaySubtitle = result.subtitle || result.channel_title;
+                const targetLink = result.deep_link || result.youtube_url_with_timestamp;
 
                 return (
                   <div
@@ -349,12 +409,20 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
                               {result.formatted_start_time} - {result.formatted_end_time}
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800/50 font-mono">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-mono border ${
+                              scoreNumber >= 80
+                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/50'
+                                : scoreNumber >= 60
+                                ? 'bg-amber-950/80 text-amber-300 border-amber-800/50'
+                                : 'bg-zinc-800/80 text-zinc-300 border-zinc-700/50'
+                            }`}
+                          >
                             {scorePercent}% match
                           </span>
                           {result.speaker && (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-800/50">
-                              <User className="w-3 h-3" />
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">
+                              <User className="w-3 h-3 text-indigo-400" />
                               {result.speaker}
                             </span>
                           )}
@@ -369,9 +437,9 @@ export function SemanticSearchApp({ language = 'pt', onAddLog }: Readonly<Semant
 
                     {/* Bottom Action: Jump to YouTube video or open Document/Website */}
                     <div className="flex items-center justify-end pt-1">
-                      {result.deep_link ? (
+                      {targetLink ? (
                         <a
-                          href={result.deep_link}
+                          href={targetLink}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-cyan-300 text-xs font-medium transition"

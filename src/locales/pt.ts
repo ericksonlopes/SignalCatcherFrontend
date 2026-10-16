@@ -366,6 +366,10 @@ export const pt = {
   voiceEnrollOnSave: "Cadastrar voz no banco (pgvector) ao salvar nome",
   voiceMatchedBadge: "Voz Identificada",
   voiceDeleteProfile: "Excluir perfil",
+  voiceSelectExistingProfile: "Ou selecione um perfil existente",
+  voiceMatchPercent: "match biométrico",
+  voiceIdentifySingle: "Identificar Voz",
+  voiceEnrolledNotice: "Voz cadastrada no pgvector",
 };
 
 export type TranslationKeys = keyof typeof pt;
