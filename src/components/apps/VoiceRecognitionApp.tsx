@@ -13,6 +13,7 @@ import {
   Mic,
   Plus,
   RefreshCw,
+  RotateCcw,
   Scissors,
   Search,
   Sparkles,
@@ -42,6 +43,61 @@ interface VoiceRecognitionAppProps {
     level: 'info' | 'success' | 'warning' | 'error',
     message: string,
   ) => void;
+}
+
+export interface SpeechBlock {
+  id: string;
+  speaker: string;
+  start: number;
+  end: number;
+  duration: number;
+  text: string;
+  rawSegmentIndices: number[];
+}
+
+function groupSpeakerTurns(
+  segments?: Array<{
+    speaker?: string;
+    original_speaker?: string;
+    start: number;
+    end: number;
+    text?: string;
+  }>,
+  targetSpeaker?: string
+): SpeechBlock[] {
+  if (!segments || !targetSpeaker) return [];
+  const blocks: SpeechBlock[] = [];
+
+  segments.forEach((seg, originalIdx) => {
+    const spk = seg.speaker || seg.original_speaker || 'UNKNOWN';
+    if (spk !== targetSpeaker && seg.original_speaker !== targetSpeaker) return;
+    if (!Number.isFinite(seg.start) || !Number.isFinite(seg.end)) return;
+
+    const start = Math.max(0, Number(seg.start));
+    const end = Math.max(0, start, Number(seg.end));
+    const text = (seg.text || '').trim();
+
+    const last = blocks.at(-1);
+    // Concatena falas contíguas do mesmo locutor (pausa natural até 2.5s)
+    if (last && start >= last.end && start - last.end <= 2.5) {
+      last.end = end;
+      last.duration = Math.round((last.end - last.start) * 10) / 10;
+      last.text = `${last.text} ${text}`.trim();
+      last.rawSegmentIndices.push(originalIdx);
+    } else {
+      blocks.push({
+        id: `block-${blocks.length}`,
+        speaker: targetSpeaker,
+        start,
+        end,
+        duration: Math.round((end - start) * 10) / 10,
+        text,
+        rawSegmentIndices: [originalIdx],
+      });
+    }
+  });
+
+  return blocks;
 }
 
 type TrainingMode = 'clip' | 'segments';
@@ -91,11 +147,11 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
   const [clipLabel, setClipLabel] = useState<string>('');
   const [isTrainingClip, setIsTrainingClip] = useState<boolean>(false);
 
-  // Segment Selection Form
+  // Speech Blocks Selection Form
   const [selectedDiarizationId, setSelectedDiarizationId] = useState<string>('');
   const [selectedSpeakerLabel, setSelectedSpeakerLabel] = useState<string>('');
   const [targetSpeakerName, setTargetSpeakerName] = useState<string>('');
-  const [selectedSegmentIndices, setSelectedSegmentIndices] = useState<number[]>([]);
+  const [selectedBlockIndices, setSelectedBlockIndices] = useState<number[]>([]);
   const [segmentStartTime, setSegmentStartTime] = useState<string>('');
   const [segmentEndTime, setSegmentEndTime] = useState<string>('');
   const [isEnrollingSegments, setIsEnrollingSegments] = useState<boolean>(false);
@@ -181,25 +237,26 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
     }
   }, [availableSpeakersInSelected]);
 
-  // Turn segments belonging to the selected speaker
-  const speakerSegments = useMemo(() => {
-    if (!selectedDiarization?.result_json?.segments || !selectedSpeakerLabel) return [];
-    return selectedDiarization.result_json.segments
-      .map((seg, originalIndex) => ({ ...seg, originalIndex }))
-      .filter(
-        (seg) =>
-          seg.speaker === selectedSpeakerLabel || seg.original_speaker === selectedSpeakerLabel
-      );
-  }, [selectedDiarization, selectedSpeakerLabel]);
+  // Grouped and concatenated speech blocks for the selected speaker
+  const speakerBlocks = useMemo(
+    () => groupSpeakerTurns(selectedDiarization?.result_json?.segments, selectedSpeakerLabel),
+    [selectedDiarization, selectedSpeakerLabel]
+  );
 
-  // Default to selecting all segments for this speaker initially
+  // Default to selecting only the first good block for this speaker initially
   useEffect(() => {
-    if (speakerSegments.length > 0) {
-      setSelectedSegmentIndices(speakerSegments.map((_, idx) => idx));
+    if (speakerBlocks.length > 0) {
+      const goodIndex = speakerBlocks.findIndex((b) => b.duration >= 2.0);
+      const chosenIdx = goodIndex >= 0 ? goodIndex : 0;
+      setSelectedBlockIndices([chosenIdx]);
+      setSegmentStartTime(formatTime(speakerBlocks[chosenIdx].start));
+      setSegmentEndTime(formatTime(speakerBlocks[chosenIdx].end));
     } else {
-      setSelectedSegmentIndices([]);
+      setSelectedBlockIndices([]);
+      setSegmentStartTime('');
+      setSegmentEndTime('');
     }
-  }, [speakerSegments]);
+  }, [speakerBlocks]);
 
   // Filtered diarizations for search
   const filteredDiarizations = useMemo(() => {
@@ -280,30 +337,66 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
     [segStartSec, segEndSec]
   );
 
-  // Sync segment start and end time when selection changes
-  useEffect(() => {
-    if (speakerSegments.length === 0 || selectedSegmentIndices.length === 0) {
-      setSegmentStartTime('');
-      setSegmentEndTime('');
-      return;
-    }
-    const selectedSegs = selectedSegmentIndices
-      .map((i) => speakerSegments[i])
-      .filter(Boolean);
-    if (selectedSegs.length > 0) {
-      const minStart = Math.min(...selectedSegs.map((s) => Number(s.start || 0)));
-      const maxEnd = Math.max(...selectedSegs.map((s) => Number(s.end || 0)));
-      setSegmentStartTime(formatTime(minStart));
-      setSegmentEndTime(formatTime(maxEnd));
-    }
-  }, [speakerSegments, selectedSegmentIndices]);
-
-  function handleSetTurnTime(start: number, end: number, index?: number) {
+  function handleFocusBlock(idx: number, start: number, end: number) {
+    setSelectedBlockIndices([idx]);
     setSegmentStartTime(formatTime(start));
     setSegmentEndTime(formatTime(end));
-    if (index !== undefined && !selectedSegmentIndices.includes(index)) {
-      setSelectedSegmentIndices([index]);
+  }
+
+  function adjustStartTime(deltaSeconds: number) {
+    const current = parseTimeStringToSeconds(segmentStartTime);
+    const next = Math.max(0, Math.round((current + deltaSeconds) * 10) / 10);
+    setSegmentStartTime(formatTime(next));
+  }
+
+  function adjustEndTime(deltaSeconds: number) {
+    const current = parseTimeStringToSeconds(segmentEndTime);
+    const next = Math.max(0, Math.round((current + deltaSeconds) * 10) / 10);
+    setSegmentEndTime(formatTime(next));
+  }
+
+  function handleResetToCurrentBlock() {
+    if (selectedBlockIndices.length > 0) {
+      const idx = selectedBlockIndices[0];
+      const block = speakerBlocks[idx];
+      if (block) {
+        setSegmentStartTime(formatTime(block.start));
+        setSegmentEndTime(formatTime(block.end));
+      }
     }
+  }
+
+  function toggleBlockIndex(idx: number) {
+    setSelectedBlockIndices((prev) => {
+      const next = prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx];
+      if (next.length > 0) {
+        const blocks = next.map((i) => speakerBlocks[i]).filter(Boolean);
+        const minStart = Math.min(...blocks.map((b) => b.start));
+        const maxEnd = Math.max(...blocks.map((b) => b.end));
+        setSegmentStartTime(formatTime(minStart));
+        setSegmentEndTime(formatTime(maxEnd));
+      } else {
+        setSegmentStartTime('');
+        setSegmentEndTime('');
+      }
+      return next;
+    });
+  }
+
+  function handleSelectAllBlocks() {
+    if (speakerBlocks.length === 0) return;
+    const all = speakerBlocks.map((_, i) => i);
+    setSelectedBlockIndices(all);
+    const minStart = Math.min(...speakerBlocks.map((b) => b.start));
+    const maxEnd = Math.max(...speakerBlocks.map((b) => b.end));
+    setSegmentStartTime(formatTime(minStart));
+    setSegmentEndTime(formatTime(maxEnd));
+  }
+
+  function handleDeselectAllBlocks() {
+    setSelectedBlockIndices([]);
+    setSegmentStartTime('');
+    setSegmentEndTime('');
   }
 
   async function handleCreateProfile(e: React.FormEvent) {
@@ -390,18 +483,22 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
       !selectedDiarizationId ||
       !selectedSpeakerLabel ||
       !targetSpeakerName.trim() ||
-      !selectedSegmentIndices.length ||
+      !selectedBlockIndices.length ||
       isEnrollingSegments
     ) {
       return;
     }
     setIsEnrollingSegments(true);
     try {
+      const rawIndices = selectedBlockIndices.flatMap(
+        (i) => speakerBlocks[i]?.rawSegmentIndices || []
+      );
+      const uniqueRawIndices = Array.from(new Set(rawIndices));
       const payload: Record<string, unknown> = {
         diarization_id: selectedDiarizationId,
         speaker_label: selectedSpeakerLabel,
         speaker_name: targetSpeakerName.trim(),
-        selected_segment_indices: selectedSegmentIndices,
+        selected_segment_indices: uniqueRawIndices,
         apply_to_diarization: true,
       };
       if (segDurationSec >= 1 && segStartSec >= 0 && segEndSec > segStartSec) {
@@ -421,7 +518,7 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
       onAddLog(
         'VoiceRecognition',
         'success',
-        `Modelo treinado para ${targetSpeakerName.trim()} com ${selectedSegmentIndices.length} falas selecionadas${timeRangeText}. Arquivo salvo em D:/voice_training/`
+        `Modelo treinado para ${targetSpeakerName.trim()} (${selectedBlockIndices.length} blocos de fala)${timeRangeText}. Arquivo salvo em D:/voice_training/`
       );
       await fetchAllData();
     } catch (err) {
@@ -809,21 +906,23 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                   </select>
                 </div>
 
-                {/* Speech Turns Selection Checklist */}
+                {/* Speech Blocks Selection Checklist */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5 text-xs">
-                    <span className="text-zinc-400">{t('voiceTrainSelectSegmentsHint')}</span>
+                    <span className="text-zinc-400 font-medium">
+                      {t('voiceTrainSelectBlocksHint')}
+                    </span>
                     <div className="flex gap-2 text-[11px]">
                       <button
                         type="button"
-                        onClick={() => setSelectedSegmentIndices(speakerSegments.map((_, i) => i))}
+                        onClick={handleSelectAllBlocks}
                         className="text-indigo-400 hover:underline"
                       >
                         {t('voiceTrainSelectAll')}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectedSegmentIndices([])}
+                        onClick={handleDeselectAllBlocks}
                         className="text-zinc-500 hover:underline"
                       >
                         {t('voiceTrainDeselectAll')}
@@ -831,106 +930,204 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                     </div>
                   </div>
 
-                  <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-xs">
-                    {speakerSegments.map((seg, idx) => {
-                      const isChecked = selectedSegmentIndices.includes(idx);
-                      const dur = Math.round((Number(seg.end) - Number(seg.start)) * 10) / 10;
-                      return (
-                        <div
-                          key={`${seg.start}-${seg.end}-${idx}`}
-                          onClick={() => toggleSegmentIndex(idx)}
-                          className={`flex items-start gap-2 p-1.5 rounded cursor-pointer transition ${
-                            isChecked
-                              ? 'bg-indigo-950/40 text-zinc-200 border border-indigo-900/40'
-                              : 'bg-zinc-900/40 text-zinc-400 hover:bg-zinc-900'
-                          }`}
-                        >
-                          <span className="mt-0.5 text-indigo-400">
-                            {isChecked ? (
-                              <CheckSquare className="h-3.5 w-3.5" />
-                            ) : (
-                              <Square className="h-3.5 w-3.5 text-zinc-600" />
-                            )}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <span className="font-mono text-[10px] text-zinc-500 mr-1.5">
-                              [{formatTime(seg.start)} – {formatTime(seg.end)}] ({dur}s)
-                            </span>
-                            <span className="line-clamp-2 text-[11px] leading-tight">
-                              {seg.text || '...'}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSetTurnTime(Number(seg.start), Number(seg.end), idx);
-                            }}
-                            title={t('voiceTrainUseThisTurnTime')}
-                            className="shrink-0 p-1 rounded text-zinc-500 hover:text-indigo-400 hover:bg-zinc-800 transition"
+                  <div className="max-h-56 overflow-y-auto space-y-2 rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-xs">
+                    {speakerBlocks.length === 0 ? (
+                      <div className="py-6 text-center text-zinc-500 text-xs">
+                        Nenhum bloco de fala encontrado para este locutor.
+                      </div>
+                    ) : (
+                      speakerBlocks.map((block, idx) => {
+                        const isChecked = selectedBlockIndices.includes(idx);
+                        const isFocused =
+                          selectedBlockIndices.length === 1 && selectedBlockIndices[0] === idx;
+                        return (
+                          <div
+                            key={block.id}
+                            onClick={() => handleFocusBlock(idx, block.start, block.end)}
+                            className={`flex flex-col gap-1.5 p-2 rounded-lg cursor-pointer transition border ${
+                              isFocused
+                                ? 'bg-indigo-950/60 border-indigo-500 text-zinc-100 shadow-sm shadow-indigo-950/40'
+                                : isChecked
+                                ? 'bg-indigo-950/30 border-indigo-900/50 text-zinc-200'
+                                : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700'
+                            }`}
                           >
-                            <Clock className="h-3 w-3" />
-                          </button>
-                        </div>
-                      );
-                    })}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="mt-0.5 text-indigo-400"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleBlockIndex(idx);
+                                  }}
+                                >
+                                  {isChecked ? (
+                                    <CheckSquare className="h-4 w-4" />
+                                  ) : (
+                                    <Square className="h-4 w-4 text-zinc-600" />
+                                  )}
+                                </span>
+                                <span className="font-mono text-[11px] font-semibold text-zinc-300">
+                                  [{formatTime(block.start)} – {formatTime(block.end)}]
+                                </span>
+                                <span
+                                  className={`rounded px-1.5 py-0.2 font-mono text-[10px] ${
+                                    block.duration >= 3 && block.duration <= 60
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : 'bg-zinc-800 text-zinc-400'
+                                  }`}
+                                >
+                                  {block.duration}s
+                                </span>
+                                {block.rawSegmentIndices.length > 1 && (
+                                  <span className="rounded bg-indigo-500/10 px-1.5 py-0.2 text-[10px] text-indigo-400 font-mono">
+                                    {block.rawSegmentIndices.length} {t('voiceTrainGroupedPhrases')}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFocusBlock(idx, block.start, block.end);
+                                }}
+                                title={t('voiceTrainUseThisTurnTime')}
+                                className="shrink-0 rounded px-2 py-0.5 text-[11px] font-medium text-indigo-300 bg-indigo-900/40 hover:bg-indigo-800/60 border border-indigo-700/50 transition flex items-center gap-1"
+                              >
+                                <Clock className="h-3 w-3" />
+                                <span>{t('voiceTrainUseThisTurnTime')}</span>
+                              </button>
+                            </div>
+                            <div className="text-[11px] leading-relaxed text-zinc-300 line-clamp-3 pl-6">
+                              {block.text || '...'}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
-                  <div className="text-[11px] text-zinc-400 mt-1">
-                    {selectedSegmentIndices.length} {t('voiceTrainSelectedTurns')}
+                  <div className="text-[11px] text-zinc-400 mt-1 flex justify-between items-center">
+                    <span>
+                      {selectedBlockIndices.length} de {speakerBlocks.length}{' '}
+                      {t('voiceTrainSelectedBlocks')}
+                    </span>
+                    <span className="text-[10px] text-zinc-500">
+                      {t('voiceTrainClickToFocusTurn')}
+                    </span>
                   </div>
                 </div>
 
                 {/* Custom Time Range for Speech Turns */}
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 space-y-2">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-400 font-medium">
-                      {t('voiceTrainCustomClipRangeTitle')}
+                    <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-indigo-400" />
+                      <span>{t('voiceTrainCustomClipRangeTitle')}</span>
                     </span>
-                    <span
-                      className={`font-mono font-semibold text-[11px] ${
-                        segDurationSec >= 3 ? 'text-emerald-400' : 'text-amber-400'
-                      }`}
-                    >
-                      {segDurationSec}s ({formatTime(segDurationSec)})
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetToCurrentBlock}
+                        title={t('voiceTrainResetOriginal')}
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 hover:text-zinc-200 text-[10px] border border-zinc-800 hover:border-zinc-700 transition"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        <span>{t('voiceTrainResetOriginal')}</span>
+                      </button>
+                      <span
+                        className={`font-mono font-semibold text-[11px] px-2 py-0.5 rounded ${
+                          segDurationSec >= 3 && segDurationSec <= 60
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        }`}
+                      >
+                        {segDurationSec}s ({formatTime(segDurationSec)})
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] text-zinc-500 mb-0.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Start Time with Stepper Controls */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] text-zinc-400">
                         {t('voiceTrainStartTime')}
                       </label>
-                      <div className="relative flex items-center">
-                        <Clock className="absolute left-2 h-3 w-3 text-zinc-500" />
-                        <input
-                          type="text"
-                          value={segmentStartTime}
-                          onChange={(e) => setSegmentStartTime(e.target.value)}
-                          placeholder="00:15"
-                          className="w-full rounded-md border border-zinc-700 bg-zinc-900 pl-7 pr-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-indigo-500"
-                        />
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1 flex items-center">
+                          <Clock className="absolute left-2 h-3.5 w-3.5 text-zinc-500" />
+                          <input
+                            type="text"
+                            value={segmentStartTime}
+                            onChange={(e) => setSegmentStartTime(e.target.value)}
+                            placeholder="00:15"
+                            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-7 pr-2 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                        <div className="flex gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => adjustStartTime(-1)}
+                            title="Começar 1s mais cedo"
+                            className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-300"
+                          >
+                            -1s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustStartTime(1)}
+                            title="Começar 1s mais tarde"
+                            className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-300"
+                          >
+                            +1s
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] text-zinc-500 mb-0.5">
+
+                    {/* End Time with Stepper Controls */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] text-zinc-400">
                         {t('voiceTrainEndTime')}
                       </label>
-                      <div className="relative flex items-center">
-                        <Clock className="absolute left-2 h-3 w-3 text-zinc-500" />
-                        <input
-                          type="text"
-                          value={segmentEndTime}
-                          onChange={(e) => setSegmentEndTime(e.target.value)}
-                          placeholder="00:45"
-                          className="w-full rounded-md border border-zinc-700 bg-zinc-900 pl-7 pr-2 py-1 font-mono text-xs text-zinc-200 outline-none focus:border-indigo-500"
-                        />
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1 flex items-center">
+                          <Clock className="absolute left-2 h-3.5 w-3.5 text-zinc-500" />
+                          <input
+                            type="text"
+                            value={segmentEndTime}
+                            onChange={(e) => setSegmentEndTime(e.target.value)}
+                            placeholder="00:45"
+                            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-7 pr-2 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                        <div className="flex gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => adjustEndTime(-1)}
+                            title="Terminar 1s mais cedo"
+                            className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-300"
+                          >
+                            -1s
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustEndTime(1)}
+                            title="Terminar 1s mais tarde"
+                            className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-300"
+                          >
+                            +1s
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
-                    <Folder className="h-3 w-3 text-cyan-400" />
-                    <span>{t('voiceTrainFolderNotice')}</span>
+                  <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/60">
+                    <div className="flex items-center gap-1.5">
+                      <Folder className="h-3 w-3 text-cyan-400" />
+                      <span>{t('voiceTrainFolderNotice')}</span>
+                    </div>
+                    <span>{t('voiceTrainIdealDuration')}</span>
                   </div>
                 </div>
 
@@ -966,7 +1163,7 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                     !selectedDiarizationId ||
                     !selectedSpeakerLabel ||
                     !targetSpeakerName.trim() ||
-                    !selectedSegmentIndices.length ||
+                    !selectedBlockIndices.length ||
                     isEnrollingSegments
                   }
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-40"

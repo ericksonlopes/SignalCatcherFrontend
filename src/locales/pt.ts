@@ -392,7 +392,14 @@ export const pt = {
   voiceSearchDiarizationClear: "Limpar busca",
   voiceNoDiarizationsFoundForSearch: "Nenhum vídeo diarizado encontrado para a busca.",
   voiceTrainCustomClipRangeTitle: "Ajustar Minutagem do Recorte (MM:SS ou s)",
-  voiceTrainUseThisTurnTime: "Usar tempo desta fala",
+  voiceTrainUseThisTurnTime: "Usar tempo deste bloco",
+  voiceTrainIdealDuration: "Duração recomendada: 3s a 60s",
+  voiceTrainResetOriginal: "Restaurar tempo do bloco",
+  voiceTrainClickToFocusTurn: "Clique para focar e regular este bloco",
+  voiceTrainSpeechBlocksTitle: "Blocos de Falas Concatenadas",
+  voiceTrainSelectBlocksHint: "Selecione um bloco contínuo de fala para regular e treinar o modelo:",
+  voiceTrainSelectedBlocks: "blocos selecionados",
+  voiceTrainGroupedPhrases: "falas agrupadas",
 };
 
 export type TranslationKeys = keyof typeof pt;

@@ -393,6 +393,13 @@ export const en: Record<TranslationKeys, string> = {
   voiceSearchDiarizationClear: "Clear search",
   voiceNoDiarizationsFoundForSearch: "No diarized videos found for this search.",
   voiceTrainCustomClipRangeTitle: "Adjust Clip Time Range (MM:SS or s)",
-  voiceTrainUseThisTurnTime: "Use this turn's time",
+  voiceTrainUseThisTurnTime: "Use this block's time",
+  voiceTrainIdealDuration: "Recommended duration: 3s to 60s",
+  voiceTrainResetOriginal: "Reset to block's time",
+  voiceTrainClickToFocusTurn: "Click to focus and adjust this block",
+  voiceTrainSpeechBlocksTitle: "Concatenated Speech Blocks",
+  voiceTrainSelectBlocksHint: "Select a continuous speech block to adjust and train the model:",
+  voiceTrainSelectedBlocks: "blocks selected",
+  voiceTrainGroupedPhrases: "phrases merged",
 };
 
