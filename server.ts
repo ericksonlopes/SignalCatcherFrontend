@@ -625,10 +625,17 @@ async function startServer() {
   ];
 
   app.get("/api/voice-recognition/stats", (_req, res) => {
-    const totalSamples = mockSpeakerProfiles.reduce((acc, p) => acc + p.samples_count, 0);
+    const totalSamples = mockSpeakerProfiles.reduce((acc, p) => acc + (p.samples?.length || 0), 0);
+    const approvedSamples = mockSpeakerProfiles.reduce(
+      (acc, p) => acc + (p.samples?.filter(s => (s as any).status === 'APPROVED')?.length || 0),
+      0
+    );
+    const pendingSamples = totalSamples - approvedSamples;
     return res.json({
       total_profiles: mockSpeakerProfiles.length,
       total_samples: totalSamples,
+      pending_samples: pendingSamples,
+      approved_samples: approvedSamples,
       embedding_dimension: 256,
       default_similarity_threshold: 0.65,
       worker_healthy: true
@@ -641,6 +648,98 @@ async function startServer() {
       ? mockSpeakerProfiles.filter(p => p.name.toLowerCase().includes(search))
       : mockSpeakerProfiles;
     return res.json(list);
+  });
+
+  app.get("/api/voice-recognition/samples/review-queue", (req, res) => {
+    const speakerId = typeof req.query.speaker_id === "string" ? req.query.speaker_id : null;
+    const status = typeof req.query.status === "string" ? req.query.status.toUpperCase() : "PENDING_REVIEW";
+    const allSamples: any[] = [];
+    for (const p of mockSpeakerProfiles) {
+      if (speakerId && p.id !== speakerId) continue;
+      for (const s of p.samples || []) {
+        if (!status || (s as any).status === status) {
+          allSamples.push({ ...s, has_audio: true });
+        }
+      }
+    }
+    return res.json(allSamples);
+  });
+
+  app.patch("/api/voice-recognition/samples/:sampleId/review", (req, res) => {
+    const { sampleId } = req.params;
+    const { status, start_time, end_time } = req.body || {};
+    for (const p of mockSpeakerProfiles) {
+      const s = p.samples?.find(item => item.id === sampleId);
+      if (s) {
+        (s as any).status = String(status || 'APPROVED').toUpperCase();
+        (s as any).reviewed_at = new Date().toISOString();
+        if (typeof start_time === 'number' && typeof end_time === 'number') {
+          s.start_time = start_time;
+          s.end_time = end_time;
+          s.duration_seconds = Math.max(0.1, end_time - start_time);
+        }
+        p.samples_count = p.samples?.filter(item => (item as any).status === 'APPROVED').length || 0;
+        return res.json({ ...s, has_audio: true });
+      }
+    }
+    return res.status(404).json({ detail: "Voice sample not found." });
+  });
+
+  app.post("/api/voice-recognition/samples/review/bulk", (req, res) => {
+    const { sample_ids, status } = req.body || {};
+    const ids = Array.isArray(sample_ids) ? sample_ids : [];
+    let count = 0;
+    for (const p of mockSpeakerProfiles) {
+      for (const s of p.samples || []) {
+        if (ids.includes(s.id)) {
+          (s as any).status = String(status || 'APPROVED').toUpperCase();
+          (s as any).reviewed_at = new Date().toISOString();
+          count++;
+        }
+      }
+      p.samples_count = p.samples?.filter(item => (item as any).status === 'APPROVED').length || 0;
+    }
+    return res.json({ processed: count, total: ids.length, status });
+  });
+
+  app.get("/api/voice-recognition/samples/:sampleId/audio", (_req, res) => {
+    // Generate minimal valid WAV audio file header (silence) for browser playback in mock mode
+    const wavHeader = Buffer.from([
+      0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45,
+      0x66, 0x6d, 0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+      0x80, 0x3e, 0x00, 0x00, 0x00, 0x7d, 0x00, 0x00, 0x02, 0x00, 0x10, 0x00,
+      0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
+    ]);
+    res.setHeader("Content-Type", "audio/wav");
+    return res.send(wavHeader);
+  });
+
+  app.get("/api/voice-recognition/preview", (_req, res) => {
+    const wavHeader = Buffer.from([
+      0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45,
+      0x66, 0x6d, 0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+      0x80, 0x3e, 0x00, 0x00, 0x00, 0x7d, 0x00, 0x00, 0x02, 0x00, 0x10, 0x00,
+      0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
+    ]);
+    res.setHeader("Content-Type", "audio/wav");
+    return res.send(wavHeader);
+  });
+
+  app.get("/api/voice-recognition/diarization/:id/speakers/:speakerLabel/suggested-clips", (req, res) => {
+    const { id, speakerLabel } = req.params;
+    const diar = mockDiarizations.find(d => d.id === id || d.entity_id === id);
+    const segs = diar?.result_json?.segments || [];
+    const speakerSegs = segs.filter((s: any) => s.speaker === speakerLabel || s.original_speaker === speakerLabel);
+    const clips = speakerSegs.map((s: any) => ({
+      start: s.start,
+      end: s.end,
+      duration: Math.round((s.end - s.start) * 10) / 10,
+      text: s.text || "",
+      energy_score: s.end - s.start >= 5.0 ? 3.0 : 1.5,
+      has_overlap: false,
+      quality_hint: s.end - s.start >= 5.0 ? "good" : "short"
+    }));
+    return res.json(clips.slice(0, 8));
   });
 
   app.post("/api/voice-recognition/profiles", (req, res) => {

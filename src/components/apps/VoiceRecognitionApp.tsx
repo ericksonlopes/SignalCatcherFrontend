@@ -16,6 +16,8 @@ import {
   RotateCcw,
   Scissors,
   Search,
+  ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Square,
   Trash2,
@@ -29,12 +31,16 @@ import type {
   IdentifyDiarizationResponse,
   LanguageMode,
   SpeakerProfile,
+  SuggestedClip,
   VoiceRecognitionStats,
   VoiceSample,
 } from '../../types';
 import { getTranslation } from '../../locales';
 import type { DiarizationVideo } from './DiarizationApp';
 import { formatTime } from './diarization/transcript';
+import { VoiceClipPlayer } from './voice/VoiceClipPlayer';
+import { VoiceCurationQueue, type ReviewStatusFilter } from './voice/VoiceCurationQueue';
+import { VoiceSuggestedClips } from './voice/VoiceSuggestedClips';
 
 interface VoiceRecognitionAppProps {
   readonly language?: LanguageMode;
@@ -124,6 +130,15 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
 }) => {
   const { t } = getTranslation(language);
 
+  // Main App Navigation Tab
+  type MainTab = 'curation' | 'training' | 'profiles';
+  const [mainTab, setMainTab] = useState<MainTab>('curation');
+
+  // Voice Curation Review Queue State
+  const [reviewSamples, setReviewSamples] = useState<VoiceSample[]>([]);
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<ReviewStatusFilter>('PENDING_REVIEW');
+  const [isReviewLoading, setIsReviewLoading] = useState<boolean>(false);
+
   const [profiles, setProfiles] = useState<SpeakerProfile[]>([]);
   const [stats, setStats] = useState<VoiceRecognitionStats | null>(null);
   const [diarizations, setDiarizations] = useState<DiarizationVideo[]>([]);
@@ -166,6 +181,28 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
   const [isIdentifying, setIsIdentifying] = useState<boolean>(false);
   const [identifyResult, setIdentifyResult] = useState<IdentifyDiarizationResponse | null>(null);
 
+  const fetchReviewQueue = useCallback(
+    async (status: ReviewStatusFilter = reviewStatusFilter) => {
+      setIsReviewLoading(true);
+      try {
+        const url =
+          status === 'ALL'
+            ? `${API_BASE_URL}/api/voice-recognition/samples/review-queue`
+            : `${API_BASE_URL}/api/voice-recognition/samples/review-queue?status=${status}`;
+        const res = await apiFetch(url);
+        if (res.ok) {
+          const data: VoiceSample[] = await res.json();
+          setReviewSamples(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        onAddLog('VoiceRecognition', 'error', `Falha ao carregar fila de curadoria: ${String(err)}`);
+      } finally {
+        setIsReviewLoading(false);
+      }
+    },
+    [reviewStatusFilter, onAddLog]
+  );
+
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -203,6 +240,72 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  useEffect(() => {
+    fetchReviewQueue(reviewStatusFilter);
+  }, [fetchReviewQueue, reviewStatusFilter]);
+
+  const handleReviewSample = async (
+    sampleId: string,
+    status: 'APPROVED' | 'REJECTED',
+    startTime?: number,
+    endTime?: number
+  ) => {
+    const body: Record<string, unknown> = { status };
+    if (startTime !== undefined && endTime !== undefined) {
+      body.start_time = startTime;
+      body.end_time = endTime;
+    }
+    const res = await apiFetch(
+      `${API_BASE_URL}/api/voice-recognition/samples/${encodeURIComponent(sampleId)}/review`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { detail?: string };
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const actionLabel = status === 'APPROVED' ? 'aprovada' : 'rejeitada';
+    onAddLog('VoiceRecognition', 'success', `Amostra ${actionLabel} com sucesso.`);
+    await Promise.all([fetchReviewQueue(), fetchAllData()]);
+  };
+
+  const handleBulkReview = async (sampleIds: string[], action: 'APPROVE' | 'REJECT') => {
+    const res = await apiFetch(`${API_BASE_URL}/api/voice-recognition/samples/review/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sample_ids: sampleIds, action }),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { detail?: string };
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const data = (await res.json()) as { updated_count?: number };
+    const actionLabel = action === 'APPROVE' ? 'aprovadas' : 'rejeitadas';
+    onAddLog(
+      'VoiceRecognition',
+      'success',
+      `${data.updated_count || sampleIds.length} amostras ${actionLabel} em lote.`
+    );
+    await Promise.all([fetchReviewQueue(), fetchAllData()]);
+  };
+
+  const handleSelectSuggestedClip = (clip: SuggestedClip) => {
+    setClipStartTime(formatTime(clip.start));
+    setClipEndTime(formatTime(clip.end));
+    setClipLabel(`Trecho ${formatTime(clip.start)}`);
+    setTrainingMode('clip');
+    onAddLog(
+      'VoiceRecognition',
+      'info',
+      `Trecho sugerido aplicado aos campos de recorte: ${formatTime(clip.start)} - ${formatTime(
+        clip.end
+      )} (${clip.duration.toFixed(1)}s)`
+    );
+  };
 
   const selectedDiarization = useMemo(
     () => diarizations.find((d) => d.id === selectedDiarizationId) || null,
@@ -600,11 +703,10 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
     }
   }
 
-  function toggleSegmentIndex(idx: number) {
-    setSelectedSegmentIndices((prev) =>
-      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
-    );
-  }
+  const pendingCurationCount = useMemo(
+    () => reviewSamples.filter((s) => s.status === 'PENDING_REVIEW').length,
+    [reviewSamples]
+  );
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-y-auto bg-[#09090b] p-4 lg:p-6 space-y-6">
@@ -638,21 +740,104 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
           )}
           <button
             type="button"
-            onClick={() => fetchAllData()}
+            onClick={() => {
+              fetchAllData();
+              fetchReviewQueue();
+            }}
             className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs text-zinc-200 hover:bg-zinc-800"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading || isReviewLoading ? 'animate-spin' : ''}`} />
             <span>Atualizar</span>
           </button>
         </div>
       </div>
 
-      {/* Main Grid: Voice Training Center + Automatic Recognition + Profiles */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        {/* Left Column: Training by Video Clips / Speech Turns (5 cols) */}
-        <div className="space-y-6 xl:col-span-5">
-          {/* Card 1: Dedicated Training Center */}
-          <div className="rounded-2xl border border-indigo-500/30 bg-zinc-900/40 p-5 space-y-4 shadow-lg shadow-indigo-950/10">
+      {/* Main Tab Navigation */}
+      <div className="flex flex-wrap gap-2 border-b border-zinc-800 pb-3">
+        <button
+          type="button"
+          onClick={() => setMainTab('curation')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
+            mainTab === 'curation'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-200'
+          }`}
+        >
+          <CheckSquare className="h-4 w-4" />
+          <span>{t('voiceCurationTabTitle')}</span>
+          {pendingCurationCount > 0 && (
+            <span
+              className={`rounded-full px-2 py-0.5 font-mono text-[11px] ${
+                mainTab === 'curation'
+                  ? 'bg-amber-400 text-zinc-950 font-bold'
+                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+              }`}
+            >
+              {pendingCurationCount} pendente{pendingCurationCount > 1 ? 's' : ''}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab('training')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
+            mainTab === 'training'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-200'
+          }`}
+        >
+          <Scissors className="h-4 w-4" />
+          <span>{t('voiceTrainTabTitle')}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab('profiles')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
+            mainTab === 'profiles'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-200'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          <span>{t('voiceProfilesTitle')} & Identificação</span>
+          <span
+            className={`rounded-full px-2 py-0.5 font-mono text-[11px] ${
+              mainTab === 'profiles'
+                ? 'bg-indigo-800 text-indigo-100'
+                : 'bg-zinc-800 text-zinc-400'
+            }`}
+          >
+            {profiles.length}
+          </span>
+        </button>
+      </div>
+
+      {/* TAB 1: CURATION REVIEW QUEUE */}
+      {mainTab === 'curation' && (
+        <VoiceCurationQueue
+          samples={reviewSamples}
+          isLoading={isReviewLoading}
+          statusFilter={reviewStatusFilter}
+          onStatusFilterChange={(st) => {
+            setReviewStatusFilter(st);
+            fetchReviewQueue(st);
+          }}
+          onReviewSample={handleReviewSample}
+          onBulkReview={handleBulkReview}
+          onRefresh={() => fetchReviewQueue(reviewStatusFilter)}
+          language={language}
+        />
+      )}
+
+      {/* TAB 2: TRAINING CENTER */}
+      {mainTab === 'training' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          {/* Left Column: Training by Video Clips / Speech Turns (7 cols) */}
+          <div className="space-y-6 xl:col-span-7">
+            {/* Card 1: Dedicated Training Center */}
+            <div className="rounded-2xl border border-indigo-500/30 bg-zinc-900/40 p-5 space-y-4 shadow-lg shadow-indigo-950/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
                 <Scissors className="h-4 w-4 text-indigo-400" />
@@ -1212,13 +1397,52 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Card 2: Automatic Speaker Identification on a Diarization */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-              <Sparkles className="h-4 w-4 text-emerald-400" />
-              <span>{t('voiceIdentifyBtn')} (pgvector Cosine Search)</span>
+        {/* Right Column: Suggested Clips & Training Guidelines (5 cols) */}
+        <div className="space-y-6 xl:col-span-5">
+            {selectedDiarizationId && selectedSpeakerLabel && (
+              <VoiceSuggestedClips
+                diarizationId={trainingMode === 'clip' ? clipVideoId : selectedDiarizationId}
+                speakerLabel={selectedSpeakerLabel}
+                onSelectClip={handleSelectSuggestedClip}
+                language={language}
+              />
+            )}
+
+            {/* Training Guidelines Card */}
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5 space-y-3 text-xs text-zinc-400">
+              <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-400" />
+                <span>Como funciona o Treinamento de Voz</span>
+              </h3>
+              <p className="leading-relaxed">
+                1. <strong>Recorte Limpo:</strong> Escolha trechos de fala isolada (sem risadas intensas, música de fundo alta ou sobreposição de outras vozes).
+              </p>
+              <p className="leading-relaxed">
+                2. <strong>Fila de Curadoria:</strong> Toda amostra criada entra inicialmente como{' '}
+                <span className="font-mono text-amber-300">Aguardando Revisão</span> para que você possa escutá-la e aprová-la antes de integrar o modelo definitivo.
+              </p>
+              <p className="leading-relaxed">
+                3. <strong>Extração Neural:</strong> Utilizamos a rede deep learning{' '}
+                <span className="font-mono text-indigo-300">Pyannote/WeSpeaker ResNet-34</span> para extrair vetores biométricos normalizados de 256 dimensões.
+              </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: PROFILES DIRECTORY & IDENTIFICATION */}
+      {mainTab === 'profiles' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          {/* Left Column: Automatic Speaker Identification on a Diarization (5 cols) */}
+          <div className="space-y-6 xl:col-span-5">
+            {/* Card 2: Automatic Speaker Identification on a Diarization */}
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                <Sparkles className="h-4 w-4 text-emerald-400" />
+                <span>{t('voiceIdentifyBtn')} (pgvector Cosine Search)</span>
+              </div>
 
             <div className="space-y-3">
               <div>
@@ -1395,11 +1619,49 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-zinc-100 text-sm">{p.name}</span>
+
+                          {/* Samples count */}
                           <span className="rounded bg-indigo-500/10 px-2 py-0.5 font-mono text-[11px] text-indigo-400 border border-indigo-500/30">
-                            {p.samples_count} {t('voiceSamplesCount')}
+                            {p.samples_count} {p.samples_count === 1 ? 'amostra aprovada' : 'amostras aprovadas'}
                           </span>
+
+                          {/* Pending count badge */}
+                          {typeof p.pending_count === 'number' && p.pending_count > 0 && (
+                            <span className="rounded bg-amber-500/15 px-2 py-0.5 font-mono text-[11px] text-amber-300 border border-amber-500/30">
+                              {p.pending_count} pendente{p.pending_count > 1 ? 's' : ''}
+                            </span>
+                          )}
+
+                          {/* Profile Strength Badge */}
+                          {p.profile_strength === 'strong' && (
+                            <span
+                              className="flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-400 border border-emerald-500/30"
+                              title={t('voiceCurationStrengthStrong')}
+                            >
+                              <ShieldCheck className="h-3 w-3" />
+                              <span>Forte</span>
+                            </span>
+                          )}
+                          {p.profile_strength === 'moderate' && (
+                            <span
+                              className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] text-amber-400 border border-amber-500/30"
+                              title={t('voiceCurationStrengthModerate')}
+                            >
+                              <ShieldAlert className="h-3 w-3" />
+                              <span>Médio</span>
+                            </span>
+                          )}
+                          {(p.profile_strength === 'weak' || !p.profile_strength) && (
+                            <span
+                              className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-0.5 font-mono text-[11px] text-zinc-400 border border-zinc-700"
+                              title={t('voiceCurationStrengthWeak')}
+                            >
+                              <ShieldAlert className="h-3 w-3" />
+                              <span>Fraco</span>
+                            </span>
+                          )}
                         </div>
                         {p.description && (
                           <p className="mt-1 text-xs text-zinc-400">{p.description}</p>
@@ -1416,34 +1678,62 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
                       </button>
                     </div>
 
-                    {/* Samples list preview */}
+                    {/* Samples list preview with player and status badges */}
                     {p.samples && p.samples.length > 0 && (
-                      <div className="space-y-1.5 border-t border-zinc-800/60 pt-2.5">
+                      <div className="space-y-2 border-t border-zinc-800/60 pt-2.5">
                         <div className="text-[11px] font-medium text-zinc-400">
                           Amostras cadastradas:
                         </div>
-                        <div className="grid gap-1.5 sm:grid-cols-2">
+                        <div className="grid gap-2 sm:grid-cols-2">
                           {p.samples.map((s) => {
                             const isClip = s.source_type === 'YOUTUBE_CLIP';
+                            const audioUrl =
+                              s.has_audio !== false
+                                ? `${API_BASE_URL}/api/voice-recognition/samples/${s.id}/audio`
+                                : '';
+
                             return (
                               <div
                                 key={s.id}
-                                className="flex items-center justify-between rounded-lg bg-zinc-900/60 px-2.5 py-1.5 text-[11px] font-mono text-zinc-400 border border-zinc-800/50"
+                                className="flex flex-col gap-1.5 rounded-lg bg-zinc-900/60 p-2 text-[11px] font-mono text-zinc-400 border border-zinc-800/50"
                               >
-                                <span className="truncate flex items-center gap-1.5">
-                                  {isClip ? (
-                                    <Film className="h-3 w-3 text-cyan-400" />
-                                  ) : (
-                                    <Mic className="h-3 w-3 text-indigo-400" />
+                                <div className="flex items-center justify-between">
+                                  <span className="truncate flex items-center gap-1.5">
+                                    {isClip ? (
+                                      <Film className="h-3 w-3 text-cyan-400" />
+                                    ) : (
+                                      <Mic className="h-3 w-3 text-indigo-400" />
+                                    )}
+                                    <span className="truncate">
+                                      {s.speaker_label || s.source_type}
+                                    </span>
+                                  </span>
+
+                                  {/* Status Badge */}
+                                  {s.status === 'APPROVED' && (
+                                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400 border border-emerald-500/20">
+                                      Aprovada
+                                    </span>
                                   )}
-                                  <span className="truncate">
-                                    {s.speaker_label || s.source_type}
-                                  </span>
-                                </span>
-                                {typeof s.duration_seconds === 'number' && s.duration_seconds > 0 && (
-                                  <span className="shrink-0 text-zinc-500 ml-2">
-                                    {Math.round(s.duration_seconds)}s
-                                  </span>
+                                  {s.status === 'PENDING_REVIEW' && (
+                                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-400 border border-amber-500/20">
+                                      Pendente
+                                    </span>
+                                  )}
+                                  {s.status === 'REJECTED' && (
+                                    <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-400 border border-rose-500/20">
+                                      Rejeitada
+                                    </span>
+                                  )}
+                                </div>
+
+                                {audioUrl && (
+                                  <VoiceClipPlayer
+                                    src={audioUrl}
+                                    duration={s.duration_seconds}
+                                    compact={true}
+                                    title={s.speaker_label || p.name}
+                                  />
                                 )}
                               </div>
                             );
@@ -1458,6 +1748,7 @@ export const VoiceRecognitionApp: React.FC<VoiceRecognitionAppProps> = ({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

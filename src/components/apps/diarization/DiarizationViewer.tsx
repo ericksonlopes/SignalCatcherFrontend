@@ -17,9 +17,10 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../../../api';
 import type { DiarizationVideo } from '../DiarizationApp';
-import type { IdentifyDiarizationResponse, LanguageMode, SpeakerMatch, SpeakerProfile } from '../../../types';
+import type { IdentifyDiarizationResponse, LanguageMode, SpeakerMatch, SpeakerProfile, SuggestedClip } from '../../../types';
 import { getTranslation } from '../../../locales';
 import { buildTranscript, formatTime, speakerStats, type TranscriptResult, type TranscriptSegment } from './transcript';
+import { VoiceSuggestedClips } from '../voice/VoiceSuggestedClips';
 
 interface DiarizationViewerProps {
   readonly video: DiarizationVideo;
@@ -97,6 +98,7 @@ function getMatchDisplayName(match: SpeakerMatch, fallbackName: string): string 
 }
 
 interface SpeakerCardProps {
+  readonly key?: React.Key;
   readonly speaker: SpeakerInfo;
   readonly totalSpeech: number;
   readonly isSelected: boolean;
@@ -108,6 +110,7 @@ interface SpeakerCardProps {
   readonly existingProfiles: SpeakerProfile[];
   readonly onToggleFilter: () => void;
   readonly onStartEdit: () => void;
+  readonly onOpenSuggestedClips?: (speaker: SpeakerInfo) => void;
   readonly onEditNameChange: (val: string) => void;
   readonly onEnrollOnSaveChange: (val: boolean) => void;
   readonly onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -128,6 +131,7 @@ function SpeakerCard({
   existingProfiles,
   onToggleFilter,
   onStartEdit,
+  onOpenSuggestedClips,
   onEditNameChange,
   onEnrollOnSaveChange,
   onKeyDown,
@@ -200,6 +204,18 @@ function SpeakerCard({
         >
           <UserPlus className="h-3.5 w-3.5 text-indigo-400" />
           <span>{t('voiceCreateNewProfileForSpeaker')}</span>
+        </button>
+      )}
+
+      {/* Action to suggest/preview training clips for this speaker */}
+      {!isEditing && (
+        <button
+          type="button"
+          onClick={() => onOpenSuggestedClips?.(speaker)}
+          className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-950/20 px-2.5 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-900/40 hover:text-indigo-200 transition"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+          <span>{t('voiceCurationSuggestedClips')}</span>
         </button>
       )}
 
@@ -293,6 +309,7 @@ function SpeakerCard({
 }
 
 interface TranscriptSegmentRowProps {
+  readonly key?: React.Key;
   readonly segment: TranscriptSegment;
   readonly speaker?: SpeakerInfo;
   readonly speakerMatch?: SpeakerMatch;
@@ -410,7 +427,39 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
   const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [notice, setNotice] = useState('');
+  const [trainingSpeaker, setTrainingSpeaker] = useState<SpeakerInfo | null>(null);
+  const [isEnrollingSuggested, setIsEnrollingSuggested] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
+
+  const handleEnrollFromSuggestedClip = async (clip: SuggestedClip) => {
+    if (!trainingSpeaker) return;
+    setIsEnrollingSuggested(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/voice-recognition/enroll/from-diarization`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          diarization_id: video.id,
+          speaker_label: trainingSpeaker.id,
+          speaker_name: trainingSpeaker.name,
+          start_time: clip.start,
+          end_time: clip.end,
+          selected_segment_indices: [],
+          apply_to_diarization: false,
+        }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { detail?: string };
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      setNotice(`Trecho enviado para a Fila de Curadoria de Voz! (${formatTime(clip.start)} - ${formatTime(clip.end)})`);
+      setTrainingSpeaker(null);
+    } catch (err) {
+      setNotice(`Erro ao enviar trecho para treino: ${String(err)}`);
+    } finally {
+      setIsEnrollingSuggested(false);
+    }
+  };
 
   useEffect(() => {
     apiFetch(`${API_BASE_URL}/api/voice-recognition/profiles`)
@@ -860,6 +909,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
                       );
                       setEnrollOnSave(true);
                     }}
+                    onOpenSuggestedClips={(spk) => setTrainingSpeaker(spk)}
                     onEditNameChange={(val) => setEditName(val)}
                     onEnrollOnSaveChange={(val) => setEnrollOnSave(val)}
                     onKeyDown={handleEditKeyDown}
@@ -923,6 +973,41 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
           </div>
         </div>
       </div>
+
+      {/* Modal with Suggested Clips for the Selected Speaker */}
+      {trainingSpeaker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-indigo-400" />
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-100">
+                    Treinar Voz com {trainingSpeaker.name}
+                  </h3>
+                  <p className="text-[11px] font-mono text-zinc-400">
+                    Locutor original: {trainingSpeaker.id} · Duração total: {formatTime(trainingSpeaker.seconds)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrainingSpeaker(null)}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <VoiceSuggestedClips
+              diarizationId={video.id}
+              speakerLabel={trainingSpeaker.id}
+              onSelectClip={handleEnrollFromSuggestedClip}
+              language={language}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 };

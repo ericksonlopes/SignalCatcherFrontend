@@ -112,6 +112,7 @@ function DiarizationStatus({ video, t }: { readonly video: DiarizationVideo; rea
 }
 
 interface DiarizationCardProps {
+  readonly key?: React.Key;
   readonly video: DiarizationVideo;
   readonly isSelected: boolean;
   readonly hasSelectedVideo: boolean;

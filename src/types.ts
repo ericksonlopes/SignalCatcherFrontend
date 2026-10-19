@@ -19,6 +19,12 @@ export interface VoiceSample {
   start_time?: number | null;
   end_time?: number | null;
   duration_seconds?: number | null;
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+  clip_path?: string | null;
+  has_audio?: boolean;
+  quality?: Record<string, unknown>;
+  reviewed_at?: string | null;
+  embedding_model?: string | null;
   metadata?: Record<string, unknown>;
   created_at?: string | null;
 }
@@ -29,6 +35,9 @@ export interface SpeakerProfile {
   description?: string | null;
   avatar_url?: string | null;
   samples_count: number;
+  pending_count?: number;
+  profile_strength?: 'weak' | 'moderate' | 'strong';
+  has_centroid?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
   samples?: VoiceSample[] | null;
@@ -37,9 +46,21 @@ export interface SpeakerProfile {
 export interface VoiceRecognitionStats {
   total_profiles: number;
   total_samples: number;
+  pending_samples?: number;
+  approved_samples?: number;
   embedding_dimension: number;
   default_similarity_threshold: number;
   worker_healthy: boolean;
+}
+
+export interface SuggestedClip {
+  start: number;
+  end: number;
+  duration: number;
+  text: string;
+  energy_score: number;
+  has_overlap: boolean;
+  quality_hint: 'good' | 'short' | 'overlap';
 }
 
 export interface SpeakerMatch {
