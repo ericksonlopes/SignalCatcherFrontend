@@ -35,3 +35,7 @@ src/
 5. **Types sincronizados**: Mantenha `src/types.ts` sincronizado com os DTOs do backend.
 6. **i18n**: Ao adicionar textos visíveis ao usuário, adicione nas locales (en e pt).
 7. **Linguagem**: Responda em português brasileiro. Código e comentários técnicos em inglês.
+8. **Validação e Qualidade Contínua (Obrigatória)**: Toda vez que qualquer alteração for realizada, execute obrigatoriamente a esteira de qualidade do frontend antes de concluir a resposta:
+   - `npx tsc --noEmit` (checagem de tipos TypeScript)
+   - `npm run lint` (linter)
+   - `npm run build` (garantir compilação de produção e bundle do server)

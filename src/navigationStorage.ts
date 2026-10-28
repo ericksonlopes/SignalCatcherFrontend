@@ -6,9 +6,7 @@ const DEFAULT_TAB: AppTab = {id: 'tab-1', appId: 'signalcatcher', title: 'Signal
 function isAppId(value: unknown): value is AppId {
     return (
         value === 'signalcatcher' ||
-        value === 'diarization' ||
-        value === 'search' ||
-        value === 'voice_recognition'
+        value === 'diarization'
     );
 }
 export type CaptureSection = 'captures' | 'saved_channels' | 'sources' | 'tracking';

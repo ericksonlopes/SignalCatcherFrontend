@@ -3,14 +3,12 @@ import {readWorkspace, saveWorkspace} from './navigationStorage';
 import {API_BASE_URL, apiFetch} from './api';
 import {createLogId} from './logId';
 import React, {useEffect, useRef, useState} from 'react';
-import {Fingerprint, Mic, Radio, Sparkles} from 'lucide-react';
+import {Mic, Radio} from 'lucide-react';
 import {Header} from './components/Header';
 import {CommandPalette} from './components/CommandPalette';
 import {NotificationDrawer} from './components/NotificationDrawer';
 import {SignalCatcherApp} from './components/apps/SignalCatcherApp';
 import {DiarizationApp} from './components/apps/DiarizationApp';
-import {SemanticSearchApp} from './components/apps/SemanticSearchApp';
-import {VoiceRecognitionApp} from './components/apps/VoiceRecognitionApp';
 import {ToastContainer, ToastProvider, useToast} from './components/toast';
 
 import {
@@ -99,24 +97,26 @@ function SignalCatcherHub() {
         if (data && Array.isArray(data)) {
           const fetchedChannels: ContentSource[] = data.map((item: any) => ({
             id: item.id.toString(),
-            name: item.title || item.name || 'Unknown Saved Channel',
-            url: item.custom_url || item.url || '',
-            channelId: item.external_id || item.channel_id || item.id.toString(),
-            channelUrl: item.channel_url || '',
-            avatar: item.thumbnail_url || 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
+            name: item.name || 'Unknown Channel',
+            url: item.url,
+            channelId: item.external_id || item.id,
+            channelUrl: item.url,
+            avatar: item.avatar_url || 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
             subscriberCount: item.subscriber_count || 0,
             lastCaptured: item.created_at || new Date().toISOString(),
             status: 'active',
-            intervalMinutes: 0,
-            totalCaptured: item.video_count || 0
+            intervalMinutes: 60,
+            totalCaptured: item.total_captured || 0
           }));
           setSavedChannels(fetchedChannels);
         }
       })
       .catch(err => console.error("Failed to fetch saved channels", err));
-      
-    // Fetch Global Stats
-    apiFetch(`${API_BASE_URL}/api/youtube/content/status-count`)
+  }, []);
+
+  // Fetch telemetry & status statistics
+  useEffect(() => {
+    apiFetch(`${API_BASE_URL}/api/youtube/content/stats`)
       .then(res => res.json())
       .then(data => {
         if (data) {
@@ -237,14 +237,12 @@ function SignalCatcherHub() {
     switch (appId) {
       case 'signalcatcher': return <Radio className="w-4 h-4" />;
       case 'diarization': return <Mic className="w-4 h-4" />;
-      case 'search': return <Sparkles className="w-4 h-4" />;
-      case 'voice_recognition': return <Fingerprint className="w-4 h-4" />;
       default: return <Radio className="w-4 h-4" />;
     }
   };
 
   return (
-    <div data-theme={theme} className={`${(activeTab.appId === 'diarization' || activeTab.appId === 'search' || activeTab.appId === 'voice_recognition') ? 'h-dvh overflow-hidden' : 'min-h-screen'} flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
+    <div data-theme={theme} className={`${activeTab.appId === 'diarization' ? 'h-dvh overflow-hidden' : 'min-h-screen'} flex flex-col font-sans ${themeClasses} selection:bg-indigo-500 selection:text-white`}>
       {/* Top Header */}
       <Header
         theme={theme}
@@ -274,8 +272,6 @@ function SignalCatcherHub() {
           {[
             { id: 'signalcatcher' as const, name: 'SignalCatcher' },
             { id: 'diarization' as const, name: language === 'pt' ? 'Diarização' : 'Diarization' },
-            { id: 'voice_recognition' as const, name: language === 'pt' ? 'Reconhecimento de Voz' : 'Voice Recognition' },
-            { id: 'search' as const, name: language === 'pt' ? 'Vetorização & Busca' : 'Vectorization & Search' },
           ].map((app) => {
             const isAppActive = activeTab.appId === app.id;
             const existingTab = tabs.find((t) => t.appId === app.id);
@@ -316,7 +312,7 @@ function SignalCatcherHub() {
         </aside>
 
         {/* Workspace Active Tab View */}
-        <main className={`flex-1 min-w-0 min-h-0 relative bg-[#09090b] ${(activeTab.appId === 'diarization' || activeTab.appId === 'voice_recognition' || activeTab.appId === 'search') ? 'flex overflow-hidden' : 'overflow-y-auto p-2 sm:p-4 md:p-6'}`}>
+        <main className={`flex-1 min-w-0 min-h-0 relative bg-[#09090b] ${activeTab.appId === 'diarization' ? 'flex overflow-hidden' : 'overflow-y-auto p-2 sm:p-4 md:p-6'}`}>
           {activeTab.appId === 'signalcatcher' && (
             <SignalCatcherApp
               language={language}
@@ -351,20 +347,6 @@ function SignalCatcherHub() {
 
           {activeTab.appId === 'diarization' && (
             <DiarizationApp 
-              language={language}
-              onAddLog={addLog}
-            />
-          )}
-
-          {activeTab.appId === 'search' && (
-            <SemanticSearchApp
-              language={language}
-              onAddLog={addLog}
-            />
-          )}
-
-          {activeTab.appId === 'voice_recognition' && (
-            <VoiceRecognitionApp
               language={language}
               onAddLog={addLog}
             />
