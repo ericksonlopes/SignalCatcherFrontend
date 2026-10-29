@@ -89,3 +89,17 @@ export interface ToastNotification {
   };
   createdAt?: number;
 }
+
+export interface VoicePerson { id: string; name: string }
+export interface VoiceSample { id: string; person_id: string; start: number; end: number }
+export type VoiceState = 'PENDING' | 'EXTRACTING' | 'ANALYZING' | 'COMPLETED' | 'ERROR';
+export interface VoiceCandidate { person_id: string; similarity: number }
+export interface VoiceJob {
+  id: string; kind: 'TRAIN' | 'IDENTIFY'; task_id: string; state: VoiceState;
+  payload: { person_id?: string; start?: number; end?: number };
+  result: { candidates?: Record<string, VoiceCandidate[]>; sample_id?: string }; error: string | null;
+}
+export interface VoiceIdentities {
+  assignments: Record<string, { person_id: string | null; name: string | null }>;
+  job: VoiceJob | null;
+}

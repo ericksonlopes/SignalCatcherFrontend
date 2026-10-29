@@ -10,6 +10,43 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
+
+  const voicePeople: Array<{ id: string; name: string }> = [];
+  const voiceJobs: Array<Record<string, unknown>> = [];
+  const voiceAssignments: Record<string, Record<string, { person_id: string | null; name: string | null }>> = {};
+  app.get('/api/voices/people', (_req, res) => res.json(voicePeople));
+  app.post('/api/voices/people', (req, res) => {
+    const person = { id: randomBytes(16).toString('hex'), name: String(req.body.name).trim() };
+    voicePeople.push(person); res.status(201).json(person);
+  });
+  app.patch('/api/voices/people/:id', (req, res) => {
+    const person = voicePeople.find(item => item.id === req.params.id);
+    if (!person) { res.sendStatus(404); return; }
+    person.name = String(req.body.name).trim(); res.json(person);
+  });
+  app.get('/api/voices/samples', (_req, res) => res.json([]));
+  app.delete('/api/voices/samples/:id', (_req, res) => res.sendStatus(404));
+  app.get('/api/voices/samples/:id/:kind', (_req, res) => res.sendStatus(404));
+  app.get('/api/diarization/:id/media', (_req, res) => res.sendStatus(404));
+  app.get('/api/voices/jobs', (_req, res) => res.json(voiceJobs));
+  function mockVoiceJob(taskId: string, kind: string, payload: unknown) {
+    const job = { id: randomBytes(16).toString('hex'), task_id: taskId, kind, payload, result: {}, state: 'ERROR', error: 'Media processing requires the real backend.' };
+    voiceJobs.unshift(job); return job;
+  }
+  app.post('/api/voices/training', (req, res) => res.status(202).json(mockVoiceJob(String(req.body.task_id), 'TRAIN', req.body)));
+  app.post('/api/diarization/:id/identify', (req, res) => res.status(202).json(mockVoiceJob(req.params.id, 'IDENTIFY', {})));
+  app.post('/api/voices/jobs/:id/retry', (req, res) => {
+    const job = voiceJobs.find(item => item.id === req.params.id);
+    if (!job) { res.sendStatus(404); return; } res.status(202).json(job);
+  });
+  app.get('/api/diarization/:id/identities', (req, res) => res.json({ assignments: voiceAssignments[req.params.id] || {}, job: voiceJobs.find(item => item.task_id === req.params.id && item.kind === 'IDENTIFY') || null }));
+  app.put('/api/diarization/:id/identities/:speaker', (req, res) => {
+    const person = voicePeople.find(item => item.id === req.body.person_id);
+    const mapping = { person_id: person?.id || null, name: person?.name || null };
+    voiceAssignments[req.params.id] ||= {}; voiceAssignments[req.params.id][req.params.speaker] = mapping;
+    res.json(mapping);
+  });
+
 // In-memory data store for YouTube sources and content
   const youtubeSources: Array<{
     id: string;
@@ -83,7 +120,7 @@ async function startServer() {
     if (!url) {
       return res.status(400).json({
         error: "Bad Request",
-        message: "O campo 'url' é obrigatório."
+        message: "O campo 'url' Ã© obrigatÃ³rio."
       });
     }
 
@@ -144,7 +181,7 @@ async function startServer() {
     if (!url) {
       return res.status(400).json({
         error: "Bad Request",
-        message: "O campo 'url' é obrigatório."
+        message: "O campo 'url' Ã© obrigatÃ³rio."
       });
     }
 
@@ -157,8 +194,8 @@ async function startServer() {
       sourceName: isPlaylist ? "YouTube Playlist Ingestion Engine" : "YouTube Direct Ingestion",
       sourceAvatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
       title: isPlaylist 
-        ? "Playlist Extraída: Série Completa e Tutoriais YouTube"
-        : "Vídeo Ingerido: Análise do Conteúdo e Metadados YouTube",
+        ? "Playlist ExtraÃ­da: SÃ©rie Completa e Tutoriais YouTube"
+        : "VÃ­deo Ingerido: AnÃ¡lise do ConteÃºdo e Metadados YouTube",
       videoUrl: String(url),
       thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
       publishedAt: new Date().toISOString(),
@@ -169,7 +206,7 @@ async function startServer() {
       status: "ingested",
       postgresRecordId: randomPgId,
       tags: ["YouTube", isPlaylist ? "Playlist" : "Video", "API"],
-      summary: "Conteúdo extraído do link fornecido, processado com IA e persistido no banco PostgreSQL.",
+      summary: "ConteÃºdo extraÃ­do do link fornecido, processado com IA e persistido no banco PostgreSQL.",
       sentimentScore: 0.94
     };
 
@@ -193,7 +230,7 @@ async function startServer() {
     if (!url) {
       return res.status(400).json({
         error: "Bad Request",
-        message: "O campo 'url' é obrigatório."
+        message: "O campo 'url' Ã© obrigatÃ³rio."
       });
     }
 
@@ -204,7 +241,7 @@ async function startServer() {
         sourceId: youtubeSources[0]?.id || "src-1",
         sourceName: "YouTube Playlist Ingestion",
         sourceAvatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
-        title: "Playlist Extraída - Módulo 1: Fundamentos & Arquitetura",
+        title: "Playlist ExtraÃ­da - MÃ³dulo 1: Fundamentos & Arquitetura",
         videoUrl: String(url),
         thumbnail: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=600&auto=format&fit=crop&q=80",
         publishedAt: new Date().toISOString(),
@@ -215,7 +252,7 @@ async function startServer() {
         status: "ingested",
         postgresRecordId: `pg_${playlistId}_1`,
         tags: ["YouTube", "Playlist", save_in_playlist_folder ? "FolderSaved" : "DirectList"],
-        summary: "Vídeo 1 da playlist extraída automaticamente.",
+        summary: "VÃ­deo 1 da playlist extraÃ­da automaticamente.",
         sentimentScore: 0.96
       },
       {
@@ -223,7 +260,7 @@ async function startServer() {
         sourceId: youtubeSources[0]?.id || "src-1",
         sourceName: "YouTube Playlist Ingestion",
         sourceAvatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
-        title: "Playlist Extraída - Módulo 2: Processamento e API FastAPI",
+        title: "Playlist ExtraÃ­da - MÃ³dulo 2: Processamento e API FastAPI",
         videoUrl: String(url),
         thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
         publishedAt: new Date().toISOString(),
@@ -234,7 +271,7 @@ async function startServer() {
         status: "ingested",
         postgresRecordId: `pg_${playlistId}_2`,
         tags: ["YouTube", "Playlist", save_in_playlist_folder ? "FolderSaved" : "DirectList"],
-        summary: "Vídeo 2 da playlist extraída automaticamente.",
+        summary: "VÃ­deo 2 da playlist extraÃ­da automaticamente.",
         sentimentScore: 0.92
       }
     ];
@@ -425,7 +462,7 @@ async function startServer() {
     return res.json({
       success: true,
       task_id: prioritized?.id || `task-diarize-${Date.now()}`,
-      message: `Diarização iniciada para o vídeo ${id} (Idioma: ${language || 'Auto'})`
+      message: `DiarizaÃ§Ã£o iniciada para o vÃ­deo ${id} (Idioma: ${language || 'Auto'})`
     });
   });
 
@@ -451,7 +488,7 @@ async function startServer() {
 
     return res.json({
       success: true,
-      message: `Diarização ${id} enviada para reprocessamento (Status: Pendente)`,
+      message: `DiarizaÃ§Ã£o ${id} enviada para reprocessamento (Status: Pendente)`,
       task_id: diar?.id || id,
       step: "PENDING"
     });
@@ -489,7 +526,7 @@ async function startServer() {
 
     return res.json({
       success: true,
-      message: `Diarização ${id} cancelada com sucesso`,
+      message: `DiarizaÃ§Ã£o ${id} cancelada com sucesso`,
       task_id: diar?.id || id,
       entity_id: diar?.entity_id || id,
       step: "CANCELLED"
