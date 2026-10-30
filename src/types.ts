@@ -13,6 +13,79 @@ export interface AppTab {
 export type ThemeMode = 'cyberpunk' | 'oled' | 'light';
 export type LanguageMode = 'en' | 'pt';
 
+export type StorageMode = 'LOCAL' | 'DRIVE' | 'BOTH';
+export type StorageLocation = StorageMode | 'NONE';
+
+export interface StorageSettings {
+    mode: StorageMode;
+    uploads_paused: boolean;
+    max_upload_mib_per_second: number | null;
+    drive_ready: boolean;
+    drive_info: {
+        folder_id?: string; folder_name?: string; folder_url?: string; account?: string;
+        limit_bytes?: number | null; used_bytes?: number; free_bytes?: number | null
+    };
+    last_error: string | null;
+    checked_at: string | null;
+    catalog_error: string | null;
+    catalog_updated_at: string | null;
+}
+
+export interface DriveOAuthStatus {
+    configured: boolean;
+    authorized: boolean;
+    reason: string | null;
+    redirect_uri: string;
+    connect_url: string | null;
+}
+
+export interface StorageSummary extends StorageSettings {
+    locations: Record<string, number>;
+    transfers: Record<string, number>;
+    queued_bytes: number;
+}
+
+export interface StorageTransfer {
+    id: number;
+    external_id: string;
+    title: string;
+    origin: string;
+    operation: 'UPLOAD' | 'RESTORE';
+    status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'ERROR' | 'MISSING_FILE';
+    storage_location: StorageLocation | null;
+    bytes_transferred: number;
+    total_bytes: number;
+    attempts: number;
+    error: string | null;
+    next_retry_at: string | null;
+    updated_at: string;
+    file_path: string | null;
+    drive_url: string | null;
+}
+
+export interface StorageEvent {
+    id: number;
+    action: string;
+    details: string | null;
+    previous_location: StorageLocation | null;
+    new_location: StorageLocation | null;
+    created_at: string;
+}
+
+export interface StoragePage<T> {
+    items: T[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface YoutubeContentStats {
+    status_counts: Record<string, number>;
+    total_videos: number;
+    total_saved_channels: number;
+    total_monitored_channels: number;
+}
+
 // SignalCatcher Types
 export interface ContentSource {
   id: string;
@@ -29,6 +102,10 @@ export interface ContentSource {
 }
 
 export interface CapturedVideo {
+    storageLocation?: StorageLocation | null;
+    filePath?: string | null;
+    driveUrl?: string | null;
+    storageVerifiedAt?: string | null;
   id: string;
   sourceId: string;
   sourceName: string;
@@ -88,18 +165,4 @@ export interface ToastNotification {
     onClick: () => void;
   };
   createdAt?: number;
-}
-
-export interface VoicePerson { id: string; name: string }
-export interface VoiceSample { id: string; person_id: string; start: number; end: number }
-export type VoiceState = 'PENDING' | 'EXTRACTING' | 'ANALYZING' | 'COMPLETED' | 'ERROR';
-export interface VoiceCandidate { person_id: string; similarity: number }
-export interface VoiceJob {
-  id: string; kind: 'TRAIN' | 'IDENTIFY'; task_id: string; state: VoiceState;
-  payload: { person_id?: string; start?: number; end?: number };
-  result: { candidates?: Record<string, VoiceCandidate[]>; sample_id?: string }; error: string | null;
-}
-export interface VoiceIdentities {
-  assignments: Record<string, { person_id: string | null; name: string | null }>;
-  job: VoiceJob | null;
 }

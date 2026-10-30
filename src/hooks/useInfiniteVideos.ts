@@ -1,8 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {API_BASE_URL, apiFetch} from '../api';
-import {CapturedVideo} from '../types';
+import {CapturedVideo, StorageLocation} from '../types';
 
 interface VideoDTO {
+    storage_location?: StorageLocation | null;
+    file_path?: string | null;
+    drive_url?: string | null;
+    storage_verified_at?: string | null;
     id: string | number; title: string; url: string; channel_name?: string; thumbnail?: string;
     created_at?: string; published_at?: string; duration?: number | string; step?: string;
     tags?: string[]; description?: string; language?: string; deletion_requested?: boolean;
@@ -24,6 +28,8 @@ function mapVideo(item: VideoDTO): CapturedVideo {
         language: item.language, deletionRequested: item.deletion_requested ?? false,
         attemptCount: item.attempt_count ?? 0, nextRetryAt: item.next_retry_at ?? null,
         errorInfo: item.error_info ?? null, isDiarized: item.is_diarized ?? false,
+        storageLocation: item.storage_location ?? null, filePath: item.file_path ?? null,
+        driveUrl: item.drive_url ?? null, storageVerifiedAt: item.storage_verified_at ?? null,
         diarizationStatus: item.diarization_status || null,
         diarizationProgress: item.diarization_progress ?? null,
     };
@@ -64,7 +70,7 @@ function mergeVideos(mode: 'more' | 'refresh', previous: CapturedVideo[], incomi
     return Array.from(new Map(combined.map(video => [video.id, video])).values());
 }
 
-export function useInfiniteVideos(step: string, search: string, channel: string, refreshTrigger: number) {
+export function useInfiniteVideos(step: string, search: string, channel: string, refreshTrigger: number, storageLocation = '') {
     const [captures, setCaptures] = useState<CapturedVideo[]>([]);
     const [isInitialLoading, setInitialLoading] = useState(true);
     const [isLoadingMore, setLoadingMore] = useState(false);
@@ -77,12 +83,13 @@ export function useInfiniteVideos(step: string, search: string, channel: string,
         if (step) params.set('step', step);
         if (search) params.set('search', search);
         if (channel) params.set('channel', channel);
+        if (storageLocation) params.set('storage_location', storageLocation);
         const response = await apiFetch(`${API_BASE_URL}/api/youtube/content?${params}`, {signal});
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json() as VideoPage;
         if (!Array.isArray(data.items) || typeof data.total_pages !== 'number') throw new Error('Invalid video page');
         return data;
-    }, [step, search, channel]);
+    }, [step, search, channel, storageLocation]);
 
     const request = useCallback(async (mode: 'more' | 'refresh') => {
         const current = context.current;

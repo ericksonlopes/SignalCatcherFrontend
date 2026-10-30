@@ -1,6 +1,7 @@
 import express from "express";
+import {registerStorageMocks} from './src/mocks/storageRoutes';
 
-import { randomBytes, randomInt } from "node:crypto";
+import {randomBytes, randomInt} from "node:crypto";
 import path from "node:path";
 import {createServer as createViteServer} from "vite";
 
@@ -10,43 +11,6 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
-
-  const voicePeople: Array<{ id: string; name: string }> = [];
-  const voiceJobs: Array<Record<string, unknown>> = [];
-  const voiceAssignments: Record<string, Record<string, { person_id: string | null; name: string | null }>> = {};
-  app.get('/api/voices/people', (_req, res) => res.json(voicePeople));
-  app.post('/api/voices/people', (req, res) => {
-    const person = { id: randomBytes(16).toString('hex'), name: String(req.body.name).trim() };
-    voicePeople.push(person); res.status(201).json(person);
-  });
-  app.patch('/api/voices/people/:id', (req, res) => {
-    const person = voicePeople.find(item => item.id === req.params.id);
-    if (!person) { res.sendStatus(404); return; }
-    person.name = String(req.body.name).trim(); res.json(person);
-  });
-  app.get('/api/voices/samples', (_req, res) => res.json([]));
-  app.delete('/api/voices/samples/:id', (_req, res) => res.sendStatus(404));
-  app.get('/api/voices/samples/:id/:kind', (_req, res) => res.sendStatus(404));
-  app.get('/api/diarization/:id/media', (_req, res) => res.sendStatus(404));
-  app.get('/api/voices/jobs', (_req, res) => res.json(voiceJobs));
-  function mockVoiceJob(taskId: string, kind: string, payload: unknown) {
-    const job = { id: randomBytes(16).toString('hex'), task_id: taskId, kind, payload, result: {}, state: 'ERROR', error: 'Media processing requires the real backend.' };
-    voiceJobs.unshift(job); return job;
-  }
-  app.post('/api/voices/training', (req, res) => res.status(202).json(mockVoiceJob(String(req.body.task_id), 'TRAIN', req.body)));
-  app.post('/api/diarization/:id/identify', (req, res) => res.status(202).json(mockVoiceJob(req.params.id, 'IDENTIFY', {})));
-  app.post('/api/voices/jobs/:id/retry', (req, res) => {
-    const job = voiceJobs.find(item => item.id === req.params.id);
-    if (!job) { res.sendStatus(404); return; } res.status(202).json(job);
-  });
-  app.get('/api/diarization/:id/identities', (req, res) => res.json({ assignments: voiceAssignments[req.params.id] || {}, job: voiceJobs.find(item => item.task_id === req.params.id && item.kind === 'IDENTIFY') || null }));
-  app.put('/api/diarization/:id/identities/:speaker', (req, res) => {
-    const person = voicePeople.find(item => item.id === req.body.person_id);
-    const mapping = { person_id: person?.id || null, name: person?.name || null };
-    voiceAssignments[req.params.id] ||= {}; voiceAssignments[req.params.id][req.params.speaker] = mapping;
-    res.json(mapping);
-  });
-
 // In-memory data store for YouTube sources and content
   const youtubeSources: Array<{
     id: string;
@@ -83,9 +47,13 @@ async function startServer() {
     diarization_status?: string | null;
     diarization_progress?: number | null;
     deletion_requested?: boolean;
+      storage_location?: 'LOCAL' | 'DRIVE' | 'BOTH' | 'NONE' | null;
+      file_path?: string | null;
+      drive_url?: string | null;
   }> = [];
 
 
+    registerStorageMocks(app, () => youtubeContents);
   app.get('/status', (_req, res) => res.json({status: 'online'}));
   app.get('/ready', (_req, res) => res.json({status: 'ready', checks: {database: true, worker: true}}));
   app.get('/metrics', (_req, res) => res.json({
@@ -95,7 +63,7 @@ async function startServer() {
   }));
   const mockJobs = new Set(['youtube_monitor_channels', 'youtube_extract_and_download',
     'youtube_extract_metadata', 'youtube_download_videos', 'youtube_process_errors',
-    'youtube_promote_scheduled', 'youtube_delete_contents']);
+      'youtube_promote_scheduled', 'youtube_delete_contents', 'youtube_drive_backup']);
   app.post('/api/youtube/scheduler/jobs/:jobId/run', (req, res) => {
     if (!mockJobs.has(req.params.jobId)) return res.status(404).json({detail: 'Job not found.'});
     return res.status(202).json({message: 'Mock request queued.', job_id: req.params.jobId});
@@ -120,7 +88,7 @@ async function startServer() {
     if (!url) {
       return res.status(400).json({
         error: "Bad Request",
-        message: "O campo 'url' Ã© obrigatÃ³rio."
+          message: "O campo 'url' é obrigatório."
       });
     }
 
@@ -181,7 +149,7 @@ async function startServer() {
     if (!url) {
       return res.status(400).json({
         error: "Bad Request",
-        message: "O campo 'url' Ã© obrigatÃ³rio."
+          message: "O campo 'url' é obrigatório."
       });
     }
 
@@ -193,9 +161,9 @@ async function startServer() {
       sourceId: youtubeSources[0]?.id || "src-1",
       sourceName: isPlaylist ? "YouTube Playlist Ingestion Engine" : "YouTube Direct Ingestion",
       sourceAvatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
-      title: isPlaylist 
-        ? "Playlist ExtraÃ­da: SÃ©rie Completa e Tutoriais YouTube"
-        : "VÃ­deo Ingerido: AnÃ¡lise do ConteÃºdo e Metadados YouTube",
+      title: isPlaylist
+          ? "Playlist Extraída: Série Completa e Tutoriais YouTube"
+          : "Vídeo Ingerido: Análise do Conteúdo e Metadados YouTube",
       videoUrl: String(url),
       thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
       publishedAt: new Date().toISOString(),
@@ -206,7 +174,7 @@ async function startServer() {
       status: "ingested",
       postgresRecordId: randomPgId,
       tags: ["YouTube", isPlaylist ? "Playlist" : "Video", "API"],
-      summary: "ConteÃºdo extraÃ­do do link fornecido, processado com IA e persistido no banco PostgreSQL.",
+        summary: "Conteúdo extraído do link fornecido, processado com IA e persistido no banco PostgreSQL.",
       sentimentScore: 0.94
     };
 
@@ -230,7 +198,7 @@ async function startServer() {
     if (!url) {
       return res.status(400).json({
         error: "Bad Request",
-        message: "O campo 'url' Ã© obrigatÃ³rio."
+          message: "O campo 'url' é obrigatório."
       });
     }
 
@@ -241,7 +209,7 @@ async function startServer() {
         sourceId: youtubeSources[0]?.id || "src-1",
         sourceName: "YouTube Playlist Ingestion",
         sourceAvatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
-        title: "Playlist ExtraÃ­da - MÃ³dulo 1: Fundamentos & Arquitetura",
+          title: "Playlist Extraída - Módulo 1: Fundamentos & Arquitetura",
         videoUrl: String(url),
         thumbnail: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=600&auto=format&fit=crop&q=80",
         publishedAt: new Date().toISOString(),
@@ -252,7 +220,7 @@ async function startServer() {
         status: "ingested",
         postgresRecordId: `pg_${playlistId}_1`,
         tags: ["YouTube", "Playlist", save_in_playlist_folder ? "FolderSaved" : "DirectList"],
-        summary: "VÃ­deo 1 da playlist extraÃ­da automaticamente.",
+          summary: "Vídeo 1 da playlist extraída automaticamente.",
         sentimentScore: 0.96
       },
       {
@@ -260,7 +228,7 @@ async function startServer() {
         sourceId: youtubeSources[0]?.id || "src-1",
         sourceName: "YouTube Playlist Ingestion",
         sourceAvatar: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80",
-        title: "Playlist ExtraÃ­da - MÃ³dulo 2: Processamento e API FastAPI",
+          title: "Playlist Extraída - Módulo 2: Processamento e API FastAPI",
         videoUrl: String(url),
         thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
         publishedAt: new Date().toISOString(),
@@ -271,7 +239,7 @@ async function startServer() {
         status: "ingested",
         postgresRecordId: `pg_${playlistId}_2`,
         tags: ["YouTube", "Playlist", save_in_playlist_folder ? "FolderSaved" : "DirectList"],
-        summary: "VÃ­deo 2 da playlist extraÃ­da automaticamente.",
+          summary: "Vídeo 2 da playlist extraída automaticamente.",
         sentimentScore: 0.92
       }
     ];
@@ -286,6 +254,23 @@ async function startServer() {
     });
   });
 
+    /**
+     * GET /api/youtube/content/status-count
+     * Returns the same status totals consumed by the pipeline tracking screen.
+     */
+    app.get("/api/youtube/content/status-count", (_req, res) => {
+        const statusCounts: Record<string, number> = {};
+        for (const item of youtubeContents) {
+            statusCounts[item.status] = (statusCounts[item.status] || 0) + 1;
+        }
+        return res.json({
+            status_counts: statusCounts,
+            total_videos: youtubeContents.length,
+            total_saved_channels: youtubeSources.length,
+            total_monitored_channels: youtubeSources.length,
+        });
+    });
+
   /**
    * GET /api/youtube/content
    * Lists ingested YouTube contents.
@@ -299,6 +284,8 @@ async function startServer() {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const step = typeof req.query.step === "string" ? req.query.step : "";
+      const storageLocation = typeof req.query.storage_location === 'string' ? req.query.storage_location : '';
+      if (storageLocation) items = items.filter(item => item.storage_location === storageLocation);
     const search = (typeof req.query.search === "string" ? req.query.search : "").toLowerCase();
     if (step) items = items.filter(item => item.status === step);
     if (search) items = items.filter(item => item.title.toLowerCase().includes(search));
@@ -307,6 +294,8 @@ async function startServer() {
       id: item.id, title: item.title, url: item.videoUrl, channel_name: item.sourceName,
       step: item.status, thumbnail: item.thumbnail, duration: 0, published_at: item.publishedAt,
       tags: item.tags, is_diarized: item.is_diarized ?? false,
+        storage_location: item.storage_location ?? null, file_path: item.file_path ?? null,
+        drive_url: item.drive_url ?? null,
       diarization_status: item.diarization_status ?? null,
       deletion_requested: item.deletion_requested ?? false,
       attempt_count: 0, next_retry_at: null, error_info: null,
@@ -462,7 +451,7 @@ async function startServer() {
     return res.json({
       success: true,
       task_id: prioritized?.id || `task-diarize-${Date.now()}`,
-      message: `DiarizaÃ§Ã£o iniciada para o vÃ­deo ${id} (Idioma: ${language || 'Auto'})`
+        message: `Diarização iniciada para o vídeo ${id} (Idioma: ${language || 'Auto'})`
     });
   });
 
@@ -488,7 +477,7 @@ async function startServer() {
 
     return res.json({
       success: true,
-      message: `DiarizaÃ§Ã£o ${id} enviada para reprocessamento (Status: Pendente)`,
+        message: `Diarização ${id} enviada para reprocessamento (Status: Pendente)`,
       task_id: diar?.id || id,
       step: "PENDING"
     });
@@ -526,7 +515,7 @@ async function startServer() {
 
     return res.json({
       success: true,
-      message: `DiarizaÃ§Ã£o ${id} cancelada com sucesso`,
+        message: `Diarização ${id} cancelada com sucesso`,
       task_id: diar?.id || id,
       entity_id: diar?.entity_id || id,
       step: "CANCELLED"

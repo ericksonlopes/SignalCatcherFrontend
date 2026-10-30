@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Download, Edit3, FileText, Search, Users, X } from 'lucide-react';
-import type { DiarizationVideo } from '../DiarizationApp';
-import type { LanguageMode } from '../../../types';
-import { getTranslation } from '../../../locales';
-import { VoiceTraining } from './VoiceTraining';
-import { buildTranscript, formatTime, speakerStats } from './transcript';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {ArrowLeft, Check, ChevronDown, Download, Edit3, FileText, Search, Users, X} from 'lucide-react';
+import type {DiarizationVideo} from '../DiarizationApp';
+import type {LanguageMode} from '../../../types';
+import {getTranslation} from '../../../locales';
+import {buildTranscript, formatTime, speakerStats} from './transcript';
 
 interface DiarizationViewerProps {
   readonly video: DiarizationVideo;
@@ -19,7 +18,6 @@ const input = 'min-h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 py-
 export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, language = 'en', onClose }) => {
   const { t } = getTranslation(language);
   const segments = useMemo(() => buildTranscript(video.result_json), [video.result_json]);
-  const [selection, setSelection] = useState<{start: number; end: number; speaker: string} | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [query, setQuery] = useState('');
   const [speakerFilter, setSpeakerFilter] = useState('');
@@ -79,7 +77,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
       '',
       ...segments.map((segment) => {
         const speaker = speakers.find((item) => item.id === segment.speakerId);
-        return `[${formatTime(segment.start)} Ã¢â‚¬â€œ ${formatTime(segment.end)}] ${speaker?.name || segment.speakerId}\n${segment.text}\n`;
+          return `[${formatTime(segment.start)} – ${formatTime(segment.end)}] ${speaker?.name || segment.speakerId}\n${segment.text}\n`;
       }),
     ].join('\n');
     const url = URL.createObjectURL(new Blob(['\uFEFF', text], { type: 'text/plain;charset=utf-8' }));
@@ -251,13 +249,13 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
                       )}
                       <div className="mt-1 flex justify-between gap-2 text-xs text-zinc-400">
                         <span>{t('diarizationSpeechTime')}</span>
-                        <span className="font-mono">{formatTime(speaker.seconds)} Ã‚Â· {share}%</span>
+                          <span className="font-mono">{formatTime(speaker.seconds)} · {share}%</span>
                       </div>
                       <div className="my-2 h-1 overflow-hidden rounded-full bg-zinc-800">
                         <div className={`h-full rounded-full ${speaker.color}`} style={{ width: `${share}%` }} />
                       </div>
                       <p className="text-xs text-zinc-400">
-                        {speaker.turns} {t('diarizationTurns')} Ã‚Â· {speaker.id}
+                          {speaker.turns} {t('diarizationTurns')} · {speaker.id}
                       </p>
                     </div>
                   );
@@ -266,7 +264,6 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
             </aside>
           )}
           <div className="min-w-0 flex-1 xl:overflow-y-auto">
-            <VoiceTraining taskId={video.id} language={language === 'pt' ? 'pt' : 'en'} selection={selection} onNames={setNames} captionSegments={video.result_json?.segments} />
             <div className="mx-auto max-w-4xl p-4 lg:p-6">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
                 <output>{visible.length} / {segments.length} {t('diarizationVisibleTurns')}</output>
@@ -283,14 +280,13 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
                     const isExpanded = expanded.has(segment.id);
                     return (
                       <article key={segment.id} className="rounded-xl border border-zinc-800 bg-zinc-900/20 p-4 sm:p-5">
-                        <button className={control} onClick={() => setSelection({start: segment.start, end: segment.end, speaker: segment.speakerId})}>{t('voiceSelect')}</button>
                         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                           <span className={`h-2.5 w-2.5 rounded-full ${speaker?.color || 'bg-zinc-500'}`} />
                           <span className="break-words text-sm font-semibold text-zinc-200">
                             {speaker?.name || segment.speakerId}
                           </span>
                           <span className="font-mono text-xs tabular-nums text-zinc-400">
-                            {formatTime(segment.start)} Ã¢â‚¬â€œ {formatTime(segment.end)}
+                            {formatTime(segment.start)} – {formatTime(segment.end)}
                           </span>
                           {segment.phrases.length > 1 && (
                             <button
@@ -310,7 +306,7 @@ export const DiarizationViewer: React.FC<DiarizationViewerProps> = ({ video, lan
                               {segment.phrases.map((phrase) => (
                                 <div key={phrase.id}>
                                   <p className="mb-1 font-mono text-xs text-zinc-400">
-                                    {formatTime(phrase.start)} Ã¢â‚¬â€œ {formatTime(phrase.end)}
+                                      {formatTime(phrase.start)} – {formatTime(phrase.end)}
                                   </p>
                                   <p className="whitespace-pre-wrap break-words text-base leading-7 text-zinc-300">
                                     {phrase.text}

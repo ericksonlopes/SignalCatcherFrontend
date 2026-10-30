@@ -40,6 +40,7 @@ const jobNames: Record<string, TranslationKeys> = {
     youtube_extract_metadata: 'metadataJob', youtube_download_videos: 'downloadJob',
     youtube_process_errors: 'retryJob', youtube_promote_scheduled: 'scheduledJob',
     youtube_delete_contents: 'deletionJob',
+    youtube_drive_backup: 'storageTitle',
 };
 
 function formatDuration(seconds: number): string {

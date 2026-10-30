@@ -25,8 +25,10 @@ import {
 
 import {CapturedVideo, ContentSource, LanguageMode} from '../../types';
 import {getTranslation} from '../../locales';
-import { PipelineTrackingView } from './PipelineTrackingView';
-import { canDiarizeVideo, canDeleteVideo, isDiarizationInProgress } from './videoActions';
+import {PipelineTrackingView} from './PipelineTrackingView';
+import {StorageBadge, StorageDetails} from './StorageDetails';
+import {canDeleteVideo, canDiarizeVideo, isDiarizationInProgress} from './videoActions';
+
 export { canDiarizeVideo, canDeleteVideo, isDiarizationInProgress };
 
 export type ModalIngestionMode = 'content' | 'sources' | 'playlist';
@@ -135,6 +137,9 @@ interface SignalCatcherAppProps {
   stepFilter?: string;
   onStepFilterChange?: (step: string) => void;
   channelFilter?: string;
+    storageLocationFilter?: string;
+    onStorageLocationFilterChange?: (location: string) => void;
+    storageCounts?: Record<string, number>;
   onChannelFilterChange?: (channel: string) => void;
   searchQuery?: string;
 
@@ -355,6 +360,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ video, canDiarize, t })
       )}
 
       {/* Duration Badge */}
+        <div className="absolute top-2 right-2"><StorageBadge location={video.storageLocation} translate={t}/></div>
       <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 text-white font-mono text-xs border border-zinc-700">
         {formatDuration(video.duration)}
       </span>
@@ -918,6 +924,7 @@ function VideoDetailBody({
 
   return (
     <div className="p-5 overflow-y-auto scrollbar-none flex flex-col gap-6">
+        <StorageDetails video={video} language={language}/>
       <div className="flex flex-col sm:flex-row gap-5 items-start">
         <div className="w-full sm:w-56 shrink-0 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 relative shadow-md aspect-video">
           {video.thumbnail ? (
@@ -1350,6 +1357,9 @@ function SignalCatcherNav({
 }
 
 interface CapturesFeedViewProps {
+    readonly storageLocationFilter: string;
+    readonly onStorageLocationFilterChange?: (location: string) => void;
+    readonly storageCounts: Record<string, number>;
   readonly query: string;
   readonly onSearchChange: (val: string) => void;
   readonly stepFilter?: string;
@@ -1366,6 +1376,9 @@ interface CapturesFeedViewProps {
 }
 
 function CapturesFeedView({
+                              storageLocationFilter,
+                              onStorageLocationFilterChange,
+                              storageCounts,
   query,
   onSearchChange,
   stepFilter,
@@ -1421,6 +1434,20 @@ function CapturesFeedView({
           </select>
         )}
 
+          {onStorageLocationFilterChange && (
+              <select aria-label={t('storageAllLocations')} value={storageLocationFilter}
+                      onChange={event => onStorageLocationFilterChange(event.target.value)}
+                      className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-200 font-mono">
+                  <option
+                      value="">{t('storageAllLocations')} ({Object.values(storageCounts).reduce((sum, count) => sum + count, 0)})
+                  </option>
+                  <option value="LOCAL">{t('storageLocal')} ({storageCounts.LOCAL || 0})</option>
+                  <option value="DRIVE">{t('storageDrive')} ({storageCounts.DRIVE || 0})</option>
+                  <option value="BOTH">{t('storageBoth')} ({storageCounts.BOTH || 0})</option>
+                  <option value="NONE">{t('storageNone')} ({storageCounts.NONE || 0})</option>
+              </select>
+          )}
+
         {onChannelFilterChange && (
           <select
             value={channelFilter}
@@ -1464,6 +1491,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
   stepFilter = '',
   onStepFilterChange,
   channelFilter = '',
+                                                                      storageLocationFilter = '',
+                                                                      onStorageLocationFilterChange,
+                                                                      storageCounts = {},
   onChannelFilterChange,
   searchQuery = '',
 
@@ -1966,6 +1996,9 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       {/* SUB-TAB 1: CAPTURED VIDEOS FEED */}
       {subTab === 'captures' && (
         <CapturesFeedView
+            storageLocationFilter={storageLocationFilter}
+            onStorageLocationFilterChange={onStorageLocationFilterChange}
+            storageCounts={storageCounts}
           query={query}
           onSearchChange={handleSearchChange}
           stepFilter={stepFilter}
@@ -2026,7 +2059,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
       />
 
       <VideoDetailModal
-        video={selectedVideo}
+          video={captures.find(item => item.id === selectedVideo?.id) || selectedVideo}
         isDeleting={selectedVideo ? deletingVideoIds.has(selectedVideo.id) : false}
         language={language === 'pt' ? 'pt' : 'en'}
         dateLocale={dateLocale}

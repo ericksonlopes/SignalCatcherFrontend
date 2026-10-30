@@ -7,7 +7,7 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
     const {t} = getTranslation(localStorage.getItem('signalcatcher_language') || 'en');
     
     const response = await fetch(input, {...init, headers});
-    
-    if (response.status === 409) throw new Error(t('contentBusy'));
+
+    if (response.status === 409 && !input.includes('/storage-settings') && !input.includes('/drive-backups')) throw new Error(t('contentBusy'));
     return response;
 }

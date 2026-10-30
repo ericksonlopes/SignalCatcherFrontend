@@ -11,16 +11,9 @@ import {SignalCatcherApp} from './components/apps/SignalCatcherApp';
 import {DiarizationApp} from './components/apps/DiarizationApp';
 import {ToastContainer, ToastProvider, useToast} from './components/toast';
 
-import {
-  AppId,
-  AppTab,
-  ContentSource,
-  LanguageMode,
-  SystemLog,
-  ThemeMode
-} from './types';
+import {AppId, AppTab, ContentSource, LanguageMode, SystemLog, ThemeMode, YoutubeContentStats} from './types';
 
-import { FASTAPI_ENDPOINTS } from './data/initialData';
+import {FASTAPI_ENDPOINTS} from './data/initialData';
 
 function getThemeClasses(theme: ThemeMode): string {
   if (theme === 'oled') return 'bg-black text-zinc-100';
@@ -37,12 +30,14 @@ function SignalCatcherHub() {
 
   const [stepFilter, setStepFilter] = useState('COMPLETED');
   const [channelFilter, setChannelFilter] = useState('');
+    const [storageLocationFilter, setStorageLocationFilter] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isFetchingChannels, setIsFetchingChannels] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+    const [storageCounts, setStorageCounts] = useState<Record<string, number>>({});
   const [totalStatusCount, setTotalStatusCount] = useState<number>(0);
   const [totalSavedCount, setTotalSavedCount] = useState<number>(0);
   const [totalMonitoredCount, setTotalMonitoredCount] = useState<number>(0);
@@ -58,7 +53,7 @@ function SignalCatcherHub() {
 
   const {captures, setCaptures, isInitialLoading: isFetchingVideos, isLoadingMore,
     hasMore, error: videoLoadError, loadMore} = useInfiniteVideos(
-      stepFilter, debouncedSearchQuery, channelFilter, refreshTrigger,
+      stepFilter, debouncedSearchQuery, channelFilter, refreshTrigger, storageLocationFilter,
     );
 
   useEffect(() => {
@@ -116,8 +111,11 @@ function SignalCatcherHub() {
 
   // Fetch telemetry & status statistics
   useEffect(() => {
-    apiFetch(`${API_BASE_URL}/api/youtube/content/stats`)
-      .then(res => res.json())
+      apiFetch(`${API_BASE_URL}/api/youtube/content/status-count`)
+          .then((res): Promise<YoutubeContentStats> => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return res.json();
+          })
       .then(data => {
         if (data) {
           if (data.status_counts) setStatusCounts(data.status_counts);
@@ -127,6 +125,13 @@ function SignalCatcherHub() {
         }
       })
       .catch(err => console.error("Failed to fetch stats", err));
+      apiFetch(`${API_BASE_URL}/api/youtube/drive-backups/summary`)
+          .then(res => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return res.json();
+          })
+          .then((data: { locations: Record<string, number> }) => setStorageCounts(data.locations))
+          .catch(err => console.error('Failed to fetch storage counts', err));
   }, [refreshTrigger]);
 
   // Data Refresh Interval
@@ -329,6 +334,9 @@ function SignalCatcherHub() {
               stepFilter={stepFilter}
               onStepFilterChange={setStepFilter}
               channelFilter={channelFilter}
+              storageLocationFilter={storageLocationFilter}
+              onStorageLocationFilterChange={setStorageLocationFilter}
+              storageCounts={storageCounts}
               onChannelFilterChange={setChannelFilter}
               searchQuery={searchQuery}
               onSearchQueryChange={setSearchQuery}
