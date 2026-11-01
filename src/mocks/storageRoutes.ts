@@ -14,15 +14,10 @@ export function registerStorageMocks(app: Express, contents: () => MockVideo[]) 
         catalog_error: null, catalog_updated_at: null,
     };
     app.get('/api/youtube/storage-settings', (_req, res) => res.json(settings));
-    app.get('/api/youtube/drive-oauth/status', (_req, res) => res.json({
-        configured: false,
-        authorized: false, reason: 'client_setup_required', connect_url: null,
-        redirect_uri: 'http://127.0.0.1:8000/api/youtube/drive-oauth/callback'
-    }));
     app.patch('/api/youtube/storage-settings', (req, res) => {
         const body = req.body as Partial<StorageSettings>;
         if (body.mode && !['LOCAL', 'DRIVE', 'BOTH'].includes(body.mode)) return res.status(422).json({detail: 'Invalid storage mode.'});
-        if (body.mode === 'DRIVE') return res.status(409).json({detail: 'Authorize Google Drive before selecting Drive-only mode.'});
+        if (body.mode === 'DRIVE') return res.status(409).json({detail: 'Check the server credential and destination folder before selecting Drive-only mode.'});
         if ('max_upload_mib_per_second' in body) {
             const speed = body.max_upload_mib_per_second;
             if (speed !== null && (typeof speed !== 'number' || !Number.isFinite(speed) || speed < 0.1 || speed > 10000)) return res.status(422).json({detail: 'Invalid upload limit.'});

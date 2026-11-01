@@ -2,7 +2,7 @@ import React, {useDeferredValue, useEffect, useState} from 'react';
 import {Cloud, History, Loader2, Pause, Play, RefreshCw} from 'lucide-react';
 import {getTranslation} from '../../locales';
 import {TranslationKeys} from '../../locales/pt';
-import {DriveOAuthStatus, LanguageMode, StorageMode, StoragePage, StorageSummary, StorageTransfer} from '../../types';
+import {LanguageMode, StorageMode, StoragePage, StorageSummary, StorageTransfer} from '../../types';
 import {storageRequest} from '../../storageApi';
 import {locationKeys, StorageBadge, StorageHistory} from './StorageDetails';
 
@@ -23,7 +23,6 @@ export function formatStorageBytes(bytes?: number | null): string {
 export function StoragePanel({language}: Readonly<{ language: LanguageMode }>) {
     const {t} = getTranslation(language);
     const [summary, setSummary] = useState<StorageSummary | null>(null);
-    const [oauth, setOAuth] = useState<DriveOAuthStatus | null>(null);
     const [data, setData] = useState<StoragePage<StorageTransfer> | null>(null);
     const [mode, setMode] = useState<StorageMode>('BOTH');
     const [limit, setLimit] = useState('');
@@ -53,17 +52,15 @@ export function StoragePanel({language}: Readonly<{ language: LanguageMode }>) {
                 const params = new URLSearchParams({page: String(page), limit: '25', search: deferredSearch});
                 if (status) params.set('status', status);
                 if (location) params.set('location', location);
-                const [nextSummary, nextData, nextOAuth] = await Promise.all([
+                const [nextSummary, nextData] = await Promise.all([
                     storageRequest<StorageSummary>('drive-backups/summary', {signal: controller.signal}),
                     storageRequest<StoragePage<StorageTransfer>>(`drive-backups?${params}`, {signal: controller.signal}),
-                    storageRequest<DriveOAuthStatus>('drive-oauth/status', {signal: controller.signal}),
                 ]);
                 if (controller.signal.aborted) return;
                 setSummary(nextSummary);
                 setData(nextData);
                 setUpdated(new Date());
                 setError('');
-                setOAuth(nextOAuth);
                 if (!initialized) {
                     setMode(nextSummary.mode);
                     setLimit(nextSummary.max_upload_mib_per_second == null ? '' : String(nextSummary.max_upload_mib_per_second));
@@ -130,24 +127,8 @@ export function StoragePanel({language}: Readonly<{ language: LanguageMode }>) {
         {summary && <>
             <div
                 className={`rounded-xl border p-3 text-xs ${summary.drive_ready ? 'border-sky-500/25 bg-sky-500/5 text-sky-200' : 'border-amber-500/25 bg-amber-500/5 text-amber-200'}`}>
-                <p className="font-medium">{t(summary.drive_ready ? 'storageReady' : 'storageAuthPending')}{summary.drive_info.account && ` · ${summary.drive_info.account}`}</p>
+                <p className="font-medium">{t(summary.drive_ready ? 'storageReady' : 'storageUnavailable')}{summary.drive_info.account && ` · ${summary.drive_info.account}`}</p>
                 {!summary.drive_ready && <p className="mt-1 text-zinc-400">{t('storageSetupHelp')}</p>}
-                {oauth?.configured && oauth.connect_url && <div className="mt-3 space-y-2">
-                    <a href={oauth.connect_url} target="_blank" rel="noopener noreferrer"
-                       className={`${buttonClass} border-sky-500/40 bg-sky-500/10 text-sky-200`}>
-                        <Cloud className="size-4"/>{t(summary.drive_ready ? 'storageReconnect' : 'storageConnect')}
-                    </a>
-                    <p className="text-xs text-zinc-400">{t('storageOAuthConsent')}</p>
-                </div>}
-                {oauth && !oauth.configured && <details className="mt-3 text-zinc-400">
-                    <summary className="cursor-pointer text-amber-200">{t('storageOAuthSetup')}</summary>
-                    <p className="mt-2 leading-relaxed">{t('storageOAuthInstructions')}</p>
-                    <p className="mt-3">{t('storageOAuthRedirect')}</p>
-                    <code className="block mt-1 select-all break-all text-zinc-200">{oauth.redirect_uri}</code>
-                    <a href="https://console.cloud.google.com/apis/credentials?project=signalcatcher-505023"
-                       target="_blank" rel="noopener noreferrer"
-                       className="inline-block mt-3 underline text-sky-300">{t('storageOAuthConsole')}</a>
-                </details>}
                 {summary.last_error && <p className="mt-2 whitespace-pre-wrap break-words">{summary.last_error}</p>}
                 {summary.drive_info.folder_url &&
                     <a className="inline-block mt-2 underline" href={summary.drive_info.folder_url} target="_blank"

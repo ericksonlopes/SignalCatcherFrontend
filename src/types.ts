@@ -23,20 +23,13 @@ export interface StorageSettings {
     drive_ready: boolean;
     drive_info: {
         folder_id?: string; folder_name?: string; folder_url?: string; account?: string;
-        limit_bytes?: number | null; used_bytes?: number; free_bytes?: number | null
+        shared_drive_id?: string;
+        limit_bytes?: number | null; used_bytes?: number | null; free_bytes?: number | null
     };
     last_error: string | null;
     checked_at: string | null;
     catalog_error: string | null;
     catalog_updated_at: string | null;
-}
-
-export interface DriveOAuthStatus {
-    configured: boolean;
-    authorized: boolean;
-    reason: string | null;
-    redirect_uri: string;
-    connect_url: string | null;
 }
 
 export interface StorageSummary extends StorageSettings {
