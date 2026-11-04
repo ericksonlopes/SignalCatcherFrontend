@@ -9,7 +9,7 @@ function isAppId(value: unknown): value is AppId {
         value === 'diarization'
     );
 }
-export type CaptureSection = 'captures' | 'saved_channels' | 'sources' | 'tracking';
+export type CaptureSection = 'captures' | 'saved_channels' | 'sources' | 'tracking' | 'storage';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
@@ -50,7 +50,7 @@ export function saveWorkspace(tabs: AppTab[], activeTabId: string): void {
 export function readCaptureSection(): CaptureSection {
     try {
         const value = sessionStorage.getItem(SECTION_KEY);
-        if (value === 'saved_channels' || value === 'sources' || value === 'tracking') return value;
+        if (value === 'saved_channels' || value === 'sources' || value === 'tracking' || value === 'storage') return value;
     } catch {
         // Fall back to the initial section when storage is unavailable.
     }

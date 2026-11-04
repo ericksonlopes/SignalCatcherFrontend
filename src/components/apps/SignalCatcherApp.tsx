@@ -6,6 +6,7 @@ import {API_BASE_URL, apiFetch} from '../../api';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   Activity,
+  Cloud,
   ExternalLink,
   ListMusic,
   ListVideo,
@@ -26,6 +27,7 @@ import {
 import {CapturedVideo, ContentSource, LanguageMode} from '../../types';
 import {getTranslation} from '../../locales';
 import {PipelineTrackingView} from './PipelineTrackingView';
+import {StoragePanel} from './StoragePanel';
 import {StorageBadge, StorageDetails} from './StorageDetails';
 import {canDeleteVideo, canDiarizeVideo, isDiarizationInProgress} from './videoActions';
 
@@ -1330,6 +1332,17 @@ function SignalCatcherNav({
           <Activity className="w-3.5 h-3.5 text-fuchsia-400" />
           <span>{t('tabTracking' as any) || 'Tracking'}</span>
         </button>
+        <button
+          onClick={() => onSelectSubTab('storage')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+            subTab === 'storage'
+              ? 'bg-zinc-800 border-zinc-700 text-zinc-100 font-bold shadow-sm'
+              : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Cloud className="w-3.5 h-3.5 text-sky-400" />
+          <span>{t('storageTitle')}</span>
+        </button>
       </div>
 
       <div className="flex items-center gap-2">
@@ -1974,7 +1987,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         sourcesCount={sources.length}
         isRetryingGlobal={isRetryingGlobal}
         onGlobalRetry={() => {
-          handleGlobalRetry();
+          void handleGlobalRetry();
         }}
         onNewIngestion={() => {
           setModalMode('content');
@@ -1991,6 +2004,10 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
           onAddLog={onAddLog}
           t={t}
         />
+      )}
+
+      {subTab === 'storage' && (
+        <StoragePanel language={language === 'pt' ? 'pt' : 'en'} />
       )}
 
       {/* SUB-TAB 1: CAPTURED VIDEOS FEED */}
@@ -2047,13 +2064,13 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         onSaveInPlaylistFolderChange={setSaveInPlaylistFolder}
         isProcessing={isProcessingManual}
         onSubmitContent={(e) => {
-          handleIngestContent(e);
+          void handleIngestContent(e);
         }}
         onSubmitPlaylist={(e) => {
-          handleIngestPlaylist(e);
+          void handleIngestPlaylist(e);
         }}
         onSubmitSource={(e) => {
-          handleRegisterSource(e);
+          void handleRegisterSource(e);
         }}
         t={t}
       />
@@ -2077,7 +2094,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         isDeleting={videoToDelete ? deletingVideoIds.has(videoToDelete.id) : false}
         onClose={() => setVideoToDelete(null)}
         onConfirm={(e, vid) => {
-          handleIndividualDelete(e, vid);
+          void handleIndividualDelete(e, vid);
         }}
         t={t}
       />
@@ -2091,7 +2108,7 @@ export const SignalCatcherApp: React.FC<SignalCatcherAppProps> = ({
         isDiarizing={isDiarizing}
         onClose={() => setDiarizationModalVideo(null)}
         onConfirm={() => {
-          confirmDiarization();
+          void confirmDiarization();
         }}
         t={t}
       />

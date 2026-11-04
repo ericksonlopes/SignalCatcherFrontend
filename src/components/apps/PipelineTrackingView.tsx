@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import {LanguageMode} from '../../types';
 import {TrackingTelemetry} from './TrackingTelemetry';
-import {StoragePanel} from './StoragePanel';
 
 interface PipelineStepDef {
   id: string;
@@ -161,7 +160,6 @@ export const PipelineTrackingView: React.FC<PipelineTrackingViewProps> = ({
         </div>
       </div>
       <TrackingTelemetry language={language === 'pt' ? 'pt' : 'en'} onAddLog={onAddLog} />
-        <StoragePanel language={language === 'pt' ? 'pt' : 'en'}/>
     </div>
   );
 };
