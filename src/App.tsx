@@ -92,7 +92,7 @@ function SignalCatcherHub() {
         if (data && Array.isArray(data)) {
           const fetchedChannels: ContentSource[] = data.map((item: any) => ({
             id: item.id.toString(),
-            name: item.name || 'Unknown Channel',
+            name: item.title || item.name || item.external_id || item.id.toString(),
             url: item.url,
             channelId: item.external_id || item.id,
             channelUrl: item.url,
