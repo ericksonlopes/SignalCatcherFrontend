@@ -23,7 +23,7 @@ export interface StorageSettings {
     drive_ready: boolean;
     drive_info: {
         folder_id?: string; folder_name?: string; folder_url?: string; account?: string;
-        shared_drive_id?: string;
+        shared_drive_id?: string | null;
         limit_bytes?: number | null; used_bytes?: number | null; free_bytes?: number | null
     };
     last_error: string | null;

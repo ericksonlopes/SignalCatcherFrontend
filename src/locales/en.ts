@@ -19,7 +19,7 @@ export const en: Record<TranslationKeys, string> = {
     storagePaused: "Uploads paused",
     storageReady: "Drive available",
     storageUnavailable: "Google Drive unavailable",
-    storageSetupHelp: "Check the service account's access to the destination folder and the details below. Local files will be preserved.",
+    storageSetupHelp: "Check the server credential, access to the destination folder and the details below. Local files will be preserved.",
     storageFree: "Available in Drive",
     storageUsed: "Storage used",
     storageQueuedBytes: "Queued volume",

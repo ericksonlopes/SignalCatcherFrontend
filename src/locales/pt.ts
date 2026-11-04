@@ -18,7 +18,7 @@ export const pt = {
     storagePaused: "Uploads pausados",
     storageReady: "Drive disponível",
     storageUnavailable: "Google Drive indisponível",
-    storageSetupHelp: "Confira o acesso da conta de serviço à pasta de destino e os detalhes abaixo. Os arquivos locais serão preservados.",
+    storageSetupHelp: "Confira a credencial configurada no servidor, o acesso à pasta de destino e os detalhes abaixo. Os arquivos locais serão preservados.",
     storageFree: "Disponível no Drive",
     storageUsed: "Espaço utilizado",
     storageQueuedBytes: "Volume na fila",
