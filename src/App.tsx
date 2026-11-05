@@ -2,6 +2,7 @@ import {useInfiniteVideos} from './hooks/useInfiniteVideos';
 import {readWorkspace, saveWorkspace} from './navigationStorage';
 import {API_BASE_URL, apiFetch} from './api';
 import {createLogId} from './logId';
+import {channelIdentity} from './channelOptions';
 import React, {useEffect, useRef, useState} from 'react';
 import {Mic, Radio} from 'lucide-react';
 import {Header} from './components/Header';
@@ -66,7 +67,7 @@ function SignalCatcherHub() {
         if (data && Array.isArray(data)) {
           const fetchedSources: ContentSource[] = data.map((item: any) => ({
             id: item.id.toString(),
-            name: item.name || 'Unknown Channel',
+            name: item.name || channelIdentity(item.url) || item.id.toString(),
             url: item.url,
             channelId: item.url,
             avatar: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
@@ -95,13 +96,13 @@ function SignalCatcherHub() {
             name: item.title || item.name || item.external_id || item.id.toString(),
             url: item.url,
             channelId: item.external_id || item.id,
-            channelUrl: item.url,
+            channelUrl: item.channel_url || item.url,
             avatar: item.avatar_url || 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80',
             subscriberCount: item.subscriber_count || 0,
             lastCaptured: item.created_at || new Date().toISOString(),
             status: 'active',
             intervalMinutes: 60,
-            totalCaptured: item.total_captured || 0
+            totalCaptured: item.video_count ?? item.total_captured ?? 0
           }));
           setSavedChannels(fetchedChannels);
         }
