@@ -7,6 +7,7 @@ import type { TranslationKeys } from '../../locales/pt';
 import { DiarizationViewer } from './diarization/DiarizationViewer';
 import { formatTime, type TranscriptResult } from './diarization/transcript';
 import { useInfiniteDiarizations } from '../../hooks/useInfiniteDiarizations';
+import { DiarizationError } from './diarization/DiarizationError';
 
 export interface DiarizationVideo {
   id: string;
@@ -15,6 +16,7 @@ export interface DiarizationVideo {
   channelName: string;
   duration: string;
   step: string;
+  error_message?: string | null;
   progress_percent?: number | null;
   queue_priority?: number;
   entity_id?: string;
@@ -212,6 +214,9 @@ function DiarizationCard({
           </div>
         )}
       </div>
+      {video.step.toUpperCase() === 'ERROR' && (
+        <DiarizationError message={video.error_message} t={t} />
+      )}
     </article>
   );
 }
@@ -319,7 +324,7 @@ export const DiarizationApp: React.FC<DiarizationAppProps> = ({ language = 'en',
         const error = await response.json().catch(() => ({}));
         throw new Error(error.detail || 'HTTP ' + response.status);
       }
-      setVideos(previous => previous.map(item => item.id === video.id ? { ...item, step: 'PENDING', progress_percent: null } : item));
+      setVideos(previous => previous.map(item => item.id === video.id ? { ...item, step: 'PENDING', progress_percent: null, error_message: null } : item));
       setNotice(t('notifReprocessDiarizationSuccess'));
       onAddLog('Diarization', 'success', t('notifReprocessDiarizationSuccess') + ' (' + video.title + ')');
       setRefresh(value => value + 1);

@@ -331,6 +331,8 @@ export const pt = {
   stepDiarization: "Separando Vozes",
   stepDiarized: "Diarizado",
   diarizationStageProgress: "Progresso da etapa",
+  diarizationErrorDetails: "Detalhes do erro de processamento",
+  diarizationErrorUnavailable: "Nenhum detalhe do erro foi registrado para esta tentativa.",
   diarizationProgressWaiting: "Aguardando atualização do progresso",
   diarizationStartNow: "Iniciar agora",
   diarizationStartNowHint: "Interrompe o vídeo atual e o devolve ao fim da fila. Quando chegar a vez dele, o processamento recomeçará do início.",

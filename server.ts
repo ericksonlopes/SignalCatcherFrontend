@@ -310,6 +310,7 @@ async function startServer() {
   const mockDiarizations: Array<{
     id: string;
     step: string;
+    error_message?: string | null;
     progress_percent?: number | null;
     queue_priority?: number;
     created_at: string;
@@ -343,7 +344,7 @@ async function startServer() {
     for (const item of youtubeContents) {
       if (active.has(item.diarization_status || '')) item.diarization_status = 'PENDING';
     }
-    task.step = 'PENDING'; task.queue_priority = 1; task.progress_percent = null; task.result_json = null;
+    task.step = 'PENDING'; task.queue_priority = 1; task.progress_percent = null; task.result_json = null; task.error_message = null;
     if (video) { video.diarization_status = 'PENDING'; video.is_diarized = false; }
     return task;
   }
@@ -368,6 +369,7 @@ async function startServer() {
         items.unshift({
           id: `diar-${v.id}`,
           step: v.diarization_status,
+          error_message: null,
           progress_percent: null,
           created_at: new Date().toISOString(),
           entity_id: v.postgresRecordId || v.id,
@@ -467,6 +469,7 @@ async function startServer() {
       diar.step = "PENDING";
       diar.progress_percent = null;
       diar.result_json = null;
+      diar.error_message = null;
     }
 
     const video = youtubeContents.find(v => v.id === id || v.postgresRecordId === id || `diar-${v.id}` === id);

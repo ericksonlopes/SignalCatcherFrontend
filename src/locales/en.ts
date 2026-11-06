@@ -332,6 +332,8 @@ export const en: Record<TranslationKeys, string> = {
   stepDiarization: "Diarizing",
   stepDiarized: "Diarized",
   diarizationStageProgress: "Stage progress",
+  diarizationErrorDetails: "Processing error details",
+  diarizationErrorUnavailable: "No error details were recorded for this attempt.",
   diarizationProgressWaiting: "Waiting for progress update",
   diarizationStartNow: "Start now",
   diarizationStartNowHint: "Stops the current video and returns it to the end of the queue. Its processing will restart from the beginning when its turn comes.",

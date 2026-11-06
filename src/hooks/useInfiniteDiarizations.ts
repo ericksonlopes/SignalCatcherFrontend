@@ -19,7 +19,7 @@ interface RequestContext {
 const PAGE_SIZE = 20;
 const ACTIVE_POLL_STEPS = new Set(['ALL', 'PROCESSING', 'TRANSCRIPTION', 'ALIGNMENT', 'DIARIZATION']);
 
-const fingerprint = (page: DiarizationPage) => JSON.stringify([page.total, page.items.map(item => [item.id, item.step, item.progress_percent, item.queue_priority])]);
+const fingerprint = (page: DiarizationPage) => JSON.stringify([page.total, page.items.map(item => [item.id, item.step, item.progress_percent, item.queue_priority, item.error_message])]);
 
 function mergeDiarizations(previous: DiarizationVideo[], incoming: DiarizationVideo[]) {
   return Array.from(new Map([...previous, ...incoming].map(item => [item.id, item])).values());
